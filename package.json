@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "vite build",
-    "package:win": "npm run build && electron-builder --win",
+    "package:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
     "start": "electron .",
     "check": "node --check electron/main.js && node --check electron/preload.cjs && node --check electron/ipcHandlers.js && node --check electron/riot/lockfile.js && node --check electron/riot/auth.js && node --check electron/riot/store.js && node --check electron/riot/contentCache.js && node --check electron/accounts/accountStore.js && node --check electron/accounts/accountService.js && node --check electron/accounts/riotClient.js && node --check electron/accounts/tcnoImport.js && node --check electron/accounts/switcher.js"
   },
