@@ -2,6 +2,26 @@
 
 A Windows Electron desktop app for viewing the daily Valorant store across saved Riot Client accounts. It can show the current store, Riot ID, account level, competitive rank, RR, and the time remaining before the store refreshes.
 
+## Features
+
+- View all four daily store offers, including skin names, images, and VP prices.
+- Save multiple Riot Client account sessions locally and switch between them.
+- View Riot ID, account level, competitive rank, RR, and placement progress.
+- Refresh one account's market or refresh all saved accounts.
+- Open a focused market page for an individual account.
+- Hide skin previews when you only need account details.
+- Save the current Riot Client login or open Riot Client and save a newly signed-in account automatically.
+- Import detected account snapshots from TCNO Account Switcher.
+
+## For end users
+
+Use one of the Windows executables created by `npm run package:win`; no terminal is required after packaging.
+
+- Run `Valorant Account Manager Setup <version>.exe` to install the app and optionally create desktop and Start Menu shortcuts.
+- Run `Valorant Account Manager <version>.exe` for a portable version that does not need installation.
+
+The application uses a custom window without the default File/Edit/View/Window menu bar.
+
 ## Requirements
 
 - Windows 10 or later
