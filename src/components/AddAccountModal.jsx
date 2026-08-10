@@ -26,7 +26,7 @@ export default function AddAccountModal({ tcno, onCapture, onManualAdd, onImport
         <input id="account-label" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="e.g. Main account" maxLength="64" autoFocus disabled={saving} required />
         <p>This securely snapshots the Riot Client session currently signed in on this PC.</p>
         <div className="add-account-actions"><button type="submit" disabled={saving}>{savingMode === 'current' ? 'Saving…' : 'Save current account'}</button><button type="button" className="secondary-button" onClick={addManually} disabled={saving}>{savingMode === 'manual' ? 'Waiting for sign-in…' : 'Add manually'}</button></div>
-        <p className="manual-add-help">Opens Riot Client. Sign out of any current account and sign in to the one you want; it will save automatically.</p>
+        <p className="manual-add-help">Closes Riot Client and Valorant, then opens the Riot sign-in screen. Sign in to the account you want; it will save automatically.</p>
       </form>
       {tcno.available && tcno.accounts.length > 0 && <section className="tcno-import">
         <h3>Import from TCNO Account Switcher</h3>

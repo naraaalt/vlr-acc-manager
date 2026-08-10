@@ -2,7 +2,6 @@ import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, 
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
 import { fetchAccountProfile, fetchStorefront, getDailyOffers } from '../riot/store.js';
 import { resolveDailyOffers } from '../riot/contentCache.js';
-import { launchRiotClient } from './riotClient.js';
 
 function expiry(accessToken) {
   try { return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8')).exp * 1000; } catch { return 0; }
@@ -58,10 +57,9 @@ export async function waitForCurrentAccount(timeoutMs = 60_000, differentFromPuu
 }
 
 export async function addManualAccount(label) {
-  let previousPuuid = null;
-  try { previousPuuid = (await getSessionTokens()).puuid; } catch { /* Riot Client may be closed or at sign-in. */ }
-  await launchRiotClient();
-  const session = await waitForCurrentAccount(300_000, previousPuuid);
+  const { openRiotSignIn } = await import('./switcher.js');
+  await openRiotSignIn();
+  const session = await waitForCurrentAccount(300_000);
   return persistCurrentAccount(label, session);
 }
 

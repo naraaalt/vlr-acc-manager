@@ -1,6 +1,6 @@
 {
   "name": "valorant-account-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "author": "naraaalt",
   "description": "A local, read-only Valorant store viewer for the active Riot Client session.",

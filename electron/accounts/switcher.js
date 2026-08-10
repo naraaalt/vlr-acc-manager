@@ -36,12 +36,33 @@ async function writeBundle(credentials) {
     await fs.writeFile(target, Buffer.from(file.content, 'base64'));
   }
 }
-async function backupLiveCredentials() {
+async function backupLiveCredentials(prefix = 'before-switch') {
   const backup = await captureLiveCredentials();
   await fs.mkdir(backupDirectory(), { recursive: true });
   if (!safeStorage.isEncryptionAvailable()) throw new Error('OS encryption is unavailable, so switching is disabled.');
-  await fs.writeFile(path.join(backupDirectory(), `before-switch-${Date.now()}.vam`), safeStorage.encryptString(JSON.stringify(backup)));
+  await fs.writeFile(path.join(backupDirectory(), `${prefix}-${Date.now()}.vam`), safeStorage.encryptString(JSON.stringify(backup)));
 }
+async function clearLiveSession() {
+  await writeBundle({ version: 1, files: [] });
+  const marker = path.join(riotRoot, 'VamAccountId.instance');
+  assertWithinRiotRoot(marker);
+  await fs.rm(marker, { force: true });
+}
+
+export async function openRiotSignIn() {
+  if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before adding an account manually.');
+  switchInProgress = true;
+  try {
+    try { await backupLiveCredentials('before-manual-sign-in'); }
+    catch (error) { if (!/session data is missing/i.test(error.message)) throw error; }
+    await closeRiotProcesses();
+    await clearLiveSession();
+    await launchRiotClient();
+  } finally {
+    switchInProgress = false;
+  }
+}
+
 export async function switchToAccount(label) {
   if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before switching again.');
   switchInProgress = true;

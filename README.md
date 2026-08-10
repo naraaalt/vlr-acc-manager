@@ -102,7 +102,7 @@ npm run build
 3. Enter a label for the saved account.
 4. Choose one of the following:
    - **Save current account** saves the session that is already active in Riot Client.
-   - **Add manually** opens Riot Client and waits for you to sign in to a different account, then saves it automatically.
+   - **Add manually** closes Riot Client and Valorant, opens the Riot sign-in screen, and saves the account automatically after you sign in. The current local session is securely backed up first.
 
 You can also import account snapshots detected from TCNO Account Switcher.
 
