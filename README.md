@@ -46,6 +46,21 @@ Then launch Electron:
 npm start
 ```
 
+## Create Windows executables
+
+Create a distributable installer and portable executable:
+
+```powershell
+npm run package:win
+```
+
+The generated files are placed in the `release` folder:
+
+- `Valorant Account Manager Setup <version>.exe` is the installer. It can create Start Menu and desktop shortcuts, so users do not need to open a terminal.
+- `Valorant Account Manager <version>.exe` is the portable executable that can be run without installation.
+
+Windows may show a SmartScreen warning for an unsigned personal application. This is expected until the executable is code-signed.
+
 ## Verify the project
 
 Run the JavaScript syntax checks:
@@ -103,5 +118,6 @@ This app is intended for your own Riot accounts on your own Windows computer.
 | --- | --- |
 | `npm run dev` | Run Vite and Electron for development. |
 | `npm run build` | Build the React renderer into `dist`. |
+| `npm run package:win` | Build Windows installer and portable `.exe` files in `release`. |
 | `npm start` | Open Electron using the built renderer. |
 | `npm run check` | Check Electron JavaScript files for syntax errors. |
