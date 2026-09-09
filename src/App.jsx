@@ -6,6 +6,7 @@ import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { fmtCountdown } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
+import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
 
@@ -160,19 +161,32 @@ export default function App() {
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
   }, [busy, selectedAccount, switchTo, showToast, flash, confirm]);
 
+  // Rate limiting: Riot dislikes bursts. Manual refreshes are gated to one
+  // per account per 30s (refresh-all marks every account + its own timer).
   const doRefresh = useCallback((label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
+    if (isRateLimited(target)) {
+      flash('R');
+      showToast(`RATE LIMITED — ${target.toUpperCase()} RETRY IN ${cooldownSeconds(target)}s`, 'warn');
+      return;
+    }
     flash('R');
     setBusyLabel(target);
     refreshAccount(target)
-      .then(() => showToast(`${target.toUpperCase()} STORE SYNCED`, 'ok'))
+      .then(() => { markRefreshed(target); showToast(`${target.toUpperCase()} STORE SYNCED`, 'ok'); })
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'))
       .finally(() => setBusyLabel(null));
   }, [busy, selectedAccount, refreshAccount, showToast, flash]);
 
   const doRefreshAll = useCallback(() => {
+    if (isRefreshAllRateLimited()) {
+      flash('CTRL+R');
+      showToast(`RATE LIMITED — RETRY IN ${refreshAllCooldownSeconds()}s`, 'warn');
+      return;
+    }
     flash('CTRL+R');
+    markRefreshAll();
     refresh()
       .then(() => showToast(`${accounts.length} ACCOUNTS SYNCED`, 'ok'))
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
