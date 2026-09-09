@@ -46,7 +46,6 @@ export function registerIpcHandlers() {
   });
   ipcMain.handle('accounts:capture-current', (_, label) => result(() => captureCurrentAccount(label)));
   ipcMain.handle('accounts:add-manually', (_, label) => result(() => addManualAccount(label)));
-  ipcMain.handle('accounts:sync-current', (_, label) => result(() => captureCurrentAccount(label)));
   ipcMain.handle('accounts:refresh-market', (_, label) => result(() => refreshAccountStore(label)));
   ipcMain.handle('accounts:delete', (_, label) => result(async () => { await deleteAccount(label); return null; }));
   ipcMain.handle('accounts:rename', (_, oldLabel, newLabel) => result(async () => { await renameAccount(oldLabel, newLabel); return null; }));

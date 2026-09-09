@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "com.naraaalt.valorantaccountmanager",
-    "productName": "Valorant Account Manager",
+    "productName": "Sapphire",
     "directories": {
       "output": "release",
       "buildResources": "build"

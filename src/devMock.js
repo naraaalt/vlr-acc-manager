@@ -107,14 +107,6 @@ export function installDevMock() {
       accounts = [...accounts, makeAccount(label)];
       return respond();
     },
-    syncCurrentAccount: async (label) => {
-      const account = findAccount(label);
-      if (!account) return fail(`No saved account “${label}”.`);
-      accounts = accounts.map((entry) => entry.label === label
-        ? { ...entry, status: 'ready', error: null, store: freshStore(entry.accountName) }
-        : entry);
-      return respond();
-    },
     refreshAccountMarket: async (label) => {
       const account = findAccount(label);
       if (!account || account.status === 'error') return fail(`No store available for “${label}”.`);

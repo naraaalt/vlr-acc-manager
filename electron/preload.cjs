@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld('valorant', {
   },
   captureCurrentAccount: (label) => ipcRenderer.invoke('accounts:capture-current', label),
   addManualAccount: (label) => ipcRenderer.invoke('accounts:add-manually', label),
-  syncCurrentAccount: (label) => ipcRenderer.invoke('accounts:sync-current', label),
   refreshAccountMarket: (label) => ipcRenderer.invoke('accounts:refresh-market', label),
   renameAccount: (oldLabel, newLabel) => ipcRenderer.invoke('accounts:rename', oldLabel, newLabel),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),

@@ -7,6 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 let mainWindow = null;
 
+// userData pin: the app was rebranded from "Valorant Account Manager" to
+// "Sapphire", and Electron derives %APPDATA%\<name> from productName. Pinning
+// keeps every saved account/session in the original folder across the rename.
+// This MUST run before app.whenReady() and any app.getPath('userData') use.
+const LEGACY_USER_DATA_NAME = 'valorant-account-manager';
+app.setPath('userData', path.join(app.getPath('appData'), LEGACY_USER_DATA_NAME));
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1280,

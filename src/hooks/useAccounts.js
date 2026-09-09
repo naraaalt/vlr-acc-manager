@@ -85,11 +85,6 @@ export function useAccounts() {
       await refresh();
     } finally { setSwitchingLabel(null); }
   }, [refresh]);
-  const syncCurrent = useCallback(async (label) => {
-    const response = await window.valorant.syncCurrentAccount(label);
-    if (!response.ok) throw new Error(response.error);
-    await refresh();
-  }, [refresh]);
   const refreshAccount = useCallback(async (label) => {
     const response = await window.valorant.refreshAccountMarket(label);
     if (!response.ok) throw new Error(response.error);
@@ -105,5 +100,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
+  return { accounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno };
 }
