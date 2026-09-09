@@ -36,7 +36,14 @@ export function registerIpcHandlers() {
       return { ok: false, error: error.message || 'Unable to retrieve the current store.' };
     }
   });
-  ipcMain.handle('accounts:dashboard', () => result(getDashboard));
+  ipcMain.handle('accounts:dashboard', (event) => {
+    const sender = event.sender;
+    // Progressive load: forward each account as it resolves so the renderer
+    // paints it immediately. The promise still resolves with the full set.
+    return result(() => getDashboard((progress) => {
+      if (!sender.isDestroyed()) sender.send('accounts:dashboard-progress', progress);
+    }));
+  });
   ipcMain.handle('accounts:capture-current', (_, label) => result(() => captureCurrentAccount(label)));
   ipcMain.handle('accounts:add-manually', (_, label) => result(() => addManualAccount(label)));
   ipcMain.handle('accounts:sync-current', (_, label) => result(() => captureCurrentAccount(label)));

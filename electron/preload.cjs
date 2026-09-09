@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('valorant', {
   getCurrentStore: () => ipcRenderer.invoke('store:current'),
   getDashboard: () => ipcRenderer.invoke('accounts:dashboard'),
+  onDashboardProgress: (callback) => {
+    ipcRenderer.on('accounts:dashboard-progress', (_event, progress) => callback(progress));
+  },
   captureCurrentAccount: (label) => ipcRenderer.invoke('accounts:capture-current', label),
   addManualAccount: (label) => ipcRenderer.invoke('accounts:add-manually', label),
   syncCurrentAccount: (label) => ipcRenderer.invoke('accounts:sync-current', label),

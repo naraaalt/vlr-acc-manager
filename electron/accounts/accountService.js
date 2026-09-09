@@ -89,7 +89,7 @@ export async function refreshAccountStore(label) {
   return { store: await getSavedAccountStore(label), active: false };
 }
 
-export async function getDashboard() {
+export async function getDashboard(onProgress = null) {
   const accounts = await listAccounts();
   const activeId = await getActiveAccountId();
   let livePuuid = null;
@@ -102,7 +102,12 @@ export async function getDashboard() {
   }));
   const owners = new Map();
   const kindOf = (error) => (error?.kind ?? classifyError(error?.message));
-  return Promise.all(hydrated.map(async ({ account, storedPuuid, loadError }) => {
+
+  // Fetch stores one account at a time. Riot rate-limits bursts; N accounts ×
+  // 2 requests in parallel is exactly the pattern that earns 429s. Each
+  // resolved account is handed to onProgress so the renderer paints it
+  // immediately instead of waiting for the whole batch.
+  const loadOne = async ({ account, storedPuuid, loadError }) => {
     const active = account.id === activeId && storedPuuid === livePuuid;
     if (loadError) return { ...account, active, status: 'error', error: loadError.message, errorKind: kindOf(loadError) };
     if (storedPuuid && owners.has(storedPuuid)) {
@@ -111,5 +116,29 @@ export async function getDashboard() {
     if (storedPuuid) owners.set(storedPuuid, account.label);
     try { return { ...account, active, status: 'ready', store: await getSavedAccountStore(account.label) }; }
     catch (error) { return { ...account, active, status: 'error', error: error.message, errorKind: kindOf(error) }; }
-  }));
+  };
+
+  if (hydrated.length <= 1) {
+    // Single account: nothing to stagger.
+    const [first] = await Promise.all(hydrated.map(loadOne));
+    return [first];
+  }
+  const results = new Array(hydrated.length);
+  // Fixed 350ms stagger + sequential start (each store fetch itself takes
+  // 300-900ms, so this yields a comfortable gap between request pairs).
+  let chain = Promise.resolve();
+  hydrated.forEach((entry, index) => {
+    chain = chain
+      .then(() => (index === 0 ? null : sleep(350)))
+      .then(async () => {
+        results[index] = await loadOne(entry);
+        onProgress?.({
+          done: results.filter(Boolean).length,
+          total: hydrated.length,
+          account: results[index]
+        });
+      });
+  });
+  await chain;
+  return results;
 }

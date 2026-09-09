@@ -11,8 +11,10 @@ import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
 
 // Skeleton mirror of the dashboard layout: same panels, grayed shimmer bars
-// and empty card frames instead of a blank screen while accounts load.
-function LoadingSkeleton() {
+// and empty card frames instead of a blank screen while accounts load. When
+// progressive-load progress events arrive, shows "FETCHING x/y" with the
+// label of the account currently being fetched.
+function LoadingSkeleton({ progress = null }) {
   return (
     <>
       <section className="panel overview skel-panel" aria-hidden="true">
@@ -53,6 +55,15 @@ function LoadingSkeleton() {
             </article>
           ))}
         </div>
+        {progress && (
+          <div className="skel-progress">
+            <span className="skel-progress-label">
+              FETCHING {progress.done}/{progress.total}
+              {progress.account ? ` — ${String(progress.account.label).toUpperCase()}` : ''}
+            </span>
+            <span className="skel-progress-track"><span style={{ width: `${(progress.done / Math.max(1, progress.total)) * 100}%` }} /></span>
+          </div>
+        )}
       </section>
     </>
   );
@@ -73,7 +84,7 @@ export default function App() {
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
   const toastTimer = useRef(null);
-  const { accounts: loadedAccounts, loading, error, errorKind, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
+  const { accounts: loadedAccounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
  const confirm = useConfirm();
 
   // The signed-in account always sits at the top of the list, even after an
@@ -389,7 +400,7 @@ export default function App() {
               );
             })()}
             {loading && !accounts.length && (
-              <LoadingSkeleton />
+              <LoadingSkeleton progress={progress} />
             )}
             {!loading && !accounts.length && (
               <section className="panel empty-panel">

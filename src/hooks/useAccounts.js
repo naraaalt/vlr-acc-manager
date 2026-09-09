@@ -8,8 +8,10 @@ export function useAccounts() {
   const [tcno, setTcno] = useState({ available: false, accounts: [] });
   const [switchingLabel, setSwitchingLabel] = useState(null);
 
+  const [progress, setProgress] = useState(null);
+
   const refresh = useCallback(async () => {
-    setLoading(true); setError(null); setErrorKind(null);
+    setLoading(true); setError(null); setErrorKind(null); setProgress(null);
     try {
       const [dashboard, detected] = await Promise.all([window.valorant.getDashboard(), window.valorant.detectTcno()]);
       if (!dashboard.ok) {
@@ -19,7 +21,25 @@ export function useAccounts() {
       setAccounts(dashboard.data);
       if (detected.ok) setTcno(detected.data);
     } catch (requestError) { setError(requestError.message || 'Unable to load saved accounts.'); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setProgress(null); }
+  }, []);
+
+  // Progressive dashboard load: accounts appear one by one as their stores
+  // resolve. Progress events only arrive while the main promise is pending;
+  // the final set replaces any partial state when it lands.
+  useEffect(() => {
+    if (!window.valorant.onDashboardProgress) return undefined;
+    window.valorant.onDashboardProgress((update) => {
+      setProgress(update);
+      if (update?.account) {
+        setAccounts((current) => {
+          const exists = current.some((account) => account.id === update.account.id);
+          if (!exists) return [...current, update.account];
+          return current.map((account) => (account.id === update.account.id ? update.account : account));
+        });
+      }
+    });
+    return undefined;
   }, []);
 
   const capture = useCallback(async (label) => {
@@ -70,5 +90,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, errorKind, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
+  return { accounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
 }

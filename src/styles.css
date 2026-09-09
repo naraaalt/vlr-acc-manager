@@ -592,6 +592,16 @@ input::placeholder { color: var(--faint); }
   0%, 100% { opacity: .55; }
   50% { opacity: 1; background: var(--border2); }
 }
+.skel-progress {
+  display: flex; align-items: center; gap: 12px;
+  border-top: 1px solid var(--border); padding: 8px 12px;
+}
+.skel-progress-label { color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: .18em; white-space: nowrap; }
+.skel-progress-track {
+  flex: 1; height: 3px; background: var(--panel3); border: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.skel-progress-track span { position: absolute; inset: 0; right: auto; background: var(--brand); transition: width 300ms ease; }
 
 @media (prefers-reduced-motion: reduce) {
   .ld-sweep::before, .ld-sweep::after { animation: none; }
