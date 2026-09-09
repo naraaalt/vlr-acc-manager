@@ -1,10 +1,11 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, powerMonitor } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerIpcHandlers } from './ipcHandlers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+let mainWindow = null;
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -39,6 +40,17 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   registerIpcHandlers();
   createWindow();
+  mainWindow = BrowserWindow.getAllWindows()[0];
+
+  // System sleep/resume: all timers (countdown, rate-limit map) and the Riot
+  // session state are stale after sleep. Tell the renderer to re-sync; it
+  // re-runs the dashboard fetch (progressive) and re-anchors timers.
+  powerMonitor.on('resume', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('system:resumed', { resumedAt: Date.now() });
+    }
+  });
+
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

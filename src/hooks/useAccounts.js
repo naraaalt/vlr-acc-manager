@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useAccounts() {
   const [accounts, setAccounts] = useState([]);
@@ -41,6 +41,21 @@ export function useAccounts() {
     });
     return undefined;
   }, []);
+
+  // System sleep/resume: after sleep the countdown anchors, rate-limit map and
+  // session validity are all stale. Re-run the dashboard fetch once, with a
+  // 15s debounce (resume fires alongside network reconnection flicker).
+  const resumingRef = useRef(false);
+  useEffect(() => {
+    if (!window.valorant.onSystemResumed) return undefined;
+    window.valorant.onSystemResumed(() => {
+      if (resumingRef.current) return;
+      resumingRef.current = true;
+      setTimeout(() => { resumingRef.current = false; }, 15_000);
+      refresh();
+    });
+    return undefined;
+  }, [refresh]);
 
   const capture = useCallback(async (label) => {
     const response = await window.valorant.captureCurrentAccount(label);

@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld('valorant', {
   onDashboardProgress: (callback) => {
     ipcRenderer.on('accounts:dashboard-progress', (_event, progress) => callback(progress));
   },
+  onSystemResumed: (callback) => {
+    ipcRenderer.on('system:resumed', (_event, payload) => callback(payload));
+  },
   captureCurrentAccount: (label) => ipcRenderer.invoke('accounts:capture-current', label),
   addManualAccount: (label) => ipcRenderer.invoke('accounts:add-manually', label),
   syncCurrentAccount: (label) => ipcRenderer.invoke('accounts:sync-current', label),
