@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
 import { getAudioPrefs, setAudioPrefs, subscribeAudioPrefs } from '../lib/audioPrefs.js';
+import { presentError } from '../lib/errorPresentation.js';
 import { BrandMark, Icon } from './Icons.jsx';
 
 function Pips({ total = 5, done = 0 }) {
@@ -14,7 +15,7 @@ function Pips({ total = 5, done = 0 }) {
   );
 }
 
-export function AccountOverview({ account, busy, onSwitch }) {
+export function AccountOverview({ account, busy, onSwitch, onRefresh, onRefreshAll, onDelete }) {
   const store = account.status === 'ready' ? account.store : null;
   const profile = store?.profile;
   const rank = profile?.rank ?? null;
@@ -24,22 +25,30 @@ export function AccountOverview({ account, busy, onSwitch }) {
   const ranked = (profile?.placementsRemaining ?? 0) === 0;
 
   if (account.status === 'error') {
+    const presentation = presentError(account.error, account.errorKind);
+    const runAction = () => {
+      if (presentation.action === 'switch') onSwitch(account.label);
+      else if (presentation.action === 'refresh') onRefresh(account.label);
+      else if (presentation.action === 'refresh-all') onRefreshAll();
+      else if (presentation.action === 'delete') onDelete(account.label);
+    };
     return (
       <section className="panel overview" aria-label="Account overview">
         <div className="ov-head">
           <span className="ov-mark"><BrandMark size={20} /></span>
           <h2 className="ov-name">{(account.store?.accountName ?? account.accountName ?? account.label).toUpperCase()}</h2>
-          <span className="ov-status is-err"><span className="dot err" />ERROR</span>
+          <span className="ov-status is-err"><span className="dot err" />{presentation.title}</span>
           <span className="ov-level">LV. {profile?.level ?? '—'}</span>
         </div>
         <div className="ov-body">
-          <div className="ov-cell ov-wide">
-            <p className="ov-error"><Icon name="warn" size={14} /> {account.error}</p>
+          <div className="ov-cell ov-wide ov-error-wrap">
+            <p className="ov-error"><Icon name="warn" size={14} /> <b>{presentation.explain}</b></p>
+            <p className="ov-error-hint">{presentation.hint}</p>
+            <p className="ov-error-raw">{account.error}</p>
             <button
-              type="button" className="ghost-btn" disabled={busy}
-              onClick={() => onSwitch(account.label)}
-              title="Restart the Riot Client with this account's saved session, then save the session again"
-            >SWITCH ACCOUNT</button>
+              type="button" className={presentation.action === 'switch' || presentation.action === 'delete' ? 'danger-btn' : 'ghost-btn'}
+              disabled={busy} onClick={runAction}
+            >{presentation.actionLabel}</button>
           </div>
         </div>
       </section>

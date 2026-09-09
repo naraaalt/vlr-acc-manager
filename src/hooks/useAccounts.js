@@ -4,14 +4,18 @@ export function useAccounts() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [errorKind, setErrorKind] = useState(null);
   const [tcno, setTcno] = useState({ available: false, accounts: [] });
   const [switchingLabel, setSwitchingLabel] = useState(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setErrorKind(null);
     try {
       const [dashboard, detected] = await Promise.all([window.valorant.getDashboard(), window.valorant.detectTcno()]);
-      if (!dashboard.ok) throw new Error(dashboard.error);
+      if (!dashboard.ok) {
+        setErrorKind(dashboard.errorKind ?? null);
+        throw new Error(dashboard.error);
+      }
       setAccounts(dashboard.data);
       if (detected.ok) setTcno(detected.data);
     } catch (requestError) { setError(requestError.message || 'Unable to load saved accounts.'); }
@@ -66,5 +70,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
+  return { accounts, loading, error, errorKind, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
 }

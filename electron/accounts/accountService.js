@@ -2,6 +2,7 @@ import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, 
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
 import { fetchAccountProfile, fetchStorefront, getDailyOffers } from '../riot/store.js';
 import { resolveDailyOffers } from '../riot/contentCache.js';
+import { fail, classifyError } from '../lib/errorKind.js';
 
 function expiry(accessToken) {
   try { return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8')).exp * 1000; } catch { return 0; }
@@ -27,10 +28,10 @@ async function persistCurrentAccount(label, session) {
   const target = accounts.find((account) => account.label === label);
   const duplicate = accounts.find((account) => account.label !== label && account.puuid === session.puuid);
   if (duplicate) {
-    throw new Error(`This Riot account is already saved as “${duplicate.label}”. It was not copied into “${label}”.`);
+    throw fail('duplicate', `This Riot account is already saved as “${duplicate.label}”. It was not copied into “${label}”.`);
   }
   if (target?.puuid && target.puuid !== session.puuid) {
-    throw new Error(`“${label}” is linked to a different Riot account. Its saved session was left unchanged.`);
+    throw fail('duplicate', `“${label}” is linked to a different Riot account. Its saved session was left unchanged.`);
   }
   const apiSession = { ...session, shard: session.shard, expiresAt: expiry(session.accessToken) };
   const credentials = await captureLiveCredentials();
@@ -71,7 +72,7 @@ export async function refreshSwitchedAccount(label) {
 export async function getSavedAccountStore(label) {
   const account = await loadAccount(label);
   if (!account.apiSession || account.apiSession.expiresAt <= Date.now()) {
-    throw new Error('Saved API session expired. Switch to this account, then refresh and save it again.');
+    throw fail('expired', 'Saved API session expired. Switch to this account, then refresh and save it again.');
   }
   const store = await resolvedStore(account.apiSession);
   await updateAccountSession(label, { ...account.apiSession, accountName: store.accountName });
@@ -100,14 +101,15 @@ export async function getDashboard() {
     } catch (error) { return { account, storedPuuid: null, loadError: error }; }
   }));
   const owners = new Map();
+  const kindOf = (error) => (error?.kind ?? classifyError(error?.message));
   return Promise.all(hydrated.map(async ({ account, storedPuuid, loadError }) => {
     const active = account.id === activeId && storedPuuid === livePuuid;
-    if (loadError) return { ...account, active, status: 'error', error: loadError.message };
+    if (loadError) return { ...account, active, status: 'error', error: loadError.message, errorKind: kindOf(loadError) };
     if (storedPuuid && owners.has(storedPuuid)) {
-      return { ...account, active: false, status: 'error', error: `This saved session duplicates “${owners.get(storedPuuid)}”. It was not loaded as a second account.` };
+      return { ...account, active: false, status: 'error', errorKind: 'duplicate', error: `This saved session duplicates “${owners.get(storedPuuid)}”. It was not loaded as a second account.` };
     }
     if (storedPuuid) owners.set(storedPuuid, account.label);
     try { return { ...account, active, status: 'ready', store: await getSavedAccountStore(account.label) }; }
-    catch (error) { return { ...account, active, status: 'error', error: error.message }; }
+    catch (error) { return { ...account, active, status: 'error', error: error.message, errorKind: kindOf(error) }; }
   }));
 }

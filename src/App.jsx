@@ -5,6 +5,7 @@ import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreview
 import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { fmtCountdown } from './lib/format.js';
+import { presentError } from './lib/errorPresentation.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
 
@@ -71,7 +72,7 @@ export default function App() {
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
   const toastTimer = useRef(null);
-  const { accounts: loadedAccounts, loading, error, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
+  const { accounts: loadedAccounts, loading, error, errorKind, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
  const confirm = useConfirm();
 
   // The signed-in account always sits at the top of the list, even after an
@@ -360,13 +361,19 @@ export default function App() {
           />
           <div className="v-divider" aria-hidden="true" />
           <section className="content" aria-label="Account details">
-            {error && (
-              <section className="panel error-panel">
-                <div className="panel-title"><span className="corner red" /><span className="t">ACCOUNTS UNAVAILABLE</span></div>
-                <p className="error-msg"><Icon name="warn" size={14} /> {error}</p>
-                <div className="error-actions"><button type="button" className="ghost-btn" onClick={doRefreshAll}><Icon name="refresh" />RETRY</button></div>
-              </section>
-            )}
+            {error && (() => {
+              const presentation = presentError(error, errorKind);
+              return (
+                <section className="panel error-panel">
+                  <div className="panel-title"><span className="corner red" /><span className="t">{presentation.title}</span></div>
+                  <p className="error-msg"><Icon name="warn" size={14} /> <b>{presentation.explain}</b></p>
+                  <p className="error-hint">{presentation.hint}</p>
+                  <div className="error-actions">
+                    <button type="button" className="ghost-btn" onClick={doRefreshAll}><Icon name="refresh" />{presentation.actionLabel}</button>
+                  </div>
+                </section>
+              );
+            })()}
             {loading && !accounts.length && (
               <LoadingSkeleton />
             )}
@@ -385,7 +392,7 @@ export default function App() {
             )}
             {selectedAccount && (
               <>
-                <AccountOverview account={selectedAccount} busy={busy} onSwitch={doSwitch} />
+                <AccountOverview account={selectedAccount} busy={busy} onSwitch={doSwitch} onRefresh={doRefresh} onRefreshAll={doRefreshAll} onDelete={doDelete} />
                 {selectedAccount.status === 'ready' && <>
                   <StoreRefreshStrip countdown={countdown} offersCount={offersCount} />
                   <DailyStore

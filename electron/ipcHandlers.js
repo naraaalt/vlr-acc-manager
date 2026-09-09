@@ -6,10 +6,14 @@ import { deleteAccount, renameAccount } from './accounts/accountStore.js';
 import { addManualAccount, captureCurrentAccount, getDashboard, refreshAccountStore } from './accounts/accountService.js';
 import { findTcnoAccounts, importTcnoAccounts } from './accounts/tcnoImport.js';
 import { switchToAccount } from './accounts/switcher.js';
+import { classifyError } from './lib/errorKind.js';
 
 async function result(action) {
   try { return { ok: true, data: await action() }; }
-  catch (error) { console.error('IPC request failed:', error.message); return { ok: false, error: error.message || 'The request failed.' }; }
+  catch (error) {
+    console.error('IPC request failed:', error.message);
+    return { ok: false, error: error.message || 'The request failed.', errorKind: error.kind ?? classifyError(error.message) };
+  }
 }
 
 export function registerIpcHandlers() {
