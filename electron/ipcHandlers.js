@@ -1,8 +1,8 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { getSessionTokens, resolveShard } from './riot/auth.js';
 import { fetchStorefront, getDailyOffers } from './riot/store.js';
 import { resolveDailyOffers } from './riot/contentCache.js';
-import { deleteAccount } from './accounts/accountStore.js';
+import { deleteAccount, renameAccount } from './accounts/accountStore.js';
 import { addManualAccount, captureCurrentAccount, getDashboard, refreshAccountStore } from './accounts/accountService.js';
 import { findTcnoAccounts, importTcnoAccounts } from './accounts/tcnoImport.js';
 import { switchToAccount } from './accounts/switcher.js';
@@ -38,7 +38,19 @@ export function registerIpcHandlers() {
   ipcMain.handle('accounts:sync-current', (_, label) => result(() => captureCurrentAccount(label)));
   ipcMain.handle('accounts:refresh-market', (_, label) => result(() => refreshAccountStore(label)));
   ipcMain.handle('accounts:delete', (_, label) => result(async () => { await deleteAccount(label); return null; }));
+  ipcMain.handle('accounts:rename', (_, oldLabel, newLabel) => result(async () => { await renameAccount(oldLabel, newLabel); return null; }));
   ipcMain.handle('accounts:switch', (_, label) => result(() => switchToAccount(label)));
   ipcMain.handle('accounts:tcno-detect', () => result(findTcnoAccounts));
   ipcMain.handle('accounts:tcno-import', (_, ids) => result(() => importTcnoAccounts(ids)));
+
+  // Custom window controls (frameless title bar).
+  ipcMain.handle('window:minimize', (event) => { BrowserWindow.fromWebContents(event.sender)?.minimize(); });
+  ipcMain.handle('window:maximizeToggle', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return;
+    if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
+  });
+  ipcMain.handle('window:close', (event) => { BrowserWindow.fromWebContents(event.sender)?.close(); });
+  ipcMain.handle('window:isMaximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false);
 }

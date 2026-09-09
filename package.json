@@ -30,13 +30,15 @@
     "appId": "com.naraaalt.valorantaccountmanager",
     "productName": "Valorant Account Manager",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
       "package.json"
     ],
+    "icon": "build/icon.ico",
     "win": {
       "target": [
         "nsis",

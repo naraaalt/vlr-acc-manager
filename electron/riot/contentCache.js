@@ -23,10 +23,34 @@ async function getSkinIndex() {
       .then((payload) => {
         const index = new Map();
         for (const skin of payload.data ?? []) {
+          // Per-skin showcase material: one video per upgrade level plus per-
+          // variant video/full-render from the chroma endpoint.
+          const levels = (skin.levels ?? []).map((level) => ({
+            name: level.displayName ?? skin.displayName ?? 'Skin',
+            item: level.levelItem ?? null,
+            video: level.streamedVideo ?? null,
+            icon: level.displayIcon ?? null
+          }));
+          const chromas = (skin.chromas ?? [])
+            .filter((chroma) => chroma.swatch)
+            .map((chroma) => ({
+              name: (chroma.displayName ?? '').replace(/\s+/g, ' ').trim(),
+              swatch: chroma.swatch,
+              // Variant-specific showcase: most newer skins have a per-chroma
+              // video; every chroma has a full-quality render as fallback.
+              video: chroma.streamedVideo ?? null,
+              render: chroma.fullRender ?? null
+            }));
           for (const level of skin.levels ?? []) {
             index.set(level.uuid, {
               name: level.displayName ?? skin.displayName ?? 'Unknown skin',
-              image: level.displayIcon ?? skin.displayIcon ?? null
+              image: level.displayIcon ?? skin.displayIcon ?? null,
+              video: level.streamedVideo ?? null,
+              levels,
+              chromas,
+              // valorant-api's /weapons/skins payload carries no category
+              // field (verified 2026-09); kept for when it does.
+              category: skin.category ?? null
             });
           }
         }
@@ -41,9 +65,12 @@ export async function resolveDailyOffers(offers) {
   return offers.map((offer) => {
     const skin = index.get(offer.offerId);
     return {
-      id: offer.offerId,
       name: skin?.name ?? 'Unknown skin',
       image: skin?.image ?? null,
+      video: skin?.video ?? null,
+      levels: skin?.levels ?? [],
+      chromas: skin?.chromas ?? [],
+      category: skin?.category ?? null,
       price: offer.price
     };
   });

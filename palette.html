@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SAPPHIRE — Palette Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060B10; --panel:#091017; --panel2:#0D151E; --panel3:#101B26;
+    --border:#16212C; --border2:#1E2C39;
+    --text:#C9D4DE; --text-bright:#E8EFF5; --dim:#5C6E7E; --faint:#39485A;
+    --brand:#3E8BFF; --brand-deep:#0F52BA;
+    --danger:#FF4655; --green:#20E693; --cyan:#3DD8F5; --gold:#E8C468;
+    --mono:'JetBrains Mono','Cascadia Mono','Consolas',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;border-radius:0!important}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;-webkit-font-smoothing:antialiased;overflow:hidden}
+  ::selection{background:rgba(62,139,255,.2);color:var(--text-bright)}
+
+  .frame{position:fixed;inset:12px;display:flex;flex-direction:column;border:1px solid var(--border2);overflow:hidden}
+
+  header{flex:0 0 46px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--border2);background:var(--panel)}
+  .mark{flex:0 0 auto}
+  .h1{color:var(--brand);font-weight:800;font-size:13px;letter-spacing:.2em}
+  .h2{color:var(--text-bright);font-weight:600;font-size:11px;letter-spacing:.34em}
+  .hsep{color:var(--faint)}
+  .hr-right{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}
+  .hr-right b{color:var(--green)}
+
+  main{flex:1;display:grid;grid-template-columns:1fr 380px;min-height:0;overflow:hidden}
+
+  .left{overflow-y:auto;padding:20px 24px}
+  .left::-webkit-scrollbar{width:8px}
+  .left::-webkit-scrollbar-thumb{background:var(--border2)}
+
+  .sec-label{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:10px;font-weight:700;letter-spacing:.24em;margin:0 0 14px}
+  .sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+  section{margin-bottom:30px}
+
+  /* hero swatch row */
+  .swatch-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+  .swatch{border:1px solid var(--border2);background:var(--panel);display:flex;flex-direction:column}
+  .swatch .chip{height:96px;position:relative;border-bottom:1px solid var(--border2)}
+  .swatch .chip .hex{position:absolute;left:8px;bottom:6px;font-size:10px;font-weight:700;letter-spacing:.1em}
+  .swatch .chip .role{position:absolute;left:8px;top:8px;font-size:8px;font-weight:700;letter-spacing:.2em;opacity:.85}
+  .swatch .body{padding:10px 12px}
+  .swatch .name{color:var(--text-bright);font-weight:700;font-size:11px;letter-spacing:.08em;margin-bottom:4px}
+  .swatch .desc{color:var(--dim);font-size:9.5px;line-height:1.55;letter-spacing:.02em}
+  .swatch .token{margin-top:8px;color:var(--faint);font-size:9px;letter-spacing:.08em}
+  .swatch .token b{color:var(--cyan);font-weight:600}
+
+  /* usage demo grid */
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .demo-card{border:1px solid var(--border);background:var(--panel);padding:14px}
+  .demo-card .t{color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.22em;margin-bottom:12px}
+  .demo-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .demo-row:last-child{margin-bottom:0}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);font:inherit;font-size:10px;font-weight:700;letter-spacing:.14em;padding:7px 12px}
+  .btn.primary{border-color:var(--brand);background:rgba(62,139,255,.14);color:var(--brand)}
+  .btn.danger{border-color:var(--danger);background:rgba(255,70,85,.14);color:var(--danger)}
+  .btn.ghost:hover{border-color:var(--dim)}
+  .btn.primary:hover{background:rgba(62,139,255,.24)}
+  .btn.danger:hover{background:rgba(255,70,85,.24)}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.14em;padding:3px 8px}
+  .badge.brand{border-color:rgba(62,139,255,.5);color:var(--brand)}
+  .badge.danger{border-color:rgba(255,70,85,.5);color:var(--danger)}
+  .badge.gold{border-color:rgba(232,196,104,.4);color:var(--gold)}
+  .badge.green{border-color:rgba(32,230,147,.4);color:var(--green)}
+  .dot{width:6px;height:6px;display:inline-block}
+  .dot.brand{background:var(--brand);box-shadow:0 0 6px rgba(62,139,255,.7)}
+  .dot.danger{background:var(--danger);box-shadow:0 0 6px rgba(255,70,85,.7)}
+  .dot.green{background:var(--green);box-shadow:0 0 6px rgba(32,230,147,.7)}
+  .dot.gold{background:var(--gold)}
+
+  .bar{height:4px;background:var(--panel3);border:1px solid var(--border);position:relative;overflow:hidden;margin-top:6px}
+  .bar i{position:absolute;inset:0;right:auto}
+  .bar.brand i{background:var(--brand)}
+  .bar.gold i{background:var(--gold)}
+  .bar.green i{background:var(--green)}
+
+  .sel-row{position:relative;border:1px solid var(--border);background:var(--panel);padding:9px 12px 9px 16px;display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+  .sel-row:last-child{margin-bottom:0}
+  .sel-row.sel{border-color:var(--brand);background:var(--panel3);box-shadow:0 0 10px rgba(62,139,255,.18),inset 0 0 14px rgba(62,139,255,.05)}
+  .sel-row.sel::before{content:'';position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;background:var(--brand);box-shadow:0 0 6px rgba(62,139,255,.8)}
+  .sel-row .l1{display:flex;align-items:center;gap:8px}
+  .sel-row .nm{font-weight:700;color:var(--text-bright);font-size:12px}
+  .sel-row .lv{margin-left:auto;color:var(--dim);font-size:10px}
+  .sel-row .l2{display:flex;align-items:center;gap:8px;padding-left:2px;font-size:10.5px}
+  .sel-row .rr{margin-left:auto;color:var(--faint)}
+  .sel-row.sel .rr{color:var(--brand);font-weight:700}
+  .mini-rank{width:14px;height:14px;border:1px solid var(--border2);display:inline-block}
+
+  .count{color:var(--danger);font-size:26px;font-weight:800;letter-spacing:.06em;text-shadow:0 0 14px rgba(255,70,85,.35)}
+  .count-lbl{color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.2em;margin-right:12px}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px}
+  .kv .k{color:var(--faint);font-size:8.5px;font-weight:700;letter-spacing:.2em;align-self:center}
+  .kv .v{color:var(--text-bright);font-size:11px;font-weight:700}
+
+  /* right column: side-by-side comparison + copy panel */
+  .right{border-left:1px solid var(--border2);background:var(--panel);overflow-y:auto;padding:20px}
+  .right::-webkit-scrollbar{width:8px}
+  .right::-webkit-scrollbar-thumb{background:var(--border2)}
+
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:26px}
+  .cmp .cell{border:1px solid var(--border2);overflow:hidden}
+  .cmp .cell .head{padding:6px 10px;font-size:8.5px;font-weight:700;letter-spacing:.2em;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between}
+  .cmp .old .head{background:#1A1016;color:#FF8792}
+  .cmp .new .head{background:#0C1B2E;color:var(--brand)}
+  .cmp .strip{height:64px;display:flex}
+  .cmp .strip i{flex:1}
+  .cmp .cell .cap{padding:8px 10px;color:var(--dim);font-size:9px;line-height:1.5;letter-spacing:.02em}
+
+  .copypanel{border:1px solid var(--border);background:var(--panel2)}
+  .copypanel .head{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.22em;display:flex;justify-content:space-between}
+  .copypanel pre{padding:12px;font-size:10px;line-height:1.75;color:var(--text);overflow-x:auto}
+  .copypanel pre .c{color:var(--faint)}
+  .copypanel pre .v{color:var(--brand)}
+  .copypanel pre .k{color:var(--text-bright)}
+
+  .pairtable{width:100%;border-collapse:collapse;margin-bottom:26px}
+  .pairtable th{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--faint);font-size:8.5px;font-weight:700;letter-spacing:.2em}
+  .pairtable td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:10.5px}
+  .pairtable .role{color:var(--text-bright);font-weight:700;letter-spacing:.04em}
+  .pairtable .oldc{color:#FF8792}
+  .pairtable .newc{color:var(--brand)}
+  .pairtable .why{color:var(--dim);font-size:9.5px;line-height:1.5}
+  .pairtable .sw{width:18px;height:18px;border:1px solid var(--border2);display:inline-block;vertical-align:-4px;margin-right:8px}
+
+  footer{flex:0 0 34px;border-top:1px solid var(--border2);display:flex;align-items:center;padding:0 16px;gap:14px;background:var(--panel)}
+  footer .fl{color:var(--faint);font-size:9px;letter-spacing:.14em}
+  footer .fr{margin-left:auto;color:var(--faint);font-size:9px;letter-spacing:.14em}
+  footer .fr b{color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <header>
+    <svg class="mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <polygon points="10,1.5 18.5,6 18.5,14 10,18.5 1.5,14 1.5,6" fill="none" stroke="#3E8BFF" stroke-width="1.4"/>
+      <polygon points="10,5 14.5,10 10,15 5.5,10" fill="#3E8BFF"/>
+      <polygon points="10,5 14.5,10 10,10" fill="#0F52BA"/>
+    </svg>
+    <span class="h1">SAPPHIRE</span>
+    <span class="hsep">//</span>
+    <span class="h2">PALETTE SPEC</span>
+    <span class="hr-right">REBRAND DRAFT <b>v1</b> · 2026-09-08</span>
+  </header>
+
+  <main>
+    <!-- LEFT: core palette + live usage -->
+    <div class="left">
+
+      <section>
+        <p class="sec-label">01 · CORE PALETTE — 4 SWATCHES</p>
+        <div class="swatch-row">
+          <div class="swatch">
+            <div class="chip" style="background:#3E8BFF">
+              <span class="role" style="color:#0B1B33">BRAND</span>
+              <span class="hex" style="color:#EAF2FF">#3E8BFF</span>
+            </div>
+            <div class="body">
+              <div class="name">Sapphire Bright</div>
+              <div class="desc">Selection, primary buttons, brand text, active glows. Pengganti langsung merah #FF4655.</div>
+              <div class="token">TOKEN <b>--brand</b></div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="chip" style="background:#0F52BA">
+              <span class="role" style="color:#CFE1FF">BRAND DEEP</span>
+              <span class="hex" style="color:#EAF2FF">#0F52BA</span>
+            </div>
+            <div class="body">
+              <div class="name">Sapphire Deep</div>
+              <div class="desc">Fill badge solid (card number, variant aktif) — teks terang di atasnya.</div>
+              <div class="token">TOKEN <b>--brand-deep</b></div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="chip" style="background:#FF4655">
+              <span class="role" style="color:#2B0A0E">DANGER</span>
+              <span class="hex" style="color:#FFE3E6">#FF4655</span>
+            </div>
+            <div class="body">
+              <div class="name">Riot Red — tetap</div>
+              <div class="desc">Khusus error & urgensi: dot error, toast warn, countdown, tombol DELETE. Gak ikut branding.</div>
+              <div class="token">TOKEN <b>--danger</b></div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="chip" style="background:linear-gradient(135deg,#060B10 0%,#0D151E 55%,#1E2C39 100%)">
+              <span class="role" style="color:var(--faint)">NEUTRALS</span>
+              <span class="hex" style="color:var(--dim)">UNTOUCHED</span>
+            </div>
+            <div class="body">
+              <div class="name">Blue-black Neutrals</div>
+              <div class="desc">#060B10 → #E8EFF5 sudah blue-tinted. Mereka yang bawain brand baru, zero perubahan.</div>
+              <div class="token">TOKEN <b>…tetap</b></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="sec-label">02 · ROLE MAPPING — OLD → NEW</p>
+        <table class="pairtable">
+          <tr><th>ROLE DI APP</th><th>DULU</th><th>JADI</th><th>ALASAN</th></tr>
+          <tr>
+            <td class="role">Selected account / card</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#3E8BFF"></span><span class="newc">#3E8BFF</span></td>
+            <td class="why">Selection = brand. Paling banyak terlihat, jadi pembawa identitas utama.</td>
+          </tr>
+          <tr>
+            <td class="role">Brand text "SAPPHIRE" header</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#3E8BFF"></span><span class="newc">#3E8BFF</span></td>
+            <td class="why">Nama brand harusnya berwarna warna brand-nya sendiri.</td>
+          </tr>
+          <tr>
+            <td class="role">Primary button (ADD ACCOUNT)</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#3E8BFF"></span><span class="newc">#3E8BFF</span></td>
+            <td class="why">Primary action = brand. Bukan "tombol bahaya".</td>
+          </tr>
+          <tr>
+            <td class="role">RR value, rank highlight</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#3E8BFF"></span><span class="newc">#3E8BFF</span></td>
+            <td class="why">Data penting yang ikut selection state, bukan error state.</td>
+          </tr>
+          <tr>
+            <td class="role">Store countdown 14:32:17</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">TETAP MERAH</span></td>
+            <td class="why">Urgensi waktu ≠ branding. Merah bikin countdown terasa "deadline".</td>
+          </tr>
+          <tr>
+            <td class="role">Dot error · status ERROR · toast warn</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">TETAP MERAH</span></td>
+            <td class="why">Konvensi universal error. EPERM & delete harus tetap terasa bahaya.</td>
+          </tr>
+          <tr>
+            <td class="role">Confirm dialog SWITCH / DELETE</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">TETAP MERAH</span></td>
+            <td class="why">Restart client & delete = aksi destruktif, danger styling bener.</td>
+          </tr>
+          <tr>
+            <td class="role">Window close hover (✕)</td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">#FF4655</span></td>
+            <td><span class="sw" style="background:#FF4655"></span><span class="oldc">TETAP MERAH</span></td>
+            <td class="why">Konvensi OS untuk tombol close. Merah = muscle memory user Windows.</td>
+          </tr>
+        </table>
+      </section>
+
+      <section>
+        <p class="sec-label">03 · USAGE PREVIEW — KOMPONEN ASLI (DIPAKE PALING SERING)</p>
+        <div class="demo">
+          <div class="demo-card">
+            <div class="t">SIDEBAR — SELECTED STATE</div>
+            <div class="sel-row sel">
+              <div class="l1"><span class="dot brand"></span><span class="nm">main</span><span class="lv">LV.121</span></div>
+              <div class="l2"><span class="mini-rank" style="background:linear-gradient(135deg,#6FAEE0,#2B4A66)"></span><span style="color:#6FAEE0">Diamond 2</span><span class="rr">85 RR</span></div>
+            </div>
+            <div class="sel-row">
+              <div class="l1"><span class="dot danger"></span><span class="nm">i eat glue</span><span class="lv">LV.—</span></div>
+              <div class="l2"><span class="mini-rank" style="background:var(--panel2)"></span><span style="color:var(--dim)">UNRANKED</span><span class="rr">—</span></div>
+            </div>
+          </div>
+          <div class="demo-card">
+            <div class="t">BUTTONS & BADGES</div>
+            <div class="demo-row">
+              <button class="btn primary">+ ADD ACCOUNT</button>
+              <button class="btn danger">DELETE</button>
+              <button class="btn ghost">REFRESH ALL</button>
+            </div>
+            <div class="demo-row">
+              <span class="badge brand"><span class="dot brand"></span>RIOT SESSION: ACTIVE</span>
+              <span class="badge danger">ERROR</span>
+              <span class="badge gold">LV. 312</span>
+              <span class="badge green">SYNCED</span>
+            </div>
+          </div>
+          <div class="demo-card">
+            <div class="t">COUNTDOWN — TETAP MERAH</div>
+            <div style="display:flex;align-items:center">
+              <span class="count-lbl">STORE REFRESHES IN</span>
+              <span class="count">14:32:17</span>
+            </div>
+            <div class="bar brand" style="max-width:260px"><i style="width:61%"></i></div>
+            <div style="margin-top:8px;color:var(--faint);font-size:9px;letter-spacing:.1em">Progress bar di bawahnya biru — dua warna beda role, satu baris.</div>
+          </div>
+          <div class="demo-card">
+            <div class="t">OVERVIEW META + RR</div>
+            <div class="kv">
+              <span class="k">RIOT ID</span><span class="v">Rifat#1337</span>
+              <span class="k">ACCOUNT LEVEL</span><span class="v">312</span>
+              <span class="k">RR THIS SEASON</span><span class="v" style="color:var(--brand)">85 <span style="color:var(--dim);font-weight:400">/ 100</span></span>
+              <span class="k">SESSION</span><span class="v" style="color:var(--green)">■ Signed in</span>
+            </div>
+            <div class="bar gold" style="max-width:260px;margin-top:10px"><i style="width:85%"></i></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT: comparison + tokens -->
+    <div class="right">
+
+      <section>
+        <p class="sec-label">04 · BEFORE / AFTER</p>
+        <div class="cmp">
+          <div class="cell old">
+            <div class="head"><span>VLR · LAMA</span><span>RED</span></div>
+            <div class="strip">
+              <i style="background:#FF4655"></i><i style="background:rgba(255,70,85,.55)"></i>
+              <i style="background:rgba(255,70,85,.28)"></i><i style="background:rgba(255,70,85,.12)"></i>
+              <i style="background:#060B10"></i>
+            </div>
+            <div class="cap">Merah Valorant sebagai accent tunggal. Identitas pinjem dari game.</div>
+          </div>
+          <div class="cell new">
+            <div class="head"><span>SAPPHIRE · BARU</span><span>BLUE</span></div>
+            <div class="strip">
+              <i style="background:#3E8BFF"></i><i style="background:rgba(62,139,255,.55)"></i>
+              <i style="background:rgba(62,139,255,.28)"></i><i style="background:rgba(62,139,255,.12)"></i>
+              <i style="background:#060B10"></i>
+            </div>
+            <div class="cap">Sapphire jadi accent, merah mundur jadi danger-only. Identitas punya sendiri.</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="sec-label">05 · CSS TOKENS — COPY KE :ROOT</p>
+        <div class="copypanel">
+          <div class="head"><span>:ROOT BLOCK</span><span>STYLES.CSS</span></div>
+          <pre><span class="c">/* brand = identity, danger = errors */</span>
+<span class="k">--brand:</span>      <span class="v">#3E8BFF</span>;
+<span class="k">--brand-deep:</span> <span class="v">#0F52BA</span>;
+<span class="k">--brand-soft:</span> <span class="v">rgba(62,139,255,.14)</span>;
+<span class="k">--brand-rgb:</span>  <span class="v">62,139,255</span>;
+<span class="k">--danger:</span>     <span class="v">#FF4655</span>;
+<span class="k">--danger-rgb:</span> <span class="v">255,70,85</span>;
+
+<span class="c">/* untouched */</span>
+<span class="k">--bg:</span> <span class="v">#060B10</span>;  <span class="k">--panel:</span> <span class="v">#091017</span>;
+<span class="k">--green:</span> <span class="v">#20E693</span>;
+<span class="k">--cyan:</span> <span class="v">#3DD8F5</span>;  <span class="k">--gold:</span> <span class="v">#E8C468</span>;</pre>
+        </div>
+      </section>
+
+      <section>
+        <p class="sec-label">06 · TINT SCALE — SEMUA ALPHA BRAND</p>
+        <div class="copypanel">
+          <div class="head"><span>GLOW & TINT LADDER</span><span>rgba(62,139,255,α)</span></div>
+          <div style="display:flex;height:34px;border:1px solid var(--border)">
+            <i style="flex:1;background:rgba(62,139,255,1)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.7)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.45)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.28)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.18)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.12)"></i>
+            <i style="flex:1;background:rgba(62,139,255,.06)"></i>
+          </div>
+          <div style="display:flex;color:var(--faint);font-size:8.5px;letter-spacing:.08em;margin-top:6px">
+            <span style="flex:1">1.0 fill</span><span style="flex:1">.7 glow</span><span style="flex:1">.45</span><span style="flex:1">.28 hover</span><span style="flex:1">.18</span><span style="flex:1">.12 tint</span><span style="flex:1">.06</span>
+          </div>
+          <div style="margin-top:12px;color:var(--dim);font-size:9.5px;line-height:1.6;padding:0 2px 4px">
+            14 literal <span style="color:var(--brand)">rgba(255,70,85,α)</span> di styles.css tinggal di-repoint ke ladder ini — alpha-nya gak berubah, hue-nya doang.
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <span class="fl">SAPPHIRE REBRAND · PALETTE SPEC v1</span>
+    <span class="fl">SOURCE: .hermes/plans/2026-09-08_185821-sapphire-rebrand.md</span>
+    <span class="fr">BLUE = BRAND · RED = DANGER · <b>NEUTRALS UNTOUCHED</b></span>
+  </footer>
+</div>
+</body>
+</html>

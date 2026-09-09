@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SAPPHIRE — Video Loading Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root, :root[data-theme='sapphire'] {
+    --bg:#060B10; --panel:#091017; --panel2:#0D151E; --panel3:#101B26;
+    --border:#16212C; --border2:#1E2C39;
+    --text:#C9D4DE; --text-bright:#E8EFF5; --dim:#5C6E7E; --faint:#39485A;
+    --brand:#3E8BFF; --brand-deep:#0F52BA;
+    --brand-rgb:62,139,255;
+    --danger:#FF4655; --green:#20E693; --cyan:#3DD8F5; --gold:#E8C468;
+    --mono:'JetBrains Mono','Cascadia Mono','Consolas',monospace;
+  }
+  :root[data-theme='vlr'] {
+    --brand:#FF4655; --brand-deep:#B31D42;
+    --brand-rgb:255,70,85;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;border-radius:0!important}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(var(--brand-rgb),.2);color:var(--text-bright)}
+
+  .frame{position:fixed;inset:12px;display:flex;flex-direction:column;border:1px solid var(--border2);overflow:hidden}
+  header{flex:0 0 46px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--border2);background:var(--panel)}
+  .h1{color:var(--brand);font-weight:800;font-size:13px;letter-spacing:.2em}
+  .h2{color:var(--text-bright);font-weight:600;font-size:11px;letter-spacing:.34em}
+  .hsep{color:var(--faint)}
+  .hr-right{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--faint);font-size:10px;letter-spacing:.14em}
+  .theme-hint{color:var(--dim)}
+  .theme-hint b{color:var(--brand)}
+
+  main{flex:1;overflow-y:auto;padding:22px 26px}
+  main::-webkit-scrollbar{width:8px}
+  main::-webkit-scrollbar-thumb{background:var(--border2)}
+  .sec-label{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:10px;font-weight:700;letter-spacing:.24em;margin:0 0 16px}
+  .sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+  section{margin-bottom:34px}
+  .intro{color:var(--dim);font-size:11px;line-height:1.7;letter-spacing:.02em;margin-bottom:22px;max-width:900px}
+  .intro b{color:var(--text-bright)}
+
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px}
+  .demo{border:1px solid var(--border2);background:var(--panel);display:flex;flex-direction:column}
+  .demo-head{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border)}
+  .demo-head .num{color:var(--brand);font-weight:800;font-size:11px;letter-spacing:.1em}
+  .demo-head .nm{color:var(--text-bright);font-weight:700;font-size:11px;letter-spacing:.14em}
+  .demo-head .cost{margin-left:auto;color:var(--faint);font-size:8.5px;letter-spacing:.14em}
+  .stage{
+    position:relative;aspect-ratio:16/9;margin:12px;border:1px solid var(--border);overflow:hidden;
+    background:
+      linear-gradient(rgba(61,216,245,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61,216,245,.03) 1px, transparent 1px),
+      var(--bg);
+    background-size:16px 16px,16px 16px,auto;
+  }
+  .demo .why{padding:2px 14px 14px;color:var(--dim);font-size:9.5px;line-height:1.65;letter-spacing:.02em}
+  .demo .why b{color:var(--text)}
+  .proscons{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;padding:0 14px 12px}
+  .pc{display:flex;flex-direction:column;gap:3px}
+  .pc .pc-h{font-size:8px;font-weight:700;letter-spacing:.22em;margin-bottom:2px}
+  .pc.pros .pc-h{color:var(--green)}
+  .pc.cons .pc-h{color:var(--danger)}
+  .pc span{display:flex;gap:6px;color:var(--dim);font-size:9px;line-height:1.5;letter-spacing:.02em}
+  .pc.pros span::before{content:'+';color:var(--green);font-weight:800;flex:0 0 auto}
+  .pc.cons span::before{content:'−';color:var(--danger);font-weight:800;flex:0 0 auto}
+  .pick{display:flex;align-items:center;gap:8px;padding:0 14px 14px}
+  .pick button{font:inherit;cursor:pointer;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.16em;padding:5px 10px}
+  .pick button:hover{color:var(--text-bright);border-color:var(--dim)}
+  .pick .picked{color:var(--faint);font-size:9px;letter-spacing:.12em}
+
+  /* ===== shared loader bits ===== */
+  .stage-loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+  .loader-label{color:var(--faint);font-size:9px;font-weight:700;letter-spacing:.3em}
+
+  /* 1. SWEEP SCAN */
+  .ld-sweep{position:absolute;inset:0}
+  .ld-sweep::before{
+    content:'';position:absolute;left:0;right:0;height:44px;top:-44px;
+    background:linear-gradient(180deg, transparent, rgba(var(--brand-rgb), .18) 45%, rgba(var(--brand-rgb), .38) 50%, rgba(var(--brand-rgb), .18) 55%, transparent);
+    animation:sweep-y 1.6s cubic-bezier(.45,0,.55,1) infinite;
+  }
+  .ld-sweep::after{
+    content:'';position:absolute;left:0;right:0;height:1px;top:-1px;
+    background:var(--brand);box-shadow:0 0 12px rgba(var(--brand-rgb), .8);
+    animation:sweep-line 1.6s cubic-bezier(.45,0,.55,1) infinite;
+  }
+  @keyframes sweep-y{to{transform:translateY(calc(100cqh + 44px))}}
+  @keyframes sweep-line{to{transform:translateY(calc(100cqh + 1px))}}
+  .ld-sweep{container-type:size}
+
+  /* 2. GEM PULSE */
+  .ld-gem{display:flex;flex-direction:column;align-items:center;gap:16px;position:relative}
+  .ld-gem svg{animation:gem-pulse 1.3s ease-in-out infinite;position:relative;z-index:1}
+  @keyframes gem-pulse{0%,100%{transform:scale(.85);opacity:.5}50%{transform:scale(1.05);opacity:1}}
+  .gem-ring{position:absolute;top:50%;left:50%;width:64px;height:64px;margin:-32px 0 0 -32px;
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+    background:rgba(var(--brand-rgb),.35);
+    animation:gem-ring 1.3s ease-out infinite}
+  @keyframes gem-ring{0%{transform:scale(.6);opacity:.8}100%{transform:scale(1.5);opacity:0}}
+
+  /* 3. DOTS TUI */
+  .ld-dots{display:flex;gap:9px}
+  .ld-dots i{width:9px;height:9px;background:var(--panel3);border:1px solid var(--border2);animation:dot-blink 1.05s steps(1) infinite}
+  .ld-dots i:nth-child(2){animation-delay:.15s}
+  .ld-dots i:nth-child(3){animation-delay:.3s}
+  @keyframes dot-blink{0%,100%{background:var(--panel3);border-color:var(--border2)}40%{background:var(--brand);border-color:var(--brand);box-shadow:0 0 9px rgba(var(--brand-rgb),.6)}}
+
+  /* 4. PROGRESS RING */
+  .ld-ring{position:relative;width:74px;height:74px;display:flex;align-items:center;justify-content:center}
+  .ld-ring svg{position:absolute;inset:0;animation:ring-rot 1.15s linear infinite}
+  @keyframes ring-rot{to{transform:rotate(360deg)}}
+  .ld-ring .lbl{color:var(--faint);font-size:7.5px;font-weight:700;letter-spacing:.24em}
+
+  /* 5. WIREFRAME REVEAL */
+  .ld-wire{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .ld-wire img{width:56%;object-fit:contain;opacity:.55;
+    -webkit-mask-image:linear-gradient(90deg,#000 50%,transparent 50%);
+    mask-image:linear-gradient(90deg,#000 50%,transparent 50%);
+    -webkit-mask-size:220% 100%;mask-size:220% 100%;
+    animation:wire-wipe 1.9s ease-in-out infinite}
+  @keyframes wire-wipe{0%{-webkit-mask-position:100% 0;mask-position:100% 0}55%{-webkit-mask-position:0 0;mask-position:0 0}100%{-webkit-mask-position:0 0;mask-position:0 0}}
+
+  /* footer of each stage: fake progress % ticker */
+  .stage-sub{position:absolute;left:10px;bottom:8px;color:var(--faint);font-size:8.5px;letter-spacing:.16em}
+  .stage-sub b{color:var(--brand);font-weight:700}
+
+  /* ===== simulation strip ===== */
+  .sim-wrap{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:14px}
+  .sim-stage{position:relative;aspect-ratio:16/9;border:1px solid var(--border);overflow:hidden;
+    background:
+      linear-gradient(rgba(61,216,245,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61,216,245,.03) 1px, transparent 1px),
+      var(--bg);
+    background-size:16px 16px,16px 16px,auto}
+  .sim-stage video{width:100%;height:100%;object-fit:cover;display:block}
+  .sim-stage .stage-loader{background:var(--panel2);opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .sim-stage .stage-loader.visible{opacity:1}
+  .sim-panel{border:1px solid var(--border);background:var(--panel);padding:14px}
+  .sim-panel .t{color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.22em;margin-bottom:10px}
+  .sim-log{list-style:none;display:flex;flex-direction:column;gap:5px;font-size:9.5px;letter-spacing:.04em;color:var(--dim);min-height:150px}
+  .sim-log li b{color:var(--brand)}
+  .sim-log li.err b{color:var(--danger)}
+  .sim-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .sim-btns button{font:inherit;cursor:pointer;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.14em;padding:5px 10px}
+  .sim-btns button:hover{color:var(--text-bright);border-color:var(--dim)}
+
+  footer{flex:0 0 34px;border-top:1px solid var(--border2);display:flex;align-items:center;padding:0 16px;gap:14px;background:var(--panel)}
+  footer .fl{color:var(--faint);font-size:9px;letter-spacing:.14em}
+  footer .fr{margin-left:auto;color:var(--faint);font-size:9px;letter-spacing:.14em}
+  footer .fr b{color:var(--brand)}
+
+  @media (prefers-reduced-motion: reduce){
+    .ld-sweep::before,.ld-sweep::after,.ld-gem svg,.gem-ring,.ld-dots i,.ld-ring svg,.ld-wire img{animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <header>
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <polygon points="10,1.5 18.5,6 18.5,14 10,18.5 1.5,14 1.5,6" fill="none" stroke="var(--brand)" stroke-width="1.4"/>
+      <polygon points="10,5 14.5,10 10,15 5.5,10" fill="var(--brand)"/>
+      <polygon points="10,5 14.5,10 10,10" fill="var(--brand-deep)"/>
+    </svg>
+    <span class="h1">SAPPHIRE</span>
+    <span class="hsep">//</span>
+    <span class="h2">VIDEO LOADING GALLERY</span>
+    <span class="hr-right">
+      5 VARIAN · <span class="theme-hint" id="theme-hint">TEMA: <b>SAPPHIRE</b></span>
+      · <button id="theme-btn" style="font:inherit;cursor:pointer;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:8.5px;letter-spacing:.16em;padding:4px 9px">GANTI TEMA [KLIK]</button>
+    </span>
+  </header>
+
+  <main>
+    <section>
+      <p class="sec-label">00 · CARA BACA</p>
+      <p class="intro">
+        Lima kandidat animasi loading buat <b>stage video showcase</b> — muncul selama video Riot CDN di-buffer, ilang pas <b>canplay</b>.
+        Semua pure CSS, token-driven (otomatis biru di Sapphire / merah di VLR), hormat <b>prefers-reduced-motion</b>.
+        Pilih satu: klik tombol <b>PILIH INI</b> — pilihan lu ke-log di bawah, bilang ke gue nomornya.
+        Scroll ke bawah ada <b>simulasi real video</b> yang nunjukin loader muncul-ilang di video beneran.
+      </p>
+    </section>
+
+    <section>
+      <p class="sec-label">01–05 · KANDIDAT</p>
+      <div class="gallery">
+
+        <!-- 1 SWEEP SCAN -->
+        <div class="demo">
+          <div class="demo-head"><span class="num">01</span><span class="nm">SWEEP SCAN</span><span class="cost">COST: RENDAH</span></div>
+          <div class="stage">
+            <div class="stage-loader">
+              <div class="ld-sweep"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span class="loader-label">LOADING SHOWCASE</span></div></div>
+              <span class="stage-sub">BUFFERING <b>riotcdn</b></span>
+            </div>
+          </div>
+          <p class="why">Bar cahaya nyapu vertikal + garis brand. <b>Feel: scanning senjata.</b> Paling "hidup" tanpa nuansa spinner generic. Hanya 2 elemen CSS.</p>
+          <div class="proscons">
+            <div class="pc pros">
+              <span class="pc-h">PROS</span>
+              <span>Motion-nya jelas "sedang memuat sesuatu" — paling komunikatif</span>
+              <span>Gerakan vertikal unik, gak mirip spinner web generic</span>
+              <span>Dua elemen pseudo-CSS, zero JS, zero asset</span>
+            </div>
+            <div class="pc cons">
+              <span class="pc-h">CONS</span>
+              <span>Paling flashy dari semua — bisa kalah tenang dibuat tema restrained</span>
+              <span>Pakai container query units (cqh) — butuh fallback test di Electron lama</span>
+              <span>Butuh 2 keyframes terpisah (bar + line) biar sinkron</span>
+            </div>
+          </div>
+          <div class="pick"><button data-pick="Sweep Scan">PILIH INI</button><span class="picked"></span></div>
+        </div>
+
+        <!-- 2 GEM PULSE -->
+        <div class="demo">
+          <div class="demo-head"><span class="num">02</span><span class="nm">GEM PULSE</span><span class="cost">COST: RENDAH · RECOMMENDED</span></div>
+          <div class="stage">
+            <div class="stage-loader">
+              <div class="ld-gem">
+                <span class="gem-ring"></span>
+                <svg viewBox="0 0 20 20" width="46" height="46">
+                  <polygon points="10,1.5 18.5,6 18.5,14 10,18.5 1.5,14 1.5,6" fill="none" stroke="var(--brand)" stroke-width="1.4"/>
+                  <polygon points="10,5 14.5,10 10,15 5.5,10" fill="var(--brand)"/>
+                  <polygon points="10,5 14.5,10 10,10" fill="var(--brand-deep)"/>
+                </svg>
+                <span class="loader-label">LOADING SHOWCASE</span>
+              </div>
+              <span class="stage-sub">BUFFERING <b>riotcdn</b></span>
+            </div>
+          </div>
+          <div class="demo">
+          </div>
+          <p class="why">Gem brand pulse + hexagon ring mengembang. <b>Feel: paling branded</b> — identitas nyala pas nunggu. Gak butuh asset per-offer, langsung integrate.</p>
+          <div class="proscons">
+            <div class="pc pros">
+              <span class="pc-h">PROS</span>
+              <span>Identitas brand hadir di momen waiting — konsisten sama rebrand Sapphire</span>
+              <span>Ring expand + pulse memberi sense of progress tanpa persen palsu</span>
+              <span>SVG inline sama kayak mark header/footer — 1 sumber kebenaran visual</span>
+            </div>
+            <div class="pc cons">
+              <span class="pc-h">CONS</span>
+              <span>Paling ramai secara composition (3 layer: gem, ring, label)</span>
+              <span>Di ukuran stage kecil (window di-resize pendek), ring bisa nempel border</span>
+              <span>Butuh prefers-reduced-motion handling eksplisit biar gem berhenti</span>
+            </div>
+          </div>
+          <div class="pick"><button data-pick="Gem Pulse">PILIH INI</button><span class="picked"></span></div>
+        </div>
+
+        <!-- 3 DOTS TUI -->
+        <div class="demo">
+          <div class="demo-head"><span class="num">03</span><span class="nm">DOTS TUI</span><span class="cost">COST: TERENDAH</span></div>
+          <div class="stage">
+            <div class="stage-loader">
+              <div class="ld-dots"><i></i><i></i><i></i></div>
+              <span class="loader-label">LOADING SHOWCASE</span>
+              <span class="stage-sub">BUFFERING <b>riotcdn</b></span>
+            </div>
+          </div>
+          <p class="why">Tiga kotak blink berurutan. <b>Feel: terminal klasik</b> — paling restrained, senada language sama skeleton dashboard (skel-bar pulse).</p>
+          <div class="proscons">
+            <div class="pc pros">
+              <span class="pc-h">PROS</span>
+              <span>Paling minimal — 3 kotak 9px, nol risiko ngelanggar restraint TUI</span>
+              <span>Senada bahasa visual sama skeleton dashboard yang udah ada (pulse bars)</span>
+              <span>CPU/GPU paling ringan — cocok buat window di-resize kecil</span>
+            </div>
+            <div class="pc cons">
+              <span class="pc-h">CONS</span>
+              <span>Paling gak beda dari loading indicator generic manapun</span>
+              <span>Gak ada unsur brand sama sekali — bisa dipake app apapun</span>
+              <span>Orang bisa nyangkut lama tanpa sadar ada video yang mau muncul</span>
+            </div>
+          </div>
+          <div class="pick"><button data-pick="Dots TUI">PILIH INI</button><span class="picked"></span></div>
+        </div>
+
+        <!-- 4 PROGRESS RING -->
+        <div class="demo">
+          <div class="demo-head"><span class="num">04</span><span class="nm">PROGRESS RING</span><span class="cost">COST: RENDAH</span></div>
+          <div class="stage">
+            <div class="stage-loader">
+              <div class="ld-ring">
+                <svg viewBox="0 0 74 74" width="74" height="74">
+                  <circle cx="37" cy="37" r="30" fill="none" stroke="var(--border2)" stroke-width="2"/>
+                  <circle cx="37" cy="37" r="30" fill="none" stroke="var(--brand)" stroke-width="2"
+                    stroke-dasharray="42 147" stroke-linecap="butt"/>
+                </svg>
+                <span class="lbl">BUFFERING</span>
+              </div>
+              <span class="stage-sub">BUFFERING <b>riotcdn</b></span>
+            </div>
+          </div>
+          <p class="why">Ring SVG muter (dasharray sweep). <b>Feel: paling jelas lagi kerja.</b> Kalau mau lebih informatif, bisa ditambah persen real dari buffer progress.</p>
+          <div class="proscons">
+            <div class="pc pros">
+              <span class="pc-h">PROS</span>
+              <span>Paling jelas nunjukin proses teknis — user paham video lagi di-buffer</span>
+              <span>Bisa upgrade ke persen real pakai bufferProgress event (upgrade path jelas)</span>
+              <span>SVG stroke — gampang di-scale, gak blur di DPI tinggi</span>
+            </div>
+            <div class="pc cons">
+              <span class="pc-h">CONS</span>
+              <span>Ring spinner = pola paling umum di web — kurang khas dibanding 4 lainnya</span>
+              <span>"BUFFERING" label plus ring agak redundan (dua-duanya ngomong hal sama)</span>
+              <span>Indeterminate sweep bisa ngerasa "gak ada kemajuan" kalau lambat</span>
+            </div>
+          </div>
+          <div class="pick"><button data-pick="Progress Ring">PILIH INI</button><span class="picked"></span></div>
+        </div>
+
+        <!-- 5 WIREFRAME REVEAL -->
+        <div class="demo">
+          <div class="demo-head"><span class="num">05</span><span class="nm">WIREFRAME REVEAL</span><span class="cost">COST: SEDANG · BUTUH IMAGE</span></div>
+          <div class="stage">
+            <div class="stage-loader">
+              <div class="ld-wire">
+                <img src="https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png" alt="">
+              </div>
+              <span class="stage-sub" style="position:absolute;left:10px;bottom:8px">BUFFERING <b>riotcdn</b></span>
+            </div>
+          </div>
+          <p class="why">Render skin-nya sendiri yang muncul bertahap (mask wipe). <b>Feel: preview dari yang bakal datang.</b> Butuh still image per-offer — di app udah ada, jadi cuma wiring.</p>
+          <div class="proscons">
+            <div class="pc pros">
+              <span class="pc-h">PROS</span>
+              <span>Konten-relevan — user liat senjata yang bakal dibeli, bukan ornamen abstrak</span>
+              <span>Transisi ke video mulus (still → moving, senjata sama)</span>
+              <span>Manfaatin asset yang udah ada (offer.image), zero payload tambahan</span>
+            </div>
+            <div class="pc cons">
+              <span class="pc-h">CONS</span>
+              <span>Kualitas nyambung sama kualitas image — skin tanpa icon (jarang) butuh fallback</span>
+              <span>Mask animation paling berat secara GPU dari semua kandidat</span>
+              <span>Bisa bikin user bingung: "ini gambar doang atau video-nya error?"</span>
+            </div>
+          </div>
+          <div class="pick"><button data-pick="Wireframe Reveal">PILIH INI</button><span class="picked"></span></div>
+        </div>
+
+      </div>
+    </section>
+
+    <section>
+      <p class="sec-label">06 · SIMULASI REAL VIDEO — LOADER MUNCUL & ILANG</p>
+      <div class="sim-wrap">
+        <div class="sim-stage" id="sim-stage">
+          <div class="stage-loader visible" id="sim-loader">
+            <div class="ld-gem">
+              <span class="gem-ring"></span>
+              <svg viewBox="0 0 20 20" width="46" height="46">
+                <polygon points="10,1.5 18.5,6 18.5,14 10,18.5 1.5,14 1.5,6" fill="none" stroke="var(--brand)" stroke-width="1.4"/>
+                <polygon points="10,5 14.5,10 10,15 5.5,10" fill="var(--brand)"/>
+                <polygon points="10,5 14.5,10 10,10" fill="var(--brand-deep)"/>
+              </svg>
+              <span class="loader-label">LOADING SHOWCASE</span>
+            </div>
+          </div>
+          <video id="sim-video" muted loop playsinline preload="auto"
+            src="https://valorant.dyn.riotcdn.net/x/videos/release-13.05/a6ee2555-4e3a-049e-916a-7ca853dd4568_default_universal.mp4"></video>
+        </div>
+        <div class="sim-panel">
+          <div class="t">EVENT LOG — SKIN LOADING STATE MACHINE</div>
+          <ul class="sim-log" id="sim-log"><li>waiting for <b>loadstart</b>…</li></ul>
+          <div class="sim-btns">
+            <button id="sim-reload">RELOAD VIDEO (SIMULASIKAN GANTI SKIN)</button>
+            <button id="sim-toggle-sound">TOGGLE SOUND</button>
+          </div>
+          <div class="t" style="margin-top:14px">ALUR DI APP</div>
+          <p style="color:var(--dim);font-size:9.5px;line-height:1.65">
+            <b style="color:var(--text-bright)">loadstart</b> / <b style="color:var(--text-bright)">waiting</b> → loader visible ·
+            <b style="color:var(--text-bright)">canplay</b> → loader fade out (200ms) ·
+            <b style="color:var(--text-bright)">error</b> → loader ilang, stage fallback ke still render.
+            Remount video (ganti skin/level/variant) re-fires loadstart — loader otomatis muncul lagi.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span class="fl">SAPPHIRE · VIDEO LOADING GALLERY v1</span>
+    <span class="fr">BLUE = BRAND · RED = DANGER · <b>PILIH SALAH SATU → BILANG NOMORNYA</b></span>
+  </footer>
+</div>
+
+<script>
+  // Theme toggle (persist per-session via localStorage for fun, no requirement)
+  const themeBtn = document.getElementById('theme-btn');
+  const themeHint = document.getElementById('theme-hint');
+  function applyTheme(t){
+    document.documentElement.dataset.theme = t;
+    themeHint.innerHTML = 'TEMA: <b>' + t.toUpperCase() + '</b>';
+    try { localStorage.setItem('gallery.theme', t); } catch(e){}
+  }
+  let current = 'sapphire';
+  try { current = localStorage.getItem('gallery.theme') || 'sapphire'; } catch(e){}
+  applyTheme(current);
+  themeBtn.addEventListener('click', () => {
+    current = current === 'sapphire' ? 'vlr' : 'sapphire';
+    applyTheme(current);
+  });
+
+  // Pick buttons
+  const log = document.getElementById('sim-log');
+  function logLine(html, isErr){
+    const li = document.createElement('li');
+    if (isErr) li.className = 'err';
+    li.innerHTML = html;
+    log.appendChild(li);
+    log.scrollTop = log.scrollHeight;
+  }
+  document.querySelectorAll('[data-pick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pick = btn.dataset.pick;
+      document.querySelectorAll('.pick .picked').forEach((p) => { p.textContent = ''; });
+      btn.parentElement.querySelector('.picked').textContent = '✓ DIPILIH';
+      logLine('PICKED → <b>' + pick + '</b> (bilang nomornya ke gue)');
+    });
+  });
+
+  // Video loading state machine — mirrors exactly what goes into SkinPreviewModal
+  const video = document.getElementById('sim-video');
+  const loader = document.getElementById('sim-loader');
+  const show = () => { loader.classList.add('visible'); };
+  const hide = () => { loader.classList.remove('visible'); };
+  video.addEventListener('loadstart', () => { show(); logLine('<b>loadstart</b> → loader visible'); });
+  video.addEventListener('waiting',    () => { show(); logLine('<b>waiting</b> → loader visible'); });
+  video.addEventListener('canplay',   () => { hide(); logLine('<b>canplay</b> → loader hidden, video plays'); });
+  video.addEventListener('error',     () => { hide(); logLine('<b>error</b> → fallback ke still render', true); });
+  video.addEventListener('loadedmetadata', () => { video.play().catch(() => {}); });
+  document.getElementById('sim-reload').addEventListener('click', () => {
+    logLine('remount video (ganti skin)…');
+    video.load();
+  });
+  document.getElementById('sim-toggle-sound').addEventListener('click', () => {
+    video.muted = !video.muted;
+    logLine('muted → <b>' + video.muted + '</b>');
+  });
+</script>
+</body>
+</html>

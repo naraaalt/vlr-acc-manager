@@ -120,6 +120,31 @@ export async function deleteAccount(label) {
   await writeIndex(index.filter((account) => account.id !== id));
 }
 
+// Renaming migrates the account id (sha256 of the label) everywhere it is
+// referenced: the encrypted blob filename, the index entry, and — when the
+// renamed account is the live one — the VamAccountId marker the switcher
+// wrote into the Riot Client root.
+export async function renameAccount(oldLabel, newLabel) {
+  const from = normaliseLabel(oldLabel);
+  const to = normaliseLabel(newLabel);
+  const id = accountId(from);
+  const nextId = accountId(to);
+  const index = await readIndex();
+  const entry = index.find((account) => account.id === id);
+  if (!entry) throw new Error(`Saved account "${from}" was not found.`);
+  if (to !== from && index.some((account) => account.id === nextId && account.id !== id)) {
+    throw new Error(`An account named "${to}" already exists.`);
+  }
+  if (to === from) return;
+  await ensureStorage();
+  await fs.rm(encryptedPath(nextId), { force: true });
+  await fs.rename(encryptedPath(id), encryptedPath(nextId));
+  await writeIndex(index.map((account) => account.id === id ? { ...account, label: to, id: nextId } : account));
+  if (await getActiveAccountId() === id) {
+    await fs.writeFile(path.join(RIOT_CLIENT_ROOT, 'VamAccountId.instance'), nextId, 'utf8');
+  }
+}
+
 export async function updateAccountSession(label, apiSession) {
   const account = await loadAccount(label);
   await writeEncrypted(encryptedPath(account.id), { credentials: account.credentials, apiSession });

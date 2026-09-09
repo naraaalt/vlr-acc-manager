@@ -22,3 +22,8 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+
+# hermes agent workspace
+.hermes/
+# qa artifacts
+preview-screenshot.png

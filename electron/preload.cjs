@@ -7,7 +7,14 @@ contextBridge.exposeInMainWorld('valorant', {
   addManualAccount: (label) => ipcRenderer.invoke('accounts:add-manually', label),
   syncCurrentAccount: (label) => ipcRenderer.invoke('accounts:sync-current', label),
   refreshAccountMarket: (label) => ipcRenderer.invoke('accounts:refresh-market', label),
-  deleteAccount: (label) => ipcRenderer.invoke('accounts:delete', label),
+  renameAccount: (oldLabel, newLabel) => ipcRenderer.invoke('accounts:rename', oldLabel, newLabel),
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  maximizeToggleWindow: () => ipcRenderer.invoke('window:maximizeToggle'),
+  closeWindow: () => ipcRenderer.invoke('window:close'),
+  isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  onWindowMaximizedChanged: (callback) => {
+    ipcRenderer.on('window:maximized-changed', (_event, maximized) => callback(maximized));
+  },
   switchAccount: (label) => ipcRenderer.invoke('accounts:switch', label),
   detectTcno: () => ipcRenderer.invoke('accounts:tcno-detect'),
   importTcno: (ids) => ipcRenderer.invoke('accounts:tcno-import', ids)

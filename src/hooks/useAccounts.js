@@ -33,6 +33,11 @@ export function useAccounts() {
     if (!response.ok) throw new Error(response.error);
     await refresh();
   }, [refresh]);
+  const rename = useCallback(async (oldLabel, newLabel) => {
+    const response = await window.valorant.renameAccount(oldLabel, newLabel);
+    if (!response.ok) throw new Error(response.error);
+    await refresh();
+  }, [refresh]);
   const switchTo = useCallback(async (label) => {
     setSwitchingLabel(label);
     try {
@@ -50,7 +55,7 @@ export function useAccounts() {
     const response = await window.valorant.refreshAccountMarket(label);
     if (!response.ok) throw new Error(response.error);
     setAccounts((current) => current.map((account) => account.label === label
-      ? { ...account, active: response.data.active, status: 'ready', error: null, store: response.data.store }
+      ? { ...account, active: response.data.active, status: 'ready', error: null, store: response.data.store, lastCheckedAt: new Date().toISOString() }
       : account));
   }, []);
   const importTcno = useCallback(async (ids) => {
@@ -61,5 +66,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, tcno, switchingLabel, refresh, capture, addManually, remove, switchTo, syncCurrent, refreshAccount, importTcno };
+  return { accounts, loading, error, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, syncCurrent, refreshAccount, importTcno };
 }
