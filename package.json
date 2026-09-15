@@ -11,7 +11,7 @@
     "build": "vite build",
     "package:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
     "start": "electron .",
-    "check": "node --check electron/main.js && node --check electron/preload.cjs && node --check electron/ipcHandlers.js && node --check electron/riot/lockfile.js && node --check electron/riot/auth.js && node --check electron/riot/store.js && node --check electron/riot/contentCache.js && node --check electron/accounts/accountStore.js && node --check electron/accounts/accountService.js && node --check electron/accounts/riotClient.js && node --check electron/accounts/tcnoImport.js && node --check electron/accounts/switcher.js"
+    "check": "node scripts/check-electron.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
