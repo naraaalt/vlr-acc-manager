@@ -39,8 +39,3 @@ export function subscribeAudioPrefs(listener) {
   listener(state);
   return () => listeners.delete(listener);
 }
-
-// Auto-unmute only flips the toggle; it never silently changes the level.
-export function unmute() {
-  commit({ ...state, soundOn: true });
-}

@@ -5,7 +5,7 @@ const lockfilePath = process.platform === 'win32'
   ? path.join(process.env.LOCALAPPDATA ?? '', 'Riot Games', 'Riot Client', 'Config', 'lockfile')
   : path.join(process.env.HOME ?? '', 'Library', 'Application Support', 'Riot Games', 'Riot Client', 'Config', 'lockfile');
 
-export class RiotClientNotRunningError extends Error {
+class RiotClientNotRunningError extends Error {
   constructor(message = 'Riot Client is not running or its lockfile is unavailable.') {
     super(message);
     this.name = 'RiotClientNotRunningError';

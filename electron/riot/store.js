@@ -25,7 +25,7 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-export async function getClientVersion() {
+async function getClientVersion() {
   const response = await fetchWithTimeout('https://valorant-api.com/v1/version');
   if (!response.ok) throw new Error(`Could not retrieve the Valorant client version (${response.status}).`);
   const payload = await response.json();

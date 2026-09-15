@@ -55,7 +55,7 @@ async function persistCurrentAccount(label, session) {
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export async function waitForCurrentAccount(timeoutMs = 60_000, differentFromPuuid = null) {
+async function waitForCurrentAccount(timeoutMs = 60_000, differentFromPuuid = null) {
   const started = Date.now();
   let lastError = null;
   while (Date.now() - started < timeoutMs) {
@@ -83,7 +83,7 @@ export async function refreshSwitchedAccount(label) {
   return persistCurrentAccount(label, session);
 }
 
-export async function getSavedAccountStore(label) {
+async function getSavedAccountStore(label) {
   const account = await loadAccount(label);
   if (!account.apiSession || account.apiSession.expiresAt <= Date.now()) {
     throw fail('expired', 'Saved API session expired. Switch to this account, then refresh and save it again.');

@@ -8,7 +8,7 @@ export { classifyError };
 
 // Copy + primary action per kind. `action` values are handled by the caller
 // (App.jsx maps them to real handlers).
-export const ERROR_PRESENTATION = {
+const ERROR_PRESENTATION = {
   expired: {
     title: 'SESSION EXPIRED',
     explain: 'The saved login for this account is no longer valid — Riot sessions rotate regularly.',

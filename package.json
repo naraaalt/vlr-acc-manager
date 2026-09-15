@@ -17,7 +17,8 @@
     "lint": "eslint .",
     "lint:summary": "node scripts/lint-summary.mjs",
     "verify": "npm run check && npm run lint && npm test && npm run build",
-    "css:dead": "node scripts/find-dead-css.mjs"
+    "css:dead": "node scripts/find-dead-css.mjs",
+    "js:dead": "node scripts/find-dead-exports.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
