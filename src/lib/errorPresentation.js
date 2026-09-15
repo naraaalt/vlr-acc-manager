@@ -1,16 +1,10 @@
 // Renderer-side error presentation config, keyed by the `errorKind` field the
-// electron layer attaches to failures (see electron/lib/errorKind.js).
-// Unknown/legacy errors (no errorKind) fall back to classifyError heuristics.
+// electron layer attaches to failures. The classifier itself lives in
+// electron/lib/errorKind.js and is imported here rather than duplicated — two
+// copies of the same regex table drift apart silently.
+import { classifyError } from '../../electron/lib/errorKind.js';
 
-export function classifyError(message) {
-  const text = String(message ?? '');
-  if (/expired/i.test(text)) return 'expired';
-  if (/duplicates?\s|already saved as/i.test(text)) return 'duplicate';
-  if (/\bEPERM\b|\bEACCES\b|\bEBUSY\b|\bENOENT\b|operation not permitted|permission denied/i.test(text)) return 'fs-error';
-  if (/took too long|timed?\s?out|ENOTFOUND|ECONNRESET|ECONNREFUSED|network|fetch failed/i.test(text)) return 'network';
-  if (/storefront|store request failed|daily skin offers/i.test(text)) return 'store';
-  return 'unknown';
-}
+export { classifyError };
 
 // Copy + primary action per kind. `action` values are handled by the caller
 // (App.jsx maps them to real handlers).

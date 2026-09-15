@@ -11,7 +11,9 @@
     "build": "vite build",
     "package:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
     "start": "electron .",
-    "check": "node scripts/check-electron.mjs"
+    "check": "node scripts/check-electron.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.5",
@@ -20,6 +22,7 @@
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
     "vite": "^8.2.1",
+    "vitest": "^5.0.1",
     "wait-on": "^9.1.0"
   },
   "dependencies": {
@@ -36,6 +39,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "!electron/**/*.test.js",
       "package.json"
     ],
     "icon": "build/icon.ico",

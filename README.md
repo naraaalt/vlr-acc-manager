@@ -96,6 +96,12 @@ Run the JavaScript syntax checks:
 npm run check
 ```
 
+Run the unit tests:
+
+```powershell
+npm test
+```
+
 Create a production renderer build:
 
 ```powershell
@@ -170,3 +176,5 @@ This app is intended for your own Riot accounts on your own Windows computer.
 | `npm run package:win` | Build Windows installer and portable `.exe` files in `release`. |
 | `npm start` | Open Electron using the built renderer. |
 | `npm run check` | Check Electron JavaScript files for syntax errors. |
+| `npm test` | Run the unit tests (Vitest) once. |
+| `npm run test:watch` | Run the unit tests in watch mode. |

@@ -79,3 +79,18 @@ export function relativeTime(input) {
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
   return `${Math.floor(diff / 86_400_000)} d ago`;
 }
+
+// The daily store rotates on a fixed server schedule: 00:00 UTC, the same
+// instant worldwide (17:00 PT / 20:00 ET / 07:00 WIB), shifting by an hour
+// only where a local region observes DST. Counting to the next UTC midnight
+// stays exact even when the last store snapshot is stale, whereas a sampled
+// `expiresIn` delta drifts.
+export function nextStoreReset(now = Date.now()) {
+  const sampled = new Date(now);
+  return Date.UTC(sampled.getUTCFullYear(), sampled.getUTCMonth(), sampled.getUTCDate() + 1);
+}
+
+// Seconds until the next store rotation (never negative).
+export function storeCountdownSeconds(now = Date.now()) {
+  return Math.max(0, (nextStoreReset(now) - now) / 1000);
+}

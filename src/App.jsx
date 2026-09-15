@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
-import { fmtCountdown } from './lib/format.js';
+import { fmtCountdown, storeCountdownSeconds } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
@@ -134,11 +134,7 @@ export default function App() {
   // worldwide (17:00 PT / 20:00 ET / 07:00 WIB, per region), shifting only when
   // a local region observes DST. Counting straight to the next UTC midnight
   // keeps the timer exact even when the last store snapshot is stale.
-  const countdown = useMemo(() => {
-    const sampled = new Date(now);
-    const nextUtcMidnight = Date.UTC(sampled.getUTCFullYear(), sampled.getUTCMonth(), sampled.getUTCDate() + 1);
-    return fmtCountdown((nextUtcMidnight - now) / 1000);
-  }, [now]);
+  const countdown = useMemo(() => fmtCountdown(storeCountdownSeconds(now)), [now]);
 
   useEffect(() => {
     setNow(Date.now());
