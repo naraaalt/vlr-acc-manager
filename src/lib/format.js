@@ -4,7 +4,6 @@ export function cx(...parts) {
   return parts.filter(Boolean).join(' ');
 }
 
-const DIVISION_BASE = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'ASCENDANT', 'IMMORTAL', 'RADIANT'];
 const DIVISION_COLORS = {
   IRON: '#8E979E',
   BRONZE: '#A2815A',

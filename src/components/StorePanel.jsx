@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
 import { getAudioPrefs, setAudioPrefs, subscribeAudioPrefs } from '../lib/audioPrefs.js';
 import { presentError } from '../lib/errorPresentation.js';
@@ -261,14 +261,17 @@ export function SkinPreviewModal({ offer, onClose }) {
   //     a stalled frame beats an infinite loader
   const [videoLoading, setVideoLoading] = useState(Boolean(offer?.video));
   const stallTimerRef = useRef(null);
-  const clearStallTimer = () => {
+  // Stable identities: the effect below lists these as dependencies, and an
+  // unstable function would re-run it on every render, restarting the timer
+  // instead of letting it fire.
+  const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
-  };
-  const startStallTimer = () => {
+  }, []);
+  const startStallTimer = useCallback(() => {
     clearStallTimer();
     stallTimerRef.current = setTimeout(() => setVideoLoading(false), 6000);
-  };
-  useEffect(() => () => clearStallTimer(), []);
+  }, [clearStallTimer]);
+  useEffect(() => () => clearStallTimer(), [clearStallTimer]);
 
   const activeLevel = levels[levelIndex] ?? null;
   const activeChroma = chromas[chromaIndex] ?? null;
@@ -291,7 +294,7 @@ export function SkinPreviewModal({ offer, onClose }) {
     setVideoLoading(Boolean(activeVideo));
     if (activeVideo) startStallTimer();
     else clearStallTimer();
-  }, [activeVideo]);
+  }, [activeVideo, startStallTimer, clearStallTimer]);
 
   return (
     <div className="overlay open skin-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>

@@ -20,7 +20,7 @@ function assertWithinRiotRoot(target) {
 async function closeRiotProcesses() {
   for (const name of processes) {
     try { await exec('taskkill', ['/F', '/IM', name]); }
-    catch (error) { if (!/not found|no running instance/i.test(`${error.stdout} ${error.stderr}`)) throw new Error(`Could not close ${name}: ${error.message}`); }
+    catch (error) { if (!/not found|no running instance/i.test(`${error.stdout} ${error.stderr}`)) throw new Error(`Could not close ${name}: ${error.message}`, { cause: error }); }
   }
 }
 async function writeBundle(credentials) {

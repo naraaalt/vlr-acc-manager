@@ -18,7 +18,7 @@ export async function readLockfile() {
     raw = await fs.readFile(lockfilePath, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') throw new RiotClientNotRunningError();
-    throw new Error(`Unable to read the Riot Client lockfile: ${error.message}`);
+    throw new Error(`Unable to read the Riot Client lockfile: ${error.message}`, { cause: error });
   }
 
   const [name, pid, portText, password, protocol] = raw.trim().split(':');

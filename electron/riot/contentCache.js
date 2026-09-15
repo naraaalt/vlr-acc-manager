@@ -6,7 +6,7 @@ async function fetchWithTimeout(url) {
   try {
     return await fetch(url, { signal: controller.signal });
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('The Valorant content service took too long to respond. Please try again.');
+    if (error.name === 'AbortError') throw new Error('The Valorant content service took too long to respond. Please try again.', { cause: error });
     throw error;
   } finally {
     clearTimeout(timeout);

@@ -12,10 +12,6 @@ mkdirSync(outDir, { recursive: true });
 
 const BRAND = [62, 139, 255];   // #3E8BFF sapphire bright
 const DEEP = [15, 82, 186];     // #0F52BA sapphire deep
-const EDGE = [8, 17, 27];       // near-bg outline
-
-// Canvas size used for rendering; ICO will embed scaled copies.
-const S = 256;
 
 // Render the gem: hexagon outline + inner facets, with 2x supersampling.
 function renderGem(size) {

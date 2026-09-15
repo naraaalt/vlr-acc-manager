@@ -263,10 +263,12 @@ export default function App() {
     setMarketLabel((current) => (current ? null : selectedAccount?.status === 'ready' ? selectedAccount.label : null));
   }, [busy, selectedAccount]);
 
-  // Single global keymap. The ref always holds the freshest closure, so the
-  // listener subscribes exactly once.
+  // Single global keymap. The listener subscribes once and always reads the
+  // freshest closure through the ref. The ref is refreshed in an effect rather
+  // than during render: writing a ref while rendering is unsafe under
+  // concurrent rendering, where a discarded render would still mutate it.
   const keyHandlerRef = useRef(null);
-  keyHandlerRef.current = (event) => {
+  const keyHandler = (event) => {
     if (quitOpen) {
       if (event.key === 'Enter') { event.preventDefault(); window.close(); }
       else if (event.key === 'Escape') setQuitOpen(false);
@@ -376,6 +378,11 @@ export default function App() {
       default:
     }
   };
+  // No dependency array on purpose: this runs after every commit and keeps the
+  // ref pointing at the newest closure. It is declared before the listener
+  // effect so the ref is populated before input can arrive.
+  useEffect(() => { keyHandlerRef.current = keyHandler; });
+
   useEffect(() => {
     const handler = (event) => keyHandlerRef.current?.(event);
     window.addEventListener('keydown', handler);

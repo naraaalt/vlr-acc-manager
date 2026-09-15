@@ -13,14 +13,21 @@
     "start": "electron .",
     "check": "node scripts/check-electron.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:summary": "node scripts/lint-summary.mjs",
+    "verify": "npm run check && npm run lint && npm test && npm run build"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^6.0.5",
     "concurrently": "^10.0.4",
     "cross-env": "^10.1.0",
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "vite": "^8.2.1",
     "vitest": "^5.0.1",
     "wait-on": "^9.1.0"

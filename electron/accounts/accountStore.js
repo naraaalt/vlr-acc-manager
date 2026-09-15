@@ -36,7 +36,7 @@ async function readEncrypted(file, fallback) {
     return JSON.parse(safeStorage.decryptString(encrypted));
   } catch (error) {
     if (error.code === 'ENOENT') return fallback;
-    throw new Error(`Unable to decrypt saved account data: ${error.message}`);
+    throw new Error(`Unable to decrypt saved account data: ${error.message}`, { cause: error });
   }
 }
 async function readIndex() { return readEncrypted(indexPath(), []); }
@@ -64,7 +64,7 @@ export async function captureLiveCredentials() {
       if (directory) files.push(...await listFiles(source, relativePath));
       else files.push({ path: relativePath, content: (await fs.readFile(source)).toString('base64') });
     } catch (error) {
-      if (error.code === 'ENOENT') throw new Error(`Riot Client session data is missing: ${relativePath}. Start and sign in to Riot Client first.`);
+      if (error.code === 'ENOENT') throw new Error(`Riot Client session data is missing: ${relativePath}. Start and sign in to Riot Client first.`, { cause: error });
       throw error;
     }
   }
