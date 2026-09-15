@@ -4,9 +4,10 @@ import Sidebar from './components/Sidebar.jsx';
 import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
-import { fmtCountdown, storeCountdownSeconds, crossedStoreReset } from './lib/format.js';
+import { fmtCountdown, storeCountdownSeconds, crossedStoreReset, parseRank } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
-import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden } from './lib/uiPrefs.js';
+import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortMode, setSortMode as persistSortMode, nextSortMode } from './lib/uiPrefs.js';
+import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
@@ -78,6 +79,8 @@ export default function App() {
   const [selectedOffer, setSelectedOffer] = useState(0);
   // [H] skin-preview toggle persists across restarts via uiPrefs.
   const [previewsHidden, setPreviewsHidden] = useState(getPreviewsHidden);
+  // Account sort mode (active-first is the invariant; this reorders the rest).
+  const [sortMode, setSortMode] = useState(getSortMode);
   const [previewIndex, setPreviewIndex] = useState(null);
   const [commandFlash, setCommandFlash] = useState(null);
   const [toast, setToast] = useState(null);
@@ -92,10 +95,12 @@ export default function App() {
   // The signed-in account always sits at the top of the list, even after an
   // app restart: the backend `active` flag only holds while that account's
   // live Riot session token is valid, and it is recomputed on every load.
-  const accounts = useMemo(() => [
-    ...loadedAccounts.filter((account) => account.active),
-    ...loadedAccounts.filter((account) => !account.active)
-  ], [loadedAccounts]);
+  // orderAccounts owns that invariant (unit-tested); the selected mode only
+  // reorders the accounts below it.
+  const accounts = useMemo(
+    () => orderAccounts(loadedAccounts, sortMode, parseRank),
+    [loadedAccounts, sortMode]
+  );
 
   const busy = Boolean(switchingLabel) || Boolean(busyLabel);
   const tcnoAvailable = Boolean(tcno.available);
@@ -155,6 +160,18 @@ export default function App() {
     clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setCommandFlash(null), 650);
   }, []);
+
+  // [O] cycles the account sort. The active account stays pinned first in every
+  // mode, so cycling can never hide the signed-in account.
+  const cycleSort = useCallback(() => {
+    flash('O');
+    setSortMode((current) => {
+      const next = nextSortMode(current);
+      persistSortMode(next);
+      showToast(`SORT: ${SORT_LABELS[next]}`, 'ok');
+      return next;
+    });
+  }, [flash, showToast]);
 
   // Daily rotation: the moment the countdown crosses 00:00 UTC the store is
   // new, so tell the user and pull it. crossedStoreReset is monotonic, so this
@@ -356,6 +373,10 @@ export default function App() {
       case 'I':
         if (tcnoAvailable) { event.preventDefault(); flash('I'); setAdding(true); }
         return;
+      case 'o':
+      case 'O':
+        cycleSort();
+        return;
       case 'a':
       case 'A':
         // preventDefault stops the key's default text insertion from landing
@@ -415,6 +436,7 @@ export default function App() {
             accounts={accounts} visible={visible} totalCount={accounts.length}
             selectedIndex={activeIndex} onSelect={setSelectedLabel} onOpenMarket={openMarket}
             filter={filter} onFilter={setFilter}
+            sortMode={sortMode} onCycleSort={cycleSort}
             tcnoAvailable={tcnoAvailable} busy={busy} commandFlash={commandFlash}
             switchingLabel={switchingLabel}
             onSwitch={doSwitch} onRefresh={doRefresh} onRefreshAll={doRefreshAll}

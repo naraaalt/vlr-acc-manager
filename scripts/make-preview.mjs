@@ -72,6 +72,20 @@ const offerOf = (id, name, image, price, bare = false) => ({
   chromas: bare ? [] : (SHOWCASE[name]?.chromas ?? []).filter((chroma) => chroma.swatch || chroma.render)
 });
 
+// A ready account with a small store. Levels/ranks differ across the fixture so
+// every sort mode produces a visibly different order.
+const readyAccount = (id, label, accountName, level, rank, rr, price) => ({
+  id, label, accountName, puuid: `puuid-${id}`,
+  active: false, status: 'ready', lastCheckedAt: minutesAgo(30), error: null,
+  store: {
+    accountName, expiresIn: 52337,
+    profile: { level, rank, rr, placementsRemaining: 0 },
+    offers: [
+      offerOf(id, 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', price)
+    ]
+  }
+});
+
 const accounts = [
   {
     id: 'acc-glue', label: 'i eat glue', accountName: 'i eat glue#EATER', puuid: 'puuid-glue',
@@ -93,7 +107,10 @@ const accounts = [
         offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/f7c2e1e0-4c1e-6a11-9f0d-a75b4a6b1e11/displayicon.png', 1975, true)
       ]
     }
-  }
+  },
+  readyAccount('acc-zyrox', 'zyrox', 'Zyrox#6942', 128, 'Diamond 1', 78, 1775),
+  readyAccount('acc-kaze', 'kaze', 'Kaze#2718', 201, 'Immortal 3', 156, 3550),
+  readyAccount('acc-lynx', 'lynx', 'Lynx#8080', 87, 'Gold 3', 12, 1275)
 ];
 
 const bridge = `

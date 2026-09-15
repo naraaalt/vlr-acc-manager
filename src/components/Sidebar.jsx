@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime } from '../lib/format.js';
+import { SORT_LABELS } from '../lib/accountOrder.js';
 import { Icon } from './Icons.jsx';
 
 function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onDelete, onRename, switching, anySwitching }) {
@@ -79,6 +80,7 @@ function SyncNote({ accounts }) {
 const COMMANDS = [
   { key: 'R', icon: 'refresh', label: 'Refresh Account', busyGated: true },
   { key: 'CTRL+R', icon: 'refreshall', label: 'Refresh All', busyGated: true },
+  { key: 'O', icon: 'sort', label: 'Sort Accounts' },
   { key: 'X', icon: 'trash', label: 'Delete Account', busyGated: true }
 ];
 
@@ -116,7 +118,8 @@ function CommandPanel({ commandFlash, tcnoAvailable, busy, onCommand, onOpenAdd 
 
 export default function Sidebar({
   accounts, visible, totalCount, selectedIndex, onSelect, onOpenMarket,
-  filter, onFilter, tcnoAvailable, busy, commandFlash, switchingLabel,
+  filter, onFilter, sortMode, onCycleSort,
+  tcnoAvailable, busy, commandFlash, switchingLabel,
   onSwitch, onRefresh, onRefreshAll, onDelete, onRename, onImport, onAdd
 }) {
   const readyCount = accounts.filter((account) => account.status === 'ready').length;
@@ -126,6 +129,7 @@ export default function Sidebar({
     else if (key === 'CTRL+R') onRefreshAll();
     else if (key === 'X') onDelete();
     else if (key === 'I') onImport();
+    else if (key === 'O') onCycleSort();
   };
   return (
     <aside className="sidebar">
@@ -136,6 +140,14 @@ export default function Sidebar({
       <div className="side-filter">
         <Icon name="search" size={12} />
         <input value={filter} onChange={(event) => onFilter(event.target.value)} placeholder="filter…" aria-label="Filter accounts" />
+        <button
+          type="button" className={`sort-btn${sortMode !== 'active' ? ' on' : ''}`} onClick={onCycleSort}
+          title={`Sort: ${SORT_LABELS[sortMode]} — click or press [O] to cycle`}
+          aria-label={`Sort accounts, currently ${SORT_LABELS[sortMode]}`}
+        >
+          <Icon name="sort" size={11} />
+          <span>{SORT_LABELS[sortMode]}</span>
+        </button>
       </div>
       <ul className="acct-list">
         {visible.map((account, index) => (
