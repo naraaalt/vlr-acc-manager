@@ -6,6 +6,7 @@ import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { fmtCountdown, storeCountdownSeconds, crossedStoreReset } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
+import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden } from './lib/uiPrefs.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
@@ -75,7 +76,8 @@ export default function App() {
   const [marketLabel, setMarketLabel] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
   const [selectedOffer, setSelectedOffer] = useState(0);
-  const [previewsHidden, setPreviewsHidden] = useState(false);
+  // [H] skin-preview toggle persists across restarts via uiPrefs.
+  const [previewsHidden, setPreviewsHidden] = useState(getPreviewsHidden);
   const [previewIndex, setPreviewIndex] = useState(null);
   const [commandFlash, setCommandFlash] = useState(null);
   const [toast, setToast] = useState(null);
@@ -333,10 +335,15 @@ export default function App() {
         if (!busy && selectedAccount) doRefresh(selectedAccount.label);
         return;
       case 'h':
-      case 'H':
+      case 'H': {
+        // Compute next state outside the updater: a side effect inside a state
+        // updater runs twice under StrictMode.
+        const nextHidden = !previewsHidden;
         flash('H');
-        setPreviewsHidden((hidden) => !hidden);
+        setPreviewsHidden(nextHidden);
+        persistPreviewsHidden(nextHidden);
         return;
+      }
       case 'p':
       case 'P': {
         const offer = selectedAccount?.status === 'ready' ? selectedAccount.store?.offers?.[Math.min(selectedOffer, (selectedAccount.store?.offers?.length ?? 1) - 1)] : null;

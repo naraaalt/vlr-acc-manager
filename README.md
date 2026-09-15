@@ -14,7 +14,7 @@ A Windows Electron desktop app for viewing the daily Valorant store across saved
 - Accounts load progressively on startup (one at a time, with a progress readout) instead of firing every store request at once.
 - Windows notification when the daily store rotates (00:00 UTC / 07:00 WIB): new offers are announced and the accounts sync automatically. Clicking the notification brings the window forward.
 - Open a focused market page for an individual account.
-- Hide skin previews when you only need account details.
+- Hide skin previews when you only need account details; the choice persists across restarts.
 - Save the current Riot Client login or open Riot Client and save a newly signed-in account automatically.
 - Import detected account snapshots from TCNO Account Switcher.
 - Resizable window with custom window controls, F11 fullscreen, and an automatic re-sync after the machine wakes from sleep.
