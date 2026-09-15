@@ -51,7 +51,10 @@ const WEAPON_WORDS = {
   MELEE: ['KNIFE', 'BLADE', 'AXE', 'SWORD', 'KATANA', 'NEEDLE', 'TALON', 'HAMMER', 'FISTS', 'FAN', 'SCYTHE', 'KUNAI', 'DAGGER', 'SPEAR', 'BAT', 'CLAW', 'GLOVES']
 };
 export function weaponCategory(skinName) {
-  const words = String(skinName || '').toUpperCase().split(/\s+/);
+  // filter(Boolean) drops the empty token that String.split always leaves
+  // behind ('' splits to [''], 'name ' to [..., '']), so the 'WEAPON' fallback
+  // below is actually reachable and a trailing space cannot yield an empty label.
+  const words = String(skinName || '').toUpperCase().split(/\s+/).filter(Boolean);
   for (const word of words) {
     for (const [category, list] of Object.entries(WEAPON_WORDS)) {
       if (list.includes(word)) return category;

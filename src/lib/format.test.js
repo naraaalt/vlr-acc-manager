@@ -155,11 +155,16 @@ describe('weaponCategory', () => {
     expect(weaponCategory('Kuronami no Yaiba')).toBe('YAIBA');
   });
 
-  it('returns an empty string for empty input (the WEAPON fallback is unreachable)', () => {
-    // ''.split(/\s+/) is [''], so words.length is 1 and the ternary never takes
-    // the 'WEAPON' branch. Asserted as-is: this is current behaviour, not a spec.
-    expect(weaponCategory('')).toBe('');
-    expect(weaponCategory(null)).toBe('');
+  it('falls back to WEAPON for empty input', () => {
+    expect(weaponCategory('')).toBe('WEAPON');
+    expect(weaponCategory(null)).toBe('WEAPON');
+    expect(weaponCategory(undefined)).toBe('WEAPON');
+    expect(weaponCategory('   ')).toBe('WEAPON');
+  });
+
+  it('ignores leading and trailing whitespace instead of returning an empty label', () => {
+    expect(weaponCategory('  Kuronami no Yaiba ')).toBe('YAIBA');
+    expect(weaponCategory('Reaver Vandal ')).toBe('RIFLE');
   });
 });
 
