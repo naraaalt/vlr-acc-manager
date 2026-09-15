@@ -14,17 +14,17 @@
     "check": "node scripts/check-electron.mjs"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
-    "concurrently": "latest",
-    "cross-env": "latest",
-    "electron": "latest",
+    "@vitejs/plugin-react": "^6.0.5",
+    "concurrently": "^10.0.4",
+    "cross-env": "^10.1.0",
+    "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
-    "vite": "latest",
-    "wait-on": "latest"
+    "vite": "^8.2.1",
+    "wait-on": "^9.1.0"
   },
   "dependencies": {
-    "react": "latest",
-    "react-dom": "latest"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "build": {
     "appId": "com.naraaalt.valorantaccountmanager",
