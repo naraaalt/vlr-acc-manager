@@ -185,6 +185,8 @@ This app is intended for your own Riot accounts on your own Windows computer.
 | `npm start` | Open Electron using the built renderer. |
 | `npm run check` | Check Electron JavaScript files for syntax errors. |
 | `npm run lint` | Lint the whole project with ESLint. |
+| `npm run lint:summary` | Print lint results grouped by rule. |
+| `npm run css:dead` | List class selectors in `styles.css` that nothing references. |
 | `npm test` | Run the unit tests (Vitest) once. |
 | `npm run test:watch` | Run the unit tests in watch mode. |
 | `npm run verify` | Run check, lint, tests and build in one go. |

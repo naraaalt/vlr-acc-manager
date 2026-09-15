@@ -136,6 +136,14 @@ if (location.hash === '#skeleton') {
   // Freeze the loading state: never resolve getDashboard.
   window.valorant.getDashboard = () => new Promise(() => {});
 }
+if (location.hash === '#dash-error') {
+  // Global dashboard failure: renders the ACCOUNTS UNAVAILABLE panel, which is
+  // the only branch that mounts .error-actions.
+  window.valorant.getDashboard = async () => ({
+    ok: false, errorKind: 'network',
+    error: 'The Riot service took too long to respond. Please try again.'
+  });
+}
 if (location.hash.startsWith('#theme-')) {
   // Flip theme by clicking the header switch until its label matches the
   // requested theme — robust against mount timing (no keyboard listener yet).
