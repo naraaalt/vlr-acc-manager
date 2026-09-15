@@ -5,6 +5,9 @@ export function useAccounts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [errorKind, setErrorKind] = useState(null);
+  // Whether a Riot Client session is readable right now — independent of how
+  // many accounts are saved. Drives the header RIOT SESSION pill.
+  const [session, setSession] = useState({ live: false });
   const [tcno, setTcno] = useState({ available: false, accounts: [] });
   const [switchingLabel, setSwitchingLabel] = useState(null);
 
@@ -18,7 +21,8 @@ export function useAccounts() {
         setErrorKind(dashboard.errorKind ?? null);
         throw new Error(dashboard.error);
       }
-      setAccounts(dashboard.data);
+      setAccounts(dashboard.data.accounts);
+      setSession(dashboard.data.session ?? { live: false });
       if (detected.ok) setTcno(detected.data);
     } catch (requestError) { setError(requestError.message || 'Unable to load saved accounts.'); }
     finally { setLoading(false); setProgress(null); }
@@ -100,5 +104,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno };
+  return { accounts, loading, error, errorKind, progress, session, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno };
 }

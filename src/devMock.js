@@ -95,7 +95,7 @@ export function installDevMock() {
     getCurrentStore: async () => respond(freshStore(accounts[0]?.accountName ?? 'Rifat#1337')),
     getDashboard: async () => {
       if (DASHBOARD_DELAY_MS) await sleep(DASHBOARD_DELAY_MS);
-      return respond(accounts);
+      return respond({ accounts, session: { live: true } });
     },
     captureCurrentAccount: async (label) => {
       accounts = accounts.filter((account) => account.label !== label);

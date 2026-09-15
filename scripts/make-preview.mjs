@@ -98,7 +98,7 @@ const accounts = [
 
 const bridge = `
 window.valorant = {
-  getDashboard: async () => ({ ok: true, data: ${JSON.stringify(accounts)} }),
+  getDashboard: async () => ({ ok: true, data: { accounts: ${JSON.stringify(accounts)}, session: { live: true } } }),
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' })

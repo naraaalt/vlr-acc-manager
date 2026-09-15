@@ -17,6 +17,20 @@ async function resolvedStore(session) {
   };
 }
 
+// PUUID of the Riot Client session that is signed in right now, or null while
+// the client sits at its sign-in screen (or is not running).
+async function readLivePuuid() {
+  try { return (await getSessionTokens()).puuid; } catch { return null; }
+}
+
+// Which saved account the live Riot Client session belongs to. The live
+// session's PUUID is authoritative: VamAccountId.instance is only written by
+// this app's own switcher, so it never marks an account signed in through Riot
+// Client directly. The marker is the fallback while no session is readable.
+function isLiveAccount(storedPuuid, id, livePuuid, activeId) {
+  return livePuuid !== null ? storedPuuid === livePuuid : id === activeId;
+}
+
 export async function captureCurrentAccount(label) {
   const session = await getSessionTokens();
   const shard = await resolveShard(session);
@@ -81,8 +95,8 @@ export async function getSavedAccountStore(label) {
 
 export async function refreshAccountStore(label) {
   const account = await loadAccount(label);
-  const activeId = await getActiveAccountId();
-  if (account.id === activeId) {
+  const livePuuid = await readLivePuuid();
+  if (isLiveAccount(account.puuid ?? account.apiSession?.puuid ?? null, account.id, livePuuid, await getActiveAccountId())) {
     const refreshed = await captureCurrentAccount(label);
     return { store: refreshed.store, active: true };
   }
@@ -92,8 +106,7 @@ export async function refreshAccountStore(label) {
 export async function getDashboard(onProgress = null) {
   const accounts = await listAccounts();
   const activeId = await getActiveAccountId();
-  let livePuuid = null;
-  try { livePuuid = (await getSessionTokens()).puuid; } catch { /* Riot Client may be at its sign-in screen. */ }
+  const livePuuid = await readLivePuuid();
   const hydrated = await Promise.all(accounts.map(async (account) => {
     try {
       const saved = await loadAccount(account.label);
@@ -108,7 +121,7 @@ export async function getDashboard(onProgress = null) {
   // resolved account is handed to onProgress so the renderer paints it
   // immediately instead of waiting for the whole batch.
   const loadOne = async ({ account, storedPuuid, loadError }) => {
-    const active = account.id === activeId && storedPuuid === livePuuid;
+    const active = isLiveAccount(storedPuuid, account.id, livePuuid, activeId);
     if (loadError) return { ...account, active, status: 'error', error: loadError.message, errorKind: kindOf(loadError) };
     if (storedPuuid && owners.has(storedPuuid)) {
       return { ...account, active: false, status: 'error', errorKind: 'duplicate', error: `This saved session duplicates “${owners.get(storedPuuid)}”. It was not loaded as a second account.` };
@@ -118,10 +131,18 @@ export async function getDashboard(onProgress = null) {
     catch (error) { return { ...account, active, status: 'error', error: error.message, errorKind: kindOf(error) }; }
   };
 
-  if (hydrated.length <= 1) {
+  // The header pill and the per-account ONLINE badge answer different
+  // questions, so both travel in the payload: `session.live` is true whenever
+  // a Riot Client session is readable, even with no saved account at all.
+  const dashboard = (loaded) => ({ accounts: loaded, session: { live: livePuuid !== null } });
+
+  // No saved accounts yet: return an empty list. Falling through to the
+  // stagger path would yield a one-element array holding undefined, which
+  // crashes the renderer on its first account read (blank window).
+  if (hydrated.length === 0) return dashboard([]);
+  if (hydrated.length === 1) {
     // Single account: nothing to stagger.
-    const [first] = await Promise.all(hydrated.map(loadOne));
-    return [first];
+    return dashboard(await Promise.all(hydrated.map(loadOne)));
   }
   const results = new Array(hydrated.length);
   // Fixed 350ms stagger + sequential start (each store fetch itself takes
@@ -140,5 +161,5 @@ export async function getDashboard(onProgress = null) {
       });
   });
   await chain;
-  return results;
+  return dashboard(results);
 }

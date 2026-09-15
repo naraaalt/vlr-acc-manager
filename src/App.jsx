@@ -84,7 +84,7 @@ export default function App() {
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
   const toastTimer = useRef(null);
-  const { accounts: loadedAccounts, loading, error, errorKind, progress, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
+  const { accounts: loadedAccounts, loading, error, errorKind, progress, session, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
  const confirm = useConfirm();
 
   // The signed-in account always sits at the top of the list, even after an
@@ -124,7 +124,9 @@ export default function App() {
       ?? null;
   const activeIndex = selectedAccount ? visible.indexOf(selectedAccount) : -1;
   const marketAccount = accounts.find((account) => account.label === marketLabel && account.status === 'ready');
-  const sessionActive = accounts.some((account) => account.active);
+  // The pill reports the Riot Client session itself, not saved-account
+  // bookkeeping: a signed-in client is ACTIVE even with zero accounts saved.
+  const sessionActive = Boolean(session.live);
 
   useEffect(() => { setSelectedOffer(0); }, [selectedLabel]);
 
