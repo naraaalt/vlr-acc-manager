@@ -1,26 +1,33 @@
-# Valorant Account Manager
+# Sapphire
 
-A Windows Electron desktop app for viewing the daily Valorant store across saved Riot Client accounts. It can show the current store, Riot ID, account level, competitive rank, RR, and the time remaining before the store refreshes.
+A Windows Electron desktop app for viewing the daily Valorant store across saved Riot Client accounts. It presents a keyboard-first terminal-style dashboard showing the current store, Riot ID, account level, competitive rank, RR, and the time remaining before the store refreshes.
 
 ## Features
 
-- View all four daily store offers, including skin names, images, and VP prices.
+- Terminal-style dashboard: dark panels, 1px borders, monospace type, dense but aligned data.
+- View the daily store offers, including skin names, rendered art, and VP prices.
+- Preview a skin's in-game video (upgrade levels and colour variants) in a modal, with a volume slider that persists across skins and restarts.
 - Save multiple Riot Client account sessions locally and switch between them.
 - View Riot ID, account level, competitive rank, RR, and placement progress.
-- Refresh one account's market or refresh all saved accounts.
+- Refresh one account's market or refresh all saved accounts, rate-limited to one refresh per account per 30 seconds to avoid Riot throttling.
+- Cause-specific error recovery: a locked file, an expired session, a network failure, and a duplicate session each get their own explanation and the action that actually fixes them.
+- Accounts load progressively on startup (one at a time, with a progress readout) instead of firing every store request at once.
 - Open a focused market page for an individual account.
 - Hide skin previews when you only need account details.
 - Save the current Riot Client login or open Riot Client and save a newly signed-in account automatically.
 - Import detected account snapshots from TCNO Account Switcher.
+- Resizable window with custom window controls, F11 fullscreen, and an automatic re-sync after the machine wakes from sleep.
 
 ## For end users
 
 Use one of the Windows executables created by `npm run package:win`; no terminal is required after packaging.
 
-- Run `Valorant Account Manager Setup <version>.exe` to install the app and optionally create desktop and Start Menu shortcuts.
-- Run `Valorant Account Manager <version>.exe` for a portable version that does not need installation.
+- Run `Sapphire Setup <version>.exe` to install the app and optionally create desktop and Start Menu shortcuts.
+- Run `Sapphire <version>.exe` for a portable version that does not need installation.
 
 The application uses a custom window without the default File/Edit/View/Window menu bar.
+
+Saved accounts live in `%APPDATA%\valorant-account-manager` and stay there across upgrades: the app pins that path explicitly so the folder name is unaffected by the product rename.
 
 ## Requirements
 
@@ -76,8 +83,8 @@ npm run package:win
 
 The generated files are placed in the `release` folder:
 
-- `Valorant Account Manager Setup <version>.exe` is the installer. It can create Start Menu and desktop shortcuts, so users do not need to open a terminal.
-- `Valorant Account Manager <version>.exe` is the portable executable that can be run without installation.
+- `Sapphire Setup <version>.exe` is the installer. It can create Start Menu and desktop shortcuts, so users do not need to open a terminal.
+- `Sapphire <version>.exe` is the portable executable that can be run without installation.
 
 Windows may show a SmartScreen warning for an unsigned personal application. This is expected until the executable is code-signed.
 
@@ -109,11 +116,33 @@ You can also import account snapshots detected from TCNO Account Switcher.
 ## Using saved accounts
 
 - **Switch to this account** restores the saved Riot Client session and opens Riot Client.
-- **Refresh market** refreshes only that account's store, rank, and level.
+- **Refresh market** refreshes only that account's store, rank, and level. Manual refreshes are rate-limited to one per account per 30 seconds; pressing again inside the cooldown reports the remaining wait instead of sending the request.
 - **View market** opens a larger store-only view for the account.
 - **Hide skins** collapses the offer previews while keeping account details visible.
 
-If a saved API session expires, switch to that account and use **Save current login** to capture a fresh session.
+When an account fails to load, the overview panel explains the specific cause and offers the action that fixes it — a locked local file asks you to close Riot Client and retry, an expired session offers **Switch account**, a network failure points at Riot's status page, and a duplicate session offers **Delete entry**.
+
+## Keyboard shortcuts
+
+The app is keyboard-first; the same list is visible in the **Commands** panel in the sidebar.
+
+| Key | Action |
+| --- | --- |
+| `↑` / `↓` | Move between saved accounts |
+| `←` / `→` | Move between the daily store offers |
+| `Enter` | Open the market view for the selected account |
+| `S` | Switch to the selected account |
+| `R` | Refresh the selected account |
+| `Ctrl+R` | Refresh all accounts |
+| `P` | Preview the selected skin's video |
+| `H` | Show or hide skin previews |
+| `M` | Toggle the market view |
+| `A` | Add an account |
+| `X` | Delete the selected account |
+| `I` | Import detected TCNO accounts (when available) |
+| `Esc` | Close the open panel or preview |
+| `F11` | Toggle fullscreen |
+| `Q` | Quit |
 
 ## Security and privacy
 
