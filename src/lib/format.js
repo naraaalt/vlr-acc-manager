@@ -97,3 +97,14 @@ export function nextStoreReset(now = Date.now()) {
 export function storeCountdownSeconds(now = Date.now()) {
   return Math.max(0, (nextStoreReset(now) - now) / 1000);
 }
+
+// The rotation instant that `now` has just crossed since `previous`, or null
+// when no boundary lies between them. Monotonic by construction: once the
+// boundary has passed, the following tick computes its own next boundary, so
+// a single reset fires exactly once — and a machine asleep across several days
+// still reports a single rotation rather than one per elapsed day.
+export function crossedStoreReset(previous, now) {
+  if (!Number.isFinite(previous) || !Number.isFinite(now) || now <= previous) return null;
+  const boundary = nextStoreReset(previous);
+  return now >= boundary ? boundary : null;
+}

@@ -45,6 +45,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
+  // Windows attributes notifications to the AppUserModelId. Without this the
+  // toast is labelled "Electron" in dev and misses the app identity when
+  // packaged. Keep it equal to electron-builder's appId.
+  app.setAppUserModelId('com.naraaalt.valorantaccountmanager');
   registerIpcHandlers();
   createWindow();
   mainWindow = BrowserWindow.getAllWindows()[0];

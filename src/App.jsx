@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
-import { fmtCountdown, storeCountdownSeconds } from './lib/format.js';
+import { fmtCountdown, storeCountdownSeconds, crossedStoreReset } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
@@ -153,6 +153,30 @@ export default function App() {
     clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setCommandFlash(null), 650);
   }, []);
+
+  // Daily rotation: the moment the countdown crosses 00:00 UTC the store is
+  // new, so tell the user and pull it. crossedStoreReset is monotonic, so this
+  // fires once per rotation — including when the machine slept through it.
+  // Skipped while a load is already in flight so a resume-triggered refresh
+  // and this one cannot stack into a double request.
+  const lastTickRef = useRef(now);
+  useEffect(() => {
+    const previous = lastTickRef.current;
+    lastTickRef.current = now;
+    if (crossedStoreReset(previous, now) == null) return;
+    window.valorant?.notifyStoreReset?.({
+      title: 'Daily store refreshed',
+      body: `${accounts.length} account${accounts.length === 1 ? '' : 's'} — new offers are live.`
+    });
+    if (!loading) {
+      markRefreshAll();
+      refresh()
+        .then(() => showToast('DAILY STORE RESET — SYNCED', 'ok'))
+        .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
+    } else {
+      showToast('DAILY STORE RESET', 'ok');
+    }
+  }, [now, loading, accounts.length, refresh, showToast]);
 
   const doSwitch = useCallback(async (label) => {
     const target = label ?? selectedAccount?.label;

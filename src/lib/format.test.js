@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   cx, parseRank, divisionColor, weaponCategory,
-  fmtCountdown, relativeTime, nextStoreReset, storeCountdownSeconds
+  fmtCountdown, relativeTime, nextStoreReset, storeCountdownSeconds, crossedStoreReset
 } from './format.js';
 
 describe('nextStoreReset', () => {
@@ -55,6 +55,66 @@ describe('storeCountdownSeconds', () => {
 
   it('never goes negative', () => {
     expect(storeCountdownSeconds(Date.UTC(2026, 8, 15, 12, 0, 0))).toBeGreaterThan(0);
+  });
+});
+
+describe('crossedStoreReset', () => {
+  it('returns null when both instants sit in the same UTC day', () => {
+    expect(crossedStoreReset(Date.UTC(2026, 8, 15, 10, 0, 0), Date.UTC(2026, 8, 15, 10, 0, 1)))
+      .toBeNull();
+  });
+
+  it('returns the boundary the tick stepped over', () => {
+    expect(crossedStoreReset(Date.UTC(2026, 8, 15, 23, 59, 59), Date.UTC(2026, 8, 16, 0, 0, 0)))
+      .toBe(Date.UTC(2026, 8, 16, 0, 0, 0));
+  });
+
+  it('counts a tick that lands exactly on the boundary', () => {
+    expect(crossedStoreReset(Date.UTC(2026, 8, 15, 23, 59, 59), Date.UTC(2026, 8, 16, 0, 0, 0)))
+      .not.toBeNull();
+  });
+
+  it('does not fire twice for the same rotation', () => {
+    const boundary = crossedStoreReset(Date.UTC(2026, 8, 15, 23, 59, 59), Date.UTC(2026, 8, 16, 0, 0, 1));
+    expect(boundary).not.toBeNull();
+    // The next tick is already past the boundary, so its own next boundary is a
+    // day away — this is what makes the notification fire exactly once.
+    expect(crossedStoreReset(Date.UTC(2026, 8, 16, 0, 0, 1), Date.UTC(2026, 8, 16, 0, 0, 2)))
+      .toBeNull();
+  });
+
+  it('returns null when the clock does not advance (same instant)', () => {
+    expect(crossedStoreReset(Date.UTC(2026, 8, 15, 12, 0, 0), Date.UTC(2026, 8, 15, 12, 0, 0)))
+      .toBeNull();
+  });
+
+  it('returns null when the clock goes backwards', () => {
+    expect(crossedStoreReset(Date.UTC(2026, 8, 16, 1, 0, 0), Date.UTC(2026, 8, 15, 12, 0, 0)))
+      .toBeNull();
+  });
+
+  it('returns null for non-finite input', () => {
+    expect(crossedStoreReset(Number.NaN, Date.UTC(2026, 8, 16, 0, 0, 0))).toBeNull();
+    expect(crossedStoreReset(Date.UTC(2026, 8, 15, 0, 0, 0), undefined)).toBeNull();
+    expect(crossedStoreReset(undefined, undefined)).toBeNull();
+  });
+
+  it('reports a single rotation after a multi-day sleep', () => {
+    // Machine suspended for three days: the user missed three rotations but the
+    // toast should appear once, not three times.
+    const fired = crossedStoreReset(Date.UTC(2026, 8, 12, 12, 0, 0), Date.UTC(2026, 8, 15, 9, 0, 0));
+    expect(fired).toBe(Date.UTC(2026, 8, 13, 0, 0, 0));
+  });
+
+  it('fires exactly once across a simulated day of one-second ticks', () => {
+    let previous = Date.UTC(2026, 8, 15, 0, 0, 0);
+    let fires = 0;
+    const dayEnd = Date.UTC(2026, 8, 16, 0, 0, 0);
+    for (let now = previous + 1000; now <= dayEnd; now += 1000) {
+      if (crossedStoreReset(previous, now) != null) fires += 1;
+      previous = now;
+    }
+    expect(fires).toBe(1);
   });
 });
 

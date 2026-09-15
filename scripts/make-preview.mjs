@@ -97,12 +97,26 @@ const accounts = [
 ];
 
 const bridge = `
+window.__notifyCalls = [];
 window.valorant = {
   getDashboard: async () => ({ ok: true, data: { accounts: ${JSON.stringify(accounts)}, session: { live: true } } }),
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
-  switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' })
+  switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
+  notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; }
 };
+// QA hook #reset: shift Date.now so the app believes it is a few seconds before
+// the next 00:00 UTC rotation. Real time then carries the countdown across the
+// boundary, exercising the whole chain (tick -> crossedStoreReset -> notify +
+// refresh) without waiting for midnight or touching the system clock.
+if (location.hash === '#reset') {
+  const realNowFn = Date.now.bind(Date);
+  const realNow = realNowFn();
+  const at = new Date(realNow);
+  const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1);
+  const offset = (midnight - 5000) - realNow;
+  Date.now = () => realNowFn() + offset;
+}
 `;
 
 const index = readFileSync(path.join(dist, 'index.html'), 'utf8');

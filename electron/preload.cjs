@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('valorant', {
   onSystemResumed: (callback) => {
     ipcRenderer.on('system:resumed', (_event, payload) => callback(payload));
   },
+  notifyStoreReset: (payload) => ipcRenderer.invoke('notify:store-reset', payload),
   captureCurrentAccount: (label) => ipcRenderer.invoke('accounts:capture-current', label),
   addManualAccount: (label) => ipcRenderer.invoke('accounts:add-manually', label),
   refreshAccountMarket: (label) => ipcRenderer.invoke('accounts:refresh-market', label),

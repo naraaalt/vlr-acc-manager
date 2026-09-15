@@ -12,6 +12,7 @@ A Windows Electron desktop app for viewing the daily Valorant store across saved
 - Refresh one account's market or refresh all saved accounts, rate-limited to one refresh per account per 30 seconds to avoid Riot throttling.
 - Cause-specific error recovery: a locked file, an expired session, a network failure, and a duplicate session each get their own explanation and the action that actually fixes them.
 - Accounts load progressively on startup (one at a time, with a progress readout) instead of firing every store request at once.
+- Windows notification when the daily store rotates (00:00 UTC / 07:00 WIB): new offers are announced and the accounts sync automatically. Clicking the notification brings the window forward.
 - Open a focused market page for an individual account.
 - Hide skin previews when you only need account details.
 - Save the current Riot Client login or open Riot Client and save a newly signed-in account automatically.

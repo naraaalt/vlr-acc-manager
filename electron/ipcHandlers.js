@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, Notification, ipcMain } from 'electron';
 import { getSessionTokens, resolveShard } from './riot/auth.js';
 import { fetchStorefront, getDailyOffers } from './riot/store.js';
 import { resolveDailyOffers } from './riot/contentCache.js';
@@ -52,6 +52,26 @@ export function registerIpcHandlers() {
   ipcMain.handle('accounts:switch', (_, label) => result(() => switchToAccount(label)));
   ipcMain.handle('accounts:tcno-detect', () => result(findTcnoAccounts));
   ipcMain.handle('accounts:tcno-import', (_, ids) => result(() => importTcnoAccounts(ids)));
+
+  // Daily store rotation notice. Clicking it brings the window forward — the
+  // point is to pull the user back to a store they have not seen yet.
+  ipcMain.handle('notify:store-reset', (event, payload) => {
+    if (!Notification.isSupported()) return { ok: true, data: false };
+    const notice = new Notification({
+      title: payload?.title ?? 'Daily store refreshed',
+      body: payload?.body ?? 'New offers are live for your saved accounts.',
+      silent: false
+    });
+    notice.on('click', () => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) return;
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    });
+    notice.show();
+    return { ok: true, data: true };
+  });
 
   // Custom window controls (frameless title bar).
   ipcMain.handle('window:minimize', (event) => { BrowserWindow.fromWebContents(event.sender)?.minimize(); });
