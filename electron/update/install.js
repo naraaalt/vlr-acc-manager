@@ -1,0 +1,79 @@
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+
+// Modul ini juga bebas 'electron': yang butuh process.execPath / pid menerimanya sebagai
+// parameter, jadi tesnya bisa jalan di Node biasa.
+
+export function buildInstallerArgs(installDir) {
+  const args = ['/S'];
+  // NSIS: /D= harus parameter terakhir dan TIDAK boleh dikutip, spasi boleh.
+  if (installDir) args.push(`/D=${installDir}`);
+  return args;
+}
+
+export function helperPath(scratchRoot) {
+  return path.join(scratchRoot, 'sapphire-update', 'apply-update.cjs');
+}
+
+// Helper dijalankan oleh Electron-nya SENDIRI dengan ELECTRON_RUN_AS_NODE=1 — jadi tidak butuh
+// Node/python/runtime lain di mesin user, dan tidak lewat cmd.exe (yang bikin masalah quoting).
+export function buildHelperSource() {
+  return `// Di-generate oleh Sapphire. Node builtin saja.
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const [installer, installDir, exePath, parentPidRaw, dryRun] = process.argv.slice(2);
+const parentPid = Number(parentPidRaw);
+const logPath = path.join(path.dirname(installer), 'update.log');
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const log = (message) => {
+  try { fs.appendFileSync(logPath, new Date().toISOString() + ' ' + message + '\\n'); } catch {}
+};
+
+(async () => {
+  log('helper start pid=' + process.pid + ' waiting for ' + parentPid + ' dryRun=' + dryRun);
+  // Installer tidak bisa menimpa Sapphire.exe selagi app jalan, jadi tunggu app benar-benar mati.
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    try { process.kill(parentPid, 0); } catch { break; }
+    await sleep(500);
+  }
+  log('parent gone, installing');
+
+  if (dryRun === 'true') {
+    log('dry run: not running the installer');
+    fs.writeFileSync(path.join(path.dirname(installer), 'dry-run-marker.txt'), 'helper ran\\n');
+    return;
+  }
+
+  const args = ['/S'];
+  if (installDir) args.push('/D=' + installDir);
+  const child = spawn(installer, args, { stdio: 'ignore' });
+  await new Promise((resolve) => child.on('exit', (code) => { log('installer exit ' + code); resolve(); }));
+
+  if (fs.existsSync(exePath)) {
+    log('relaunching ' + exePath);
+    spawn(exePath, [], { detached: true, stdio: 'ignore' }).unref();
+  } else {
+    log('exe missing after install: ' + exePath);
+  }
+})().catch((error) => log('helper failed: ' + (error && error.stack)));
+`;
+}
+
+/**
+ * Jalankan helper lalu keluar dari app. Pemanggil yang bertanggung jawab memanggil app.quit().
+ */
+export function runUpdateHelper({ scratchRoot, installerPath: installer, installDir, exePath, pid, electronPath, dryRun = false }) {
+  const helper = helperPath(scratchRoot);
+  // ELECTRON_RUN_AS_NODE: binary Electron yang sudah terpasang dijalankan sebagai Node biasa.
+  const child = spawn(electronPath, [
+    helper, installer, installDir ?? '', exePath, String(pid), String(dryRun)
+  ], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+  });
+  child.unref();
+  return child.pid;
+}
