@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddAccountModal from './components/AddAccountModal.jsx';
 import Sidebar from './components/Sidebar.jsx';
+import SettingsPanel from './components/SettingsPanel.jsx';
 import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
@@ -8,6 +9,7 @@ import { fmtCountdown, storeCountdownSeconds, crossedStoreReset, parseRank } fro
 import { presentError } from './lib/errorPresentation.js';
 import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortMode, setSortMode as persistSortMode, nextSortMode } from './lib/uiPrefs.js';
 import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
+import { getSetting, subscribeSettings } from './lib/settings.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
@@ -85,6 +87,9 @@ export default function App() {
   const [commandFlash, setCommandFlash] = useState(null);
   const [toast, setToast] = useState(null);
   const [quitOpen, setQuitOpen] = useState(false);
+  // The settings panel is opened from the header button only (no keybind), but it has to be
+  // in the keymap guard: see the first block of keyHandler.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
@@ -286,6 +291,14 @@ export default function App() {
   // concurrent rendering, where a discarded render would still mutate it.
   const keyHandlerRef = useRef(null);
   const keyHandler = (event) => {
+    if (settingsOpen) {
+      // Without this the app's own hotkeys fire BEHIND the open modal: X would raise the
+      // delete confirmation, Q the quit prompt, A the add-account modal, H would toggle a
+      // setting nobody can see. The panel's own onKeyDown owns the arrows and Enter; this
+      // only closes on Escape.
+      if (event.key === 'Escape') setSettingsOpen(false);
+      return;
+    }
     if (quitOpen) {
       if (event.key === 'Enter') { event.preventDefault(); window.close(); }
       else if (event.key === 'Escape') setQuitOpen(false);
@@ -410,6 +423,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // The settings panel is the other writer for these two, and App mirrors both in state.
+  // Subscribing is what keeps a change made in the panel visible immediately in the sidebar,
+  // the store and the sort button instead of drifting until the next launch.
+  useEffect(() => subscribeSettings(() => {
+    setPreviewsHidden(getSetting('previewsHidden'));
+    setSortMode(getSetting('sortMode'));
+  }), []);
+
   const pill = error ? { on: false, text: 'ERROR' } : loading ? { on: false, text: 'SYNCING' } : sessionActive ? { on: true, text: 'ACTIVE' } : { on: false, text: 'STANDBY' };
   const offersCount = selectedAccount?.status === 'ready' ? (selectedAccount.store?.offers?.length ?? 0) : 0;
 
@@ -420,6 +441,7 @@ export default function App() {
         <span className="brand-vlr">SAPPHIRE</span>
       </div>
       <div className="header-right">
+        <button type="button" className="ghost-btn hdr-settings" onClick={() => setSettingsOpen(true)} title="Settings" aria-label="Open settings"><Icon name="settings" /></button>
         <button type="button" className="ghost-btn" onClick={() => setAdding(true)}><Icon name="plus" />ADD</button>
         <span className="session-pill">
           <span className={`dot ${pill.on ? 'on' : pill.text === 'ERROR' ? 'err' : 'off'}`} />
@@ -517,6 +539,14 @@ export default function App() {
         <div className="quit-big">QUIT SAPPHIRE</div>
         <div className="quit-sub">PRESS <kbd>ENTER</kbd> TO CLOSE THE APP · <kbd>ESC</kbd> TO RESUME</div>
       </div>
+    </div>
+
+    <div
+      className={`overlay${settingsOpen ? ' open' : ''}`}
+      onClick={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}
+      aria-hidden={!settingsOpen}
+    >
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
 
     {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}

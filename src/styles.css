@@ -629,3 +629,47 @@ input::placeholder { color: var(--faint); }
 :root[data-density='compact'] .cmd-list li { padding: 3px 6px; font-size: 10px; }
 :root[data-density='compact'] .win-btn { width: 34px; }
 :root[data-density='compact'] .cards { gap: 6px; padding: 7px; }
+
+/* ---------- settings panel ----------
+   Rendered from the registry in src/lib/settings.js, so nothing here is per-setting.
+   Rows are one line high and the hint for the focused row lives in .set-foot instead:
+   two lines per row overflows the list budget on a 1280x832 window. */
+.settings-modal { width: 660px; }
+.set-list { list-style: none; max-height: 56vh; overflow-y: auto; }
+.set-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+}
+.set-row:last-child { border-bottom: none; }
+.set-row:hover { background: var(--panel2); }
+.set-row.sel { background: var(--panel3); box-shadow: inset 3px 0 0 var(--brand); }
+/* A value that differs from its default is visible at a glance, the same rule the sort
+   button already follows (.sort-btn.on). The revert button is the indicator. */
+.set-row.changed .set-label { color: var(--brand); }
+.set-label { color: var(--text-bright); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.set-value { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.set-revert-slot { flex: 0 0 20px; display: flex; justify-content: flex-end; }
+.set-revert {
+  border: 1px solid var(--border2); background: var(--panel2); color: var(--dim);
+  padding: 2px 4px; display: flex; align-items: center;
+}
+.set-revert:hover { color: var(--brand); border-color: var(--brand-deep); }
+.set-pill {
+  border: 1px solid var(--border2); background: var(--panel2); color: var(--dim);
+  font-size: 9px; font-weight: 700; letter-spacing: .14em; padding: 3px 9px; min-width: 42px; text-align: center;
+}
+.set-pill.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.set-opt {
+  border: 1px solid var(--border2); background: var(--panel2); color: var(--dim);
+  font-size: 9px; font-weight: 700; letter-spacing: .1em; padding: 3px 8px;
+}
+.set-opt:hover { color: var(--text-bright); border-color: var(--faint); }
+.set-opt.on { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.set-readout { color: var(--dim); font-size: 10px; font-weight: 700; min-width: 34px; text-align: right; }
+.settings-modal input[type='range'] { width: 120px; accent-color: var(--brand); }
+.set-foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border-top: 1px solid var(--border2); min-height: 36px;
+}
+.set-focus-hint { color: var(--dim); font-size: 9.5px; letter-spacing: .06em; }
+.set-note { margin-left: auto; color: var(--faint); font-size: 9px; letter-spacing: .12em; }

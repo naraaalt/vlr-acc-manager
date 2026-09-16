@@ -161,6 +161,16 @@ if (location.hash === '#dash-error') {
     error: 'The Riot service took too long to respond. Please try again.'
   });
 }
+if (location.hash === '#settings') {
+  // Click the real header control until the panel is mounted, rather than firing a
+  // synthetic keydown: synthetic keys fire before React mounts the keymap and no-op.
+  const timer = setInterval(() => {
+    const button = document.querySelector('.hdr-settings');
+    if (!button) return;
+    clearInterval(timer);
+    button.click();
+  }, 300);
+}
 if (location.hash === '#compact') {
   // Seed the store's own key BEFORE the app module runs. The qa hook block executes during
   // parsing and the app is a deferred module, so this exercises the real load path

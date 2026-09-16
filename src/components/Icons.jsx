@@ -28,6 +28,7 @@ const PATHS = {
   soundoff: <><path d="M2 5.2h2.2L7.4 2.4v9.2L4.2 8.8H2Z" /><path d="M9.4 5.4l3.2 3.2M12.6 5.4 9.4 8.6" /></>,
   search: <><circle cx="6.2" cy="6.2" r="4.2" /><path d="M9.4 9.4l3.4 3.4" /></>,
   sort: <><path d="M4.6 11.4V3.1M2.9 4.8 4.6 3.1l1.7 1.7" /><path d="M9.4 2.6v8.3M7.7 9.2l1.7 1.7 1.7-1.7" /></>,
+  settings: <><path d="M2 4.2h10M2 9.8h10" /><circle cx="5.2" cy="4.2" r="1.6" /><circle cx="8.8" cy="9.8" r="1.6" /></>,
   plus: <><path d="M7 2.5v9M2.5 7h9" /></>,
   warn: <><path d="M7 1.8 12.8 12H1.2Z" /><path d="M7 5.4v3" /><circle cx="7" cy="10.2" r="0.7" /></>
 };
