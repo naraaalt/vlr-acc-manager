@@ -14,6 +14,21 @@ let mainWindow = null;
 const LEGACY_USER_DATA_NAME = 'valorant-account-manager';
 app.setPath('userData', path.join(app.getPath('appData'), LEGACY_USER_DATA_NAME));
 
+// Single-instance lock. A second copy would load and re-save the same accounts
+// index concurrently — the EPERM-on-rename failure the error panel exists to
+// explain — and could drive the Riot switcher at the same time as the first.
+// This MUST come after the userData pin above: the lock is keyed on the
+// userData path, so taking it any earlier would guard a directory the app does
+// not actually use and let two copies past.
+const isPrimaryInstance = app.requestSingleInstanceLock();
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1280,
@@ -41,28 +56,40 @@ function createWindow() {
   });
   if (devServerUrl) window.loadURL(devServerUrl);
   else window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  return window;
 }
 
-app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
-  // Windows attributes notifications to the AppUserModelId. Without this the
-  // toast is labelled "Electron" in dev and misses the app identity when
-  // packaged. Keep it equal to electron-builder's appId.
-  app.setAppUserModelId('com.naraaalt.valorantaccountmanager');
-  registerIpcHandlers();
-  createWindow();
-  mainWindow = BrowserWindow.getAllWindows()[0];
+if (!isPrimaryInstance) {
+  // Another copy already owns the data directory. Quit without opening a
+  // window or registering handlers; the running copy is told to come forward
+  // through its own 'second-instance' event.
+  app.quit();
+} else {
+  app.on('second-instance', () => focusMainWindow());
 
-  // System sleep/resume: all timers (countdown, rate-limit map) and the Riot
-  // session state are stale after sleep. Tell the renderer to re-sync; it
-  // re-runs the dashboard fetch (progressive) and re-anchors timers.
-  powerMonitor.on('resume', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('system:resumed', { resumedAt: Date.now() });
-    }
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+    // Windows attributes notifications to the AppUserModelId. Without this the
+    // toast is labelled "Electron" in dev and misses the app identity when
+    // packaged. Keep it equal to electron-builder's appId.
+    app.setAppUserModelId('com.naraaalt.valorantaccountmanager');
+    registerIpcHandlers();
+    mainWindow = createWindow();
+
+    // System sleep/resume: all timers (countdown, rate-limit map) and the Riot
+    // session state are stale after sleep. Tell the renderer to re-sync; it
+    // re-runs the dashboard fetch (progressive) and re-anchors timers.
+    powerMonitor.on('resume', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('system:resumed', { resumedAt: Date.now() });
+      }
+    });
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+      else focusMainWindow();
+    });
   });
 
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-});
-
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+}
