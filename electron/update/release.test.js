@@ -32,6 +32,16 @@ describe('pickInstaller', () => {
   it('picks the NSIS installer, not the portable build', () => {
     expect(pickInstaller(assets).browser_download_url).toBe('https://x/setup');
   });
+  // GitHub menormalkan spasi di nama asset hasil upload REST jadi TITIK. Fixture yang cuma
+  // memakai nama berspasi bikin bug ini lolos dari unit test dan baru ketahuan dari release
+  // SUNGGUHAN: updater tidak menemukan installer-nya dan berhenti menawarkan update.
+  it('accepts the dot-normalised name GitHub actually stores', () => {
+    expect(pickInstaller([{ name: 'Sapphire.Setup.0.1.3.exe', browser_download_url: 'https://x/setup' }]).browser_download_url).toBe('https://x/setup');
+  });
+  it('still refuses the portable build under either spelling', () => {
+    expect(pickInstaller([{ name: 'Sapphire.0.1.3.exe' }])).toBeNull();
+    expect(pickInstaller([{ name: 'Sapphire 0.1.3.exe' }])).toBeNull();
+  });
   it('returns null when no installer was attached', () => {
     expect(pickInstaller([{ name: 'notes.txt' }])).toBeNull();
     expect(pickInstaller([])).toBeNull();

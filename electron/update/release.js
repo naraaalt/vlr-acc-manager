@@ -23,10 +23,17 @@ export function compareVersions(a, b) {
 }
 
 // electron-builder juga bikin build portable ("Sapphire 0.1.3.exe"). Itu BUKAN yang dijalankan
-// untuk update di tempat, jadi filter nama di bawah yang menyingkirkannya.
+// untuk update di tempat, jadi filter yang menyingkirkannya.
+//
+// Pemisah katanya spasi/titik/dash/underscore, bukan cuma spasi: GitHub menormalkan spasi di nama
+// asset upload REST jadi TITIK, jadi release yang SUNGGUHAN berisi "Sapphire.Setup.0.1.3.exe".
+// Menerima keduanya penting — pola yang hanya menerima spasi membuat updater tidak menemukan
+// installer-nya dan diam-diam berhenti menawarkan update.
+const INSTALLER_NAME = /^Sapphire[ ._-]+Setup[ ._-]+.+\.exe$/i;
+
 export function pickInstaller(assets) {
   const list = Array.isArray(assets) ? assets : [];
-  return list.find((asset) => /^Sapphire Setup .+\.exe$/i.test(String(asset?.name ?? ''))) ?? null;
+  return list.find((asset) => INSTALLER_NAME.test(String(asset?.name ?? ''))) ?? null;
 }
 
 function base(currentVersion, reason) {
