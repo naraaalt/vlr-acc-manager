@@ -9,7 +9,7 @@ import { fmtCountdown, storeCountdownSeconds, crossedStoreReset, parseRank } fro
 import { presentError } from './lib/errorPresentation.js';
 import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortMode, setSortMode as persistSortMode, nextSortMode } from './lib/uiPrefs.js';
 import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
-import { getSetting, subscribeSettings } from './lib/settings.js';
+import { getSetting, subscribeSettings, getLastSelection, setLastSelection } from './lib/settings.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
@@ -110,18 +110,32 @@ export default function App() {
   const busy = Boolean(switchingLabel) || Boolean(busyLabel);
   const tcnoAvailable = Boolean(tcno.available);
 
-  // Keep a selection once accounts load: active account, else first ready, else first.
-  // Falls back the same way after a refresh removed the current selection.
+  // Keep a selection once accounts load: the remembered account when REOPEN LAST ACCOUNT is
+  // on, else the active account, else first ready, else first. Falls back the same way after
+  // a refresh removed the current selection.
+  //
+  // The remembered label is only a preference among accounts that still exist. It can never
+  // outrank the signed-in invariant — that is about ORDER in the list and is owned by
+  // orderAccounts, not about which row is highlighted.
   useEffect(() => {
     setSelectedLabel((current) => {
       if (current && accounts.some((account) => account.label === current)) return current;
-      const fallback = accounts.find((account) => account.active)
+      const remembered = getSetting('restoreLastSelection') ? getLastSelection() : null;
+      const rememberedAccount = remembered ? accounts.find((account) => account.label === remembered) : null;
+      const fallback = rememberedAccount
+        ?? accounts.find((account) => account.active)
         ?? accounts.find((account) => account.status === 'ready')
         ?? accounts[0]
         ?? null;
       return fallback?.label ?? null;
     });
   }, [accounts]);
+
+  // Remember the selection only while the setting is on, so turning it off leaves nothing
+  // behind for a later launch to pick up.
+  useEffect(() => {
+    if (getSetting('restoreLastSelection') && selectedLabel) setLastSelection(selectedLabel);
+  }, [selectedLabel]);
 
   const needle = filter.trim().toLocaleLowerCase();
   const visible = accounts.filter((account) => `${account.label} ${account.accountName ?? ''} ${account.store?.accountName ?? ''}`.toLocaleLowerCase().includes(needle));
@@ -188,10 +202,18 @@ export default function App() {
     const previous = lastTickRef.current;
     lastTickRef.current = now;
     if (crossedStoreReset(previous, now) == null) return;
-    window.valorant?.notifyStoreReset?.({
-      title: 'Daily store refreshed',
-      body: `${accounts.length} account${accounts.length === 1 ? '' : 's'} — new offers are live.`
-    });
+    if (getSetting('notifyOnRotation')) {
+      window.valorant?.notifyStoreReset?.({
+        title: 'Daily store refreshed',
+        body: `${accounts.length} account${accounts.length === 1 ? '' : 's'} — new offers are live.`
+      });
+    }
+    if (!getSetting('autoSyncOnRotation')) {
+      // Still surface the event rather than swallowing it: the store rotated whether or not
+      // this app pulled the new offers.
+      showToast('DAILY STORE RESET — AUTO-SYNC OFF', 'ok');
+      return;
+    }
     if (!loading) {
       markRefreshAll();
       refresh()
@@ -205,13 +227,17 @@ export default function App() {
   const doSwitch = useCallback(async (label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
-    const ok = await confirm({
-      title: 'SWITCH ACCOUNT',
-      body: `Switch the Riot Client to “${target}”? The client restarts with this account's saved session.`,
-      confirmLabel: 'SWITCH',
-      danger: true
-    });
-    if (!ok) return;
+    // CONFIRM SWITCH & DELETE is the one setting that REMOVES a safeguard, so the prompt is
+    // read here rather than baked in: off means act immediately.
+    if (getSetting('confirmDestructive')) {
+      const ok = await confirm({
+        title: 'SWITCH ACCOUNT',
+        body: `Switch the Riot Client to “${target}”? The client restarts with this account's saved session.`,
+        confirmLabel: 'SWITCH',
+        danger: true
+      });
+      if (!ok) return;
+    }
     flash('S');
     switchTo(target)
       .then(() => showToast(`SWITCHED SESSION → ${target.toUpperCase()}`, 'ok'))
@@ -252,13 +278,15 @@ export default function App() {
   const doDelete = useCallback(async (label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
-    const ok = await confirm({
-      title: 'DELETE ACCOUNT',
-      body: `Delete saved account “${target}”? This cannot be undone.`,
-      confirmLabel: 'DELETE',
-      danger: true
-    });
-    if (!ok) return;
+    if (getSetting('confirmDestructive')) {
+      const ok = await confirm({
+        title: 'DELETE ACCOUNT',
+        body: `Delete saved account “${target}”? This cannot be undone.`,
+        confirmLabel: 'DELETE',
+        danger: true
+      });
+      if (!ok) return;
+    }
     flash('X');
     remove(target)
       .then(() => showToast('ACCOUNT DELETED', 'warn'))

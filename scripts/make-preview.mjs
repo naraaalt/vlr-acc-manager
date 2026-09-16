@@ -115,12 +115,30 @@ const accounts = [
 
 const bridge = `
 window.__notifyCalls = [];
+// Live list, so the mutating methods below really change what the next getDashboard
+// returns. Inlining it into getDashboard (as this used to) made delete and rename
+// unverifiable from the preview: the renderer made the call and the list never changed,
+// which looks exactly like a broken setting.
+window.__previewAccounts = ${JSON.stringify(accounts)};
 window.valorant = {
-  getDashboard: async () => ({ ok: true, data: { accounts: ${JSON.stringify(accounts)}, session: { live: true } } }),
+  getDashboard: async () => ({ ok: true, data: { accounts: window.__previewAccounts, session: { live: true } } }),
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
-  notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; }
+  notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
+  deleteAccount: async (label) => {
+    const before = window.__previewAccounts.length;
+    window.__previewAccounts = window.__previewAccounts.filter((account) => account.label !== label);
+    return window.__previewAccounts.length === before
+      ? { ok: false, error: 'No saved account “' + label + '”.' }
+      : { ok: true, data: null };
+  },
+  renameAccount: async (oldLabel, newLabel) => {
+    const target = window.__previewAccounts.find((account) => account.label === oldLabel);
+    if (!target) return { ok: false, error: 'No saved account “' + oldLabel + '”.' };
+    target.label = newLabel;
+    return { ok: true, data: null };
+  }
 };
 // QA hook #reset: shift Date.now so the app believes it is a few seconds before
 // the next 00:00 UTC rotation. Real time then carries the countdown across the
@@ -170,6 +188,29 @@ if (location.hash === '#settings') {
     clearInterval(timer);
     button.click();
   }, 300);
+}
+if (location.hash.startsWith('#rotation')) {
+  // Land the clock 5s before the next 00:00 UTC so REAL time carries the app across the
+  // boundary within seconds (the tick is 1s), exercising tick -> crossedStoreReset -> the
+  // rotation effect end to end. Query params seed the two settings that effect reads:
+  // ?notify=0 and ?autosync=0 turn them off.
+  const realNow = Date.now;
+  const nextMidnight = Math.ceil(realNow() / 86400000) * 86400000;
+  const offset = nextMidnight - 5000 - realNow();
+  Date.now = () => realNow() + offset;
+  const params = new URLSearchParams(location.search);
+  const seeded = (() => { try { return JSON.parse(localStorage.getItem('vlr.settings') || '{}'); } catch { return {}; } })();
+  if (params.has('notify')) seeded.notifyOnRotation = params.get('notify') !== '0';
+  if (params.has('autosync')) seeded.autoSyncOnRotation = params.get('autosync') !== '0';
+  localStorage.setItem('vlr.settings', JSON.stringify(seeded));
+  // Record every toast, because the rotation toast can expire before the harness reads the
+  // DOM — a probe that samples once cannot tell "never shown" from "shown and gone".
+  window.__toasts = [];
+  new MutationObserver(() => {
+    const el = document.querySelector('.toast');
+    const text = el ? el.textContent : null;
+    if (text && window.__toasts[window.__toasts.length - 1] !== text) window.__toasts.push(text);
+  }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 }
 if (location.hash === '#compact') {
   // Seed the store's own key BEFORE the app module runs. The qa hook block executes during

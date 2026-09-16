@@ -96,7 +96,9 @@ export function installDevMock() {
       if (DASHBOARD_DELAY_MS) await sleep(DASHBOARD_DELAY_MS);
       return respond({ accounts, session: { live: true } });
     },
-    notifyStoreReset: async () => respond(true),
+    // Recorded so the headless harness can assert the rotation notice fired, or that it did
+    // NOT: a call that returns true is indistinguishable from one never made.
+    notifyStoreReset: async (payload) => { (window.__notifyCalls ??= []).push(payload ?? null); return respond(true); },
     captureCurrentAccount: async (label) => {
       accounts = accounts.filter((account) => account.label !== label);
       accounts = [makeAccount(label), ...accounts];
