@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 // Modul ini juga bebas 'electron': yang butuh process.execPath / pid menerimanya sebagai
 // parameter, jadi tesnya bisa jalan di Node biasa.
@@ -13,6 +14,18 @@ export function buildInstallerArgs(installDir) {
 
 export function helperPath(scratchRoot) {
   return path.join(scratchRoot, 'sapphire-update', 'apply-update.cjs');
+}
+
+// Helper-nya DI-GENERATE, jadi ia harus ditulis ke disk sebelum ada yang mencoba menjalankannya.
+// Ini pernah terlewat: runUpdateHelper men-spawn path helper tanpa ada apa pun yang menulisnya,
+// jadi Electron dijalankan sebagai Node dengan path yang tidak ada, keluar seketika, dan karena
+// stdio-nya sengaja diabaikan tidak ada pesan apa pun — gejalanya cuma "app menutup, versi tidak
+// berubah".
+export function writeHelper(scratchRoot) {
+  const helper = helperPath(scratchRoot);
+  mkdirSync(path.dirname(helper), { recursive: true });
+  writeFileSync(helper, buildHelperSource(), 'utf8');
+  return helper;
 }
 
 // Helper dijalankan oleh Electron-nya SENDIRI dengan ELECTRON_RUN_AS_NODE=1 — jadi tidak butuh
@@ -65,7 +78,7 @@ const log = (message) => {
  * Jalankan helper lalu keluar dari app. Pemanggil yang bertanggung jawab memanggil app.quit().
  */
 export function runUpdateHelper({ scratchRoot, installerPath: installer, installDir, exePath, pid, electronPath, dryRun = false }) {
-  const helper = helperPath(scratchRoot);
+  const helper = writeHelper(scratchRoot);
   // ELECTRON_RUN_AS_NODE: binary Electron yang sudah terpasang dijalankan sebagai Node biasa.
   const child = spawn(electronPath, [
     helper, installer, installDir ?? '', exePath, String(pid), String(dryRun)

@@ -1,5 +1,8 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildInstallerArgs, buildHelperSource, helperPath } from './install.js';
+import { buildHelperSource, buildInstallerArgs, helperPath, writeHelper } from './install.js';
 
 describe('buildInstallerArgs', () => {
   // NSIS: /D= harus parameter TERAKHIR dan tidak boleh dikutip, walaupun path-nya ada spasi.
@@ -42,6 +45,24 @@ describe('buildHelperSource', () => {
   it('uses only node builtins', () => {
     expect(source).toContain("require('node:child_process')");
     expect(source).not.toContain('require(\'electron\')');
+  });
+});
+
+// Ditemukan dari UPDATE SUNGGUHAN, bukan dari unit test: runUpdateHelper MEN-spawn path helper,
+// dan tidak ada apa pun yang menulis file itu. Electron dijalankan sebagai Node dengan path yang
+// tidak ada akan keluar seketika TANPA pesan, karena stdio-nya sengaja diabaikan — jadi gejalanya
+// "app menutup, versi tidak berubah, tidak ada log". Tes teks di atas tidak bisa menangkapnya, dan
+// proof dry-run juga tidak, karena proof itu MENULIS sendiri file helper-nya.
+describe('writeHelper', () => {
+  it('writes the generated helper to disk, because nothing else does', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'sapphire-helper-test-'));
+    try {
+      const written = writeHelper(root);
+      expect(written).toBe(helperPath(root));
+      expect(await readFile(written, 'utf8')).toBe(buildHelperSource());
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
