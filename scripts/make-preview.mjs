@@ -161,6 +161,32 @@ if (location.hash === '#dash-error') {
     error: 'The Riot service took too long to respond. Please try again.'
   });
 }
+if (location.hash === '#no-content') {
+  // The content service is down: Riot's storefront still answered, so the store
+  // renders with unknown names and no previews, plus the note explaining why.
+  // This is the only branch that mounts that note.
+  const realDashboard = window.valorant.getDashboard;
+  window.valorant.getDashboard = async () => {
+    const payload = await realDashboard();
+    if (!payload?.ok) return payload;
+    return {
+      ...payload,
+      data: {
+        ...payload.data,
+        accounts: payload.data.accounts.map((account) => account.store ? {
+          ...account,
+          store: {
+            ...account.store,
+            contentUnavailable: true,
+            offers: account.store.offers.map((offer) => ({
+              ...offer, name: 'Unknown skin', image: null, video: null, levels: [], chromas: []
+            }))
+          }
+        } : account)
+      }
+    };
+  };
+}
 if (location.hash.startsWith('#theme-')) {
   // Flip theme by clicking the header switch until its label matches the
   // requested theme — robust against mount timing (no keyboard listener yet).

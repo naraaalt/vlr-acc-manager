@@ -25,13 +25,28 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-async function getClientVersion() {
-  const response = await fetchWithTimeout('https://valorant-api.com/v1/version');
-  if (!response.ok) throw new Error(`Could not retrieve the Valorant client version (${response.status}).`);
-  const payload = await response.json();
-  const version = payload?.data?.riotClientVersion;
-  if (!version) throw new Error('The public version service returned no Riot client version.');
-  return version;
+// The Riot client version is identical for every account, and Riot rejects a
+// request made with a stale one. Fetch it once per session instead of once per
+// account — and once per parallel request within an account, which is why five
+// accounts used to make ten identical calls to the public version service.
+// A failure clears the memo rather than being remembered, so one blip does not
+// make every later account fail without even trying.
+let clientVersionPromise;
+function getClientVersion() {
+  if (!clientVersionPromise) {
+    clientVersionPromise = (async () => {
+      const response = await fetchWithTimeout('https://valorant-api.com/v1/version');
+      if (!response.ok) throw new Error(`Could not retrieve the Valorant client version (${response.status}).`);
+      const payload = await response.json();
+      const version = payload?.data?.riotClientVersion;
+      if (!version) throw new Error('The public version service returned no Riot client version.');
+      return version;
+    })().catch((error) => {
+      clientVersionPromise = undefined;
+      throw error;
+    });
+  }
+  return clientVersionPromise;
 }
 
 async function getAuthenticatedHeaders({ accessToken, entitlementsToken }) {

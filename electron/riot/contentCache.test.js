@@ -78,3 +78,71 @@ describe('resolveDailyOffers', () => {
     expect(await resolveDailyOffers([])).toEqual([]);
   });
 });
+
+// One blip in the content service must not break every account for the rest of
+// the session. The rejected promise used to be remembered, so each later
+// account failed instantly without even making a request.
+describe('a failed content fetch is not remembered', () => {
+  it('retries on the next account and succeeds once the service is back', async () => {
+    const resolveDailyOffers = await loadResolver();
+
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    await expect(resolveDailyOffers([{ offerId: LEVEL_UUID, price: 1775 }])).rejects.toThrow(/skin content/i);
+
+    // Service recovers.
+    stubContentApi();
+    const calls = globalThis.fetch.mock.calls.length;
+    const [offer] = await resolveDailyOffers([{ offerId: LEVEL_UUID, price: 1775 }]);
+    expect(globalThis.fetch.mock.calls.length).toBeGreaterThan(calls);
+    expect(offer.name).toBe('Reaver Vandal');
+  });
+
+  it('does not re-fetch while the cached index is still valid', async () => {
+    const resolveDailyOffers = await loadResolver();
+    await resolveDailyOffers([{ offerId: LEVEL_UUID, price: 1775 }]);
+    const callsAfterFirst = globalThis.fetch.mock.calls.length;
+    await resolveDailyOffers([{ offerId: OTHER_LEVEL_UUID, price: 2175 }]);
+    expect(globalThis.fetch.mock.calls.length).toBe(callsAfterFirst);
+  });
+});
+
+// Skin names and previews are decorative, and they come from a third-party
+// service rather than from Riot. Losing them must not hide a store Riot served.
+describe('resolveDailyOffersOrFallback', () => {
+  it('keeps the store usable, with prices, when the content service is down', async () => {
+    vi.resetModules();
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    const { resolveDailyOffersOrFallback } = await import('./contentCache.js');
+
+    const result = await resolveDailyOffersOrFallback([
+      { offerId: LEVEL_UUID, price: 1775 },
+      { offerId: OTHER_LEVEL_UUID, price: 2175 }
+    ]);
+
+    expect(result.contentUnavailable).toBe(true);
+    // Riot's own data survives: the ids (React keys) and the prices.
+    expect(result.offers.map((offer) => offer.id)).toEqual([LEVEL_UUID, OTHER_LEVEL_UUID]);
+    expect(result.offers.map((offer) => offer.price)).toEqual([1775, 2175]);
+    expect(result.offers.every((offer) => offer.name === 'Unknown skin')).toBe(true);
+    expect(result.offers.every((offer) => offer.image === null && offer.video === null)).toBe(true);
+  });
+
+  it('flags nothing and names every skin when the content service works', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveDailyOffersOrFallback } = await import('./contentCache.js');
+
+    const result = await resolveDailyOffersOrFallback([{ offerId: LEVEL_UUID, price: 1775 }]);
+
+    expect(result.contentUnavailable).toBe(false);
+    expect(result.offers[0].name).toBe('Reaver Vandal');
+  });
+
+  it('gives the fallback records the same shape as resolved ones', async () => {
+    const resolveDailyOffers = await loadResolver();
+    const [resolved] = await resolveDailyOffers([{ offerId: LEVEL_UUID, price: 1775 }]);
+    const { unavailableDailyOffers } = await import('./contentCache.js');
+    const [fallback] = unavailableDailyOffers([{ offerId: LEVEL_UUID, price: 1775 }]);
+    expect(Object.keys(fallback).sort()).toEqual(Object.keys(resolved).sort());
+  });
+});

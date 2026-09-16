@@ -1,7 +1,7 @@
 import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, saveAccount, updateAccountSession } from './accountStore.js';
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
 import { fetchAccountProfile, fetchStorefront, getDailyOffers } from '../riot/store.js';
-import { resolveDailyOffers } from '../riot/contentCache.js';
+import { resolveDailyOffersOrFallback } from '../riot/contentCache.js';
 import { fail, classifyError } from '../lib/errorKind.js';
 
 function expiry(accessToken) {
@@ -9,9 +9,15 @@ function expiry(accessToken) {
 }
 async function resolvedStore(session) {
   const [storefront, profile] = await Promise.all([fetchStorefront(session), fetchAccountProfile(session)]);
+  // Riot's storefront is the authoritative part: the offers and their prices come
+  // from Riot itself. Names, images and showcase videos come from a third-party
+  // content service, so losing that service degrades the labels on a store Riot
+  // served perfectly well — it must not turn the account into an error.
+  const { offers, contentUnavailable } = await resolveDailyOffersOrFallback(getDailyOffers(storefront));
   return {
     accountName: session.accountName ?? null,
-    offers: await resolveDailyOffers(getDailyOffers(storefront)),
+    offers,
+    contentUnavailable,
     expiresIn: storefront?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds ?? null,
     profile
   };

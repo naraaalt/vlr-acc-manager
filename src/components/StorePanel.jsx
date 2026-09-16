@@ -131,6 +131,9 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
   return (
     <section className="panel store" aria-label="Daily store">
       {title}
+      {store?.contentUnavailable && (
+        <p className="snap-note">SKIN NAMES AND PREVIEWS UNAVAILABLE — RIOT&apos;S OFFERS AND PRICES BELOW.</p>
+      )}
       {previewsHidden
         ? <p className="store-hidden">{offers.length} STORE SKINS HIDDEN — PRESS [H] TO SHOW.</p>
         : <div className="cards">

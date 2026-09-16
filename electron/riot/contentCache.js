@@ -13,9 +13,23 @@ async function fetchWithTimeout(url) {
   }
 }
 
-async function getSkinIndex() {
+// The index is built once per session and shared by every account. A FAILED
+// attempt must not be remembered: keeping the rejected promise meant one blip
+// in the content service made every later account fail instantly without even
+// making a request, for the rest of the session. Forget it and let the next
+// account try again.
+function getSkinIndex() {
   if (!skinIndexPromise) {
-    skinIndexPromise = fetchWithTimeout('https://valorant-api.com/v1/weapons/skins')
+    skinIndexPromise = buildSkinIndex().catch((error) => {
+      skinIndexPromise = undefined;
+      throw error;
+    });
+  }
+  return skinIndexPromise;
+}
+
+async function buildSkinIndex() {
+  return fetchWithTimeout('https://valorant-api.com/v1/weapons/skins')
       .then(async (response) => {
         if (!response.ok) throw new Error(`Could not retrieve Valorant skin content (${response.status}).`);
         return response.json();
@@ -56,8 +70,6 @@ async function getSkinIndex() {
         }
         return index;
       });
-  }
-  return skinIndexPromise;
 }
 
 export async function resolveDailyOffers(offers) {
@@ -79,4 +91,29 @@ export async function resolveDailyOffers(offers) {
       price: offer.price
     };
   });
+}
+
+// The offer ids and their prices came from Riot; only the decorative labels
+// (name, image, showcase video) come from the content service. This produces
+// the same record shape with those labels absent, so the cards, the keyboard
+// navigation and the prices all keep working while the previews do not.
+export function unavailableDailyOffers(offers) {
+  return offers.map((offer) => ({
+    id: offer.offerId,
+    name: 'Unknown skin',
+    image: null,
+    video: null,
+    levels: [],
+    chromas: [],
+    category: null,
+    price: offer.price
+  }));
+}
+
+export async function resolveDailyOffersOrFallback(offers) {
+  try {
+    return { offers: await resolveDailyOffers(offers), contentUnavailable: false };
+  } catch {
+    return { offers: unavailableDailyOffers(offers), contentUnavailable: true };
+  }
 }
