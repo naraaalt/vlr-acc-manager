@@ -95,7 +95,7 @@ export default function App() {
   const flashTimer = useRef(null);
   const toastTimer = useRef(null);
   const { accounts: loadedAccounts, loading, error, errorKind, progress, session, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
- const confirm = useConfirm();
+  const { confirm, pending: confirmPending } = useConfirm();
 
   // The signed-in account always sits at the top of the list, even after an
   // app restart: the backend `active` flag only holds while that account's
@@ -319,6 +319,13 @@ export default function App() {
   // concurrent rendering, where a discarded render would still mutate it.
   const keyHandlerRef = useRef(null);
   const keyHandler = (event) => {
+    if (confirmPending) {
+      // A pending confirmation is the topmost layer and owns the keyboard. Its own listener
+      // handles Escape/Enter/Tab (in the capture phase), but it only calls preventDefault —
+      // so without this guard every other key reaches the keymap BEHIND it: H toggled skin
+      // previews, Q raised the quit prompt, A raised the add-account modal.
+      return;
+    }
     if (settingsOpen) {
       // Without this the app's own hotkeys fire BEHIND the open modal: X would raise the
       // delete confirmation, Q the quit prompt, A the add-account modal, H would toggle a

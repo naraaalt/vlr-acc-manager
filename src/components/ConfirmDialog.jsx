@@ -43,7 +43,11 @@ export function ConfirmProvider({ children }) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [dialog, settle]);
 
-  const value = useMemo(() => ({ confirm }), [confirm]);
+  // `pending` is what lets the app's keymap stay out of the way while a dialog is up. The
+  // dialog's own listener is in the CAPTURE phase but only calls preventDefault, so keys it
+  // does not handle still reach the keymap behind it (H toggled skin previews, Q raised the
+  // quit prompt).
+  const value = useMemo(() => ({ confirm, pending: Boolean(dialog) }), [confirm, dialog]);
 
   return (
     <ConfirmContext.Provider value={value}>
@@ -85,7 +89,13 @@ export function ConfirmProvider({ children }) {
   );
 }
 
+// Stable fallback so a consumer outside the provider still gets both fields with a stable
+// identity, and keeps the warning that says why its dialog is a native one.
+const NO_PROVIDER = {
+  confirm: async () => { console.warn('useConfirm outside provider'); return window.confirm?.('Confirm?') ?? false; },
+  pending: false
+};
+
 export function useConfirm() {
-  const context = useContext(ConfirmContext);
-  return context?.confirm ?? (async () => { console.warn('useConfirm outside provider'); return window.confirm?.('Confirm?') ?? false; });
+  return useContext(ConfirmContext) ?? NO_PROVIDER;
 }
