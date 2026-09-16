@@ -1,8 +1,11 @@
-import { BrowserWindow, Notification, ipcMain } from 'electron';
+import { app, BrowserWindow, Notification, ipcMain } from 'electron';
+import path from 'node:path';
 import { deleteAccount, renameAccount } from './accounts/accountStore.js';
 import { addManualAccount, captureCurrentAccount, getDashboard, refreshAccountStore } from './accounts/accountService.js';
 import { findTcnoAccounts, importTcnoAccounts } from './accounts/tcnoImport.js';
 import { switchToAccount } from './accounts/switcher.js';
+import { checkForUpdates, downloadInstaller } from './update/service.js';
+import { runUpdateHelper } from './update/install.js';
 import { classifyError } from './lib/errorKind.js';
 
 async function result(action) {
@@ -50,6 +53,49 @@ export function registerIpcHandlers() {
     notice.show();
     return { ok: true, data: true };
   });
+
+  // ---- update ----
+  ipcMain.handle('app:version', () => app.getVersion());
+
+  ipcMain.handle('update:check', (_, options) => result(() => checkForUpdates({
+    currentVersion: app.getVersion(),
+    force: Boolean(options?.force)
+  })));
+
+  // Hasil unduhan disimpan di SINI, bukan dikirim balik ke renderer untuk dipakai lagi:
+  // renderer tidak boleh menyebut path yang akan dieksekusi.
+  let verified = null;
+
+  ipcMain.handle('update:download', (event, { info } = {}) => result(async () => {
+    const sender = event.sender;
+    const downloaded = await downloadInstaller(info, {
+      root: app.getPath('temp'),
+      onProgress: (progress) => { if (!sender.isDestroyed()) sender.send('update:progress', progress); }
+    });
+    verified = {
+      ...downloaded,
+      installDir: path.dirname(app.getPath('exe')),
+      exePath: app.getPath('exe'),
+      name: info?.installer?.name ?? 'update.exe'
+    };
+    return { path: verified.path, bytes: verified.bytes, name: verified.name };
+  }));
+
+  ipcMain.handle('update:install', () => result(async () => {
+    if (!verified) throw new Error('Nothing has been downloaded yet.');
+    const helperPid = runUpdateHelper({
+      scratchRoot: app.getPath('temp'),
+      installerPath: verified.path,
+      installDir: verified.installDir,
+      exePath: verified.exePath,
+      pid: process.pid,
+      electronPath: process.execPath
+    });
+    // Helper sudah detached dan menunggu PID ini hilang; keluar supaya installer bisa menimpa
+    // Sapphire.exe. Delay kecil supaya balasan IPC-nya sempat sampai ke renderer dulu.
+    setTimeout(() => app.quit(), 400);
+    return { helperPid };
+  }));
 
   // Custom window controls (frameless title bar).
   ipcMain.handle('window:minimize', (event) => { BrowserWindow.fromWebContents(event.sender)?.minimize(); });

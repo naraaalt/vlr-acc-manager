@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld('valorant', {
     ipcRenderer.on('window:maximized-changed', (_event, maximized) => callback(maximized));
   },
   switchAccount: (label) => ipcRenderer.invoke('accounts:switch', label),
+  getAppVersion: () => ipcRenderer.invoke('app:version'),
+  checkForUpdates: (options) => ipcRenderer.invoke('update:check', options),
+  downloadUpdate: (info) => ipcRenderer.invoke('update:download', { info }),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateProgress: (callback) => {
+    ipcRenderer.on('update:progress', (_event, progress) => callback(progress));
+  },
   detectTcno: () => ipcRenderer.invoke('accounts:tcno-detect'),
   importTcno: (ids) => ipcRenderer.invoke('accounts:tcno-import', ids)
 });

@@ -54,7 +54,7 @@ async function fetchJson(url, fetchImpl, timeoutMs) {
     if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
     return await response.json();
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('The update check took too long. Try again.');
+    if (error.name === 'AbortError') throw new Error('The update check took too long. Try again.', { cause: error });
     throw error;
   } finally {
     clearTimeout(timer);
@@ -101,7 +101,7 @@ export async function downloadInstaller(info, { root, onProgress, fetchImpl = fe
   } catch (error) {
     clearTimeout(timer);
     await rm(target, { force: true });
-    if (error.name === 'AbortError') throw new Error('The download took too long and was cancelled.');
+    if (error.name === 'AbortError') throw new Error('The download took too long and was cancelled.', { cause: error });
     throw error;
   }
   clearTimeout(timer);
