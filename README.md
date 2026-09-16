@@ -184,7 +184,12 @@ GitHub immediately.
 ## Updates
 
 Install once, then the app updates itself: it reads the latest GitHub Release for this repository and
-compares it against the running version.
+compares it against the running version. The pill in the header when one is available, and the
+confirmation it opens:
+
+![Update available](docs/screenshots/update.png)
+
+![Update confirmation](docs/screenshots/update-dialog.png)
 
 - **Checking.** Once per launch, a few seconds after the window appears, unless CHECK UPDATES ON
   LAUNCH is off. It is one small request, and it stays silent when it fails — being offline is not
