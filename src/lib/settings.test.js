@@ -28,10 +28,10 @@ describe('defaults', () => {
     for (const setting of SETTINGS) expect(getSetting(setting.id)).toEqual(setting.default);
   });
 
-  it('declares exactly nine settings, each with a unique id', async () => {
+  it('declares exactly ten settings, each with a unique id', async () => {
     const { SETTINGS } = await loadSettings();
-    expect(SETTINGS).toHaveLength(9);
-    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(9);
+    expect(SETTINGS).toHaveLength(10);
+    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(10);
   });
 
   it('defaults to the full (non-compact) density', async () => {

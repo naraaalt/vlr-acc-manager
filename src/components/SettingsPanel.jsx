@@ -7,7 +7,8 @@ import { SETTINGS, getSettings, setSetting, subscribeSettings } from '../lib/set
 //
 // Rows are deliberately one line high. The hint for the FOCUSED row renders in the panel
 // footer: at two lines per row the list overflows its max-height on a 1280x832 window, and
-// nine rows at 51px each is 459px against a 466px budget.
+// ten rows at ~35px each is ~350px against a 466px budget, and the SYSTEM row adds ~40px —
+// both re-measured headlessly rather than trusted (see the plan's phase 7).
 //
 // Escape is handled by App.jsx's keymap guard, which also swallows every other key while
 // this is open. Arrows and Enter are handled here, by the modal itself.

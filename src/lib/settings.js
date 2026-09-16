@@ -89,6 +89,14 @@ export const SETTINGS = [
     hint: 'Select the account you were viewing last, instead of the signed-in one.',
     kind: 'toggle',
     default: false
+  },
+  {
+    id: 'autoCheckUpdates',
+    label: 'CHECK UPDATES ON LAUNCH',
+    hint: 'One small request to GitHub when the app starts. CHECK NOW in the panel footer works either way.',
+    kind: 'toggle',
+    // Default ON: fitur ini ada justru supaya tidak perlu ada yang ingat ngecek sendiri.
+    default: true
   }
 ];
 
