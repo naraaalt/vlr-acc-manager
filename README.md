@@ -2,6 +2,16 @@
 
 A Windows Electron desktop app for viewing the daily Valorant store across saved Riot Client accounts. It presents a keyboard-first terminal-style dashboard showing the current store, Riot ID, account level, competitive rank, RR, and the time remaining before the store refreshes.
 
+## Screenshots
+
+Saved accounts on the left, the daily store for the selected one on the right:
+
+![Accounts and the daily store](docs/screenshots/main.png)
+
+Every setting, plus the running version and the update check:
+
+![Settings](docs/screenshots/settings.png)
+
 ## Features
 
 - Terminal-style dashboard: dark panels, 1px borders, monospace type, dense but aligned data.
@@ -26,6 +36,9 @@ Use one of the Windows executables created by `npm run package:win`; no terminal
 
 - Run `Sapphire Setup <version>.exe` to install the app and optionally create desktop and Start Menu shortcuts.
 - Run `Sapphire <version>.exe` for a portable version that does not need installation.
+
+After the first install, updates come from inside the app — see [Updates](#updates). The installer
+only has to be run by hand once.
 
 The application uses a custom window without the default File/Edit/View/Window menu bar.
 
@@ -88,6 +101,9 @@ The generated files are placed in the `release` folder:
 - `Sapphire Setup <version>.exe` is the installer. It can create Start Menu and desktop shortcuts, so users do not need to open a terminal.
 - `Sapphire <version>.exe` is the portable executable that can be run without installation.
 
+Only the installer needs to be published for in-app updates to work; the portable build is for
+keeping a copy that does not need installation. See [Publishing a release](#publishing-a-release).
+
 Windows may show a SmartScreen warning for an unsigned personal application. This is expected until the executable is code-signed.
 
 ## Verify the project
@@ -142,6 +158,67 @@ You can also import account snapshots detected from TCNO Account Switcher.
 
 When an account fails to load, the overview panel explains the specific cause and offers the action that fixes it — a locked local file asks you to close Riot Client and retry, an expired session offers **Switch account**, a network failure points at Riot's status page, and a duplicate session offers **Delete entry**.
 
+## Settings
+
+Open the panel with the button next to the app name in the header. It is keyboard-navigable like the
+rest of the app: `↑`/`↓` to move, `Enter` or `←`/`→` to change the focused row, `Esc` to close.
+
+| Setting | What it does |
+| --- | --- |
+| STORE ROTATION NOTICE | Windows notification when the daily store resets at 00:00 UTC. |
+| AUTO-SYNC ON ROTATION | Pull every saved account automatically when the store resets. |
+| CONFIRM SWITCH & DELETE | Ask before restarting Riot Client or deleting a saved account. Turning it off removes a safeguard, which is why it is the one setting that defaults to being protective. |
+| REOPEN LAST ACCOUNT | Reopen the account you were viewing last, instead of the signed-in one. |
+| CHECK UPDATES ON LAUNCH | One small request to GitHub when the app starts. CHECK NOW works either way. |
+
+A row that differs from its default is marked in blue and carries a `↺` button that resets just that
+row. Preferences are stored locally under a single key; nothing is sent anywhere.
+
+The panel holds only settings with **no other home**. Skin previews (`H`), account sort (`O`) and the
+showcase volume all already have a keyboard shortcut or an in-context control, so they are not
+duplicated here — one value offered in two places is how the two end up disagreeing.
+
+The last row, **SYSTEM**, shows the running version and the update state, with **CHECK NOW** to ask
+GitHub immediately.
+
+## Updates
+
+Install once, then the app updates itself: it reads the latest GitHub Release for this repository and
+compares it against the running version.
+
+- **Checking.** Once per launch, a few seconds after the window appears, unless CHECK UPDATES ON
+  LAUNCH is off. It is one small request, and it stays silent when it fails — being offline is not
+  worth an error message. Pressing **CHECK NOW** reports the result either way.
+- **Being told.** When a newer version exists a pill appears in the header, `UPDATE 0.1.3`. The `×`
+  beside it dismisses the notice until the next launch. It does **not** skip the version, so a stray
+  click cannot hide an update forever, and the SYSTEM row keeps showing the available version either
+  way — what is dismissed is the nag, not the fact.
+- **Updating.** The pill asks for confirmation, downloads the installer while showing progress, and
+  checks it against the SHA-256 GitHub publishes alongside the release. Only then does the app close,
+  run the installer silently, and start again. Saved accounts and sessions are untouched: they live
+  in `%APPDATA%\valorant-account-manager`, which the installer never writes to.
+
+The checksum proves the download arrived intact. It is **not** proof of authenticity — anyone able to
+replace a release asset could replace its digest too. That is a consequence of the app being unsigned,
+and it is worth knowing rather than glossing over. A release with no published digest is refused
+rather than run unverified.
+
+### Publishing a release
+
+A new version needs exactly one asset: the installer that `npm run package:win` produces.
+
+```powershell
+npm version patch --no-git-tag-version   # or edit "version" in package.json by hand
+npm run package:win
+git tag v0.1.3
+git push origin main --tags
+```
+
+Attach `release\Sapphire Setup 0.1.3.exe` to a GitHub Release with the matching tag (`v0.1.3`), and
+publish it as a normal release — prereleases and drafts are ignored by the updater, since both mean
+"not for everyone yet". The portable build does not need to be attached: the in-app updater runs the
+installer, and the portable is built locally anyway.
+
 ## Keyboard shortcuts
 
 The app is keyboard-first; the same list is visible in the **Commands** panel in the sidebar.
@@ -180,6 +257,7 @@ This app is intended for your own Riot accounts on your own Windows computer.
 - This project depends on Riot Client local endpoints and Valorant service endpoints that may change without notice.
 - Store, rank, level, and account data are available only while the related Riot session remains valid.
 - Riot Client must be installed in `C:\Riot Games\Riot Client` for automatic launch and switching.
+- In-app updates verify a checksum published with the release, which shows the download arrived intact but does not prove where it came from. The installers are unsigned; see [Updates](#updates).
 - This project is unofficial and is not affiliated with or endorsed by Riot Games.
 
 ## Project scripts
