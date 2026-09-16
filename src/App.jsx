@@ -497,8 +497,12 @@ export default function App() {
         <BrandMark size={20} />
         <span className="brand-vlr">SAPPHIRE</span>
       </div>
+      {/* Kontrol app-level (settings) duduk di sebelah identitas app, BUKAN di cluster
+          kanan bareng ADD. Dulu ia di sana dan terbaca sebagai sepasang kotak dengan ADD —
+          dua aksi yang tidak berhubungan, berdampingan tanpa pemisah. Jangan dipindah balik
+          ke .header-right tanpa memberi pemisah visual. */}
+      <button type="button" className="ghost-btn hdr-settings" onClick={() => setSettingsOpen(true)} title="Settings" aria-label="Open settings"><Icon name="settings" /></button>
       <div className="header-right">
-        <button type="button" className="ghost-btn hdr-settings" onClick={() => setSettingsOpen(true)} title="Settings" aria-label="Open settings"><Icon name="settings" /></button>
         {updates.release?.available && !updateDismissed && (
           <span className="update-notice">
             <button
