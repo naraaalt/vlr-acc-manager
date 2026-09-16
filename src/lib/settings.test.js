@@ -9,9 +9,8 @@ class MemoryStorage {
   removeItem(key) { this.#map.delete(key); }
 }
 
-// settings.js keeps module-level state (a cache and a subscriber set) and applies the
-// stored density at import time, so every test needs a fresh module graph. Importing it
-// once at the top of this file would give every test the same cache.
+// settings.js keeps a module-level subscriber set, so every test gets a fresh module graph.
+// Importing it once at the top of this file would share that set across every test.
 async function loadSettings() {
   vi.resetModules();
   return import('./settings.js');
@@ -28,32 +27,32 @@ describe('defaults', () => {
     for (const setting of SETTINGS) expect(getSetting(setting.id)).toEqual(setting.default);
   });
 
-  it('declares exactly ten settings, each with a unique id', async () => {
+  it('declares exactly nine settings, five of them rendered in the panel', async () => {
     const { SETTINGS } = await loadSettings();
-    expect(SETTINGS).toHaveLength(10);
-    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(10);
-  });
-
-  it('defaults to the full (non-compact) density', async () => {
-    const { getSetting } = await loadSettings();
-    expect(getSetting('density')).toBe(false);
+    expect(SETTINGS).toHaveLength(9);
+    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(9);
+    // The panel shows only what has no other surface; the rest are owned by a keybind or an
+    // in-context control. Defaults are covered by the loop test above.
+    expect(SETTINGS.filter((setting) => setting.panel !== false)).toHaveLength(5);
   });
 });
 
 describe('writing', () => {
   it('round-trips a toggle', async () => {
     const { getSetting, setSetting } = await loadSettings();
-    setSetting('density', true);
-    expect(getSetting('density')).toBe(true);
-    setSetting('density', false);
-    expect(getSetting('density')).toBe(false);
+    setSetting('notifyOnRotation', false);
+    expect(getSetting('notifyOnRotation')).toBe(false);
+    setSetting('notifyOnRotation', true);
+    expect(getSetting('notifyOnRotation')).toBe(true);
   });
 
-  it('stores everything under one key', async () => {
+  it('stores everything under one key, including settings the panel does not render', async () => {
     const { setSetting } = await loadSettings();
-    setSetting('density', true);
+    setSetting('notifyOnRotation', false);
+    setSetting('previewsHidden', true);
     const blob = JSON.parse(globalThis.localStorage.getItem('vlr.settings'));
-    expect(blob.density).toBe(true);
+    expect(blob.notifyOnRotation).toBe(false);
+    expect(blob.previewsHidden).toBe(true);
     expect(globalThis.localStorage.getItem('vlr.ui.previewsHidden')).toBeNull();
   });
 
@@ -74,9 +73,9 @@ describe('writing', () => {
 
   it('accepts the declared default back, so a per-row revert clears the changed flag', async () => {
     const { getSetting, setSetting } = await loadSettings();
-    expect(setSetting('density', true)).toBe(true);
-    expect(setSetting('density', false)).toBe(false);
-    expect(getSetting('density')).toBe(false);
+    expect(setSetting('notifyOnRotation', false)).toBe(false);
+    expect(setSetting('notifyOnRotation', true)).toBe(true);
+    expect(getSetting('notifyOnRotation')).toBe(true);
   });
 
   it('throws on an unknown setting id rather than writing garbage', async () => {
@@ -85,19 +84,21 @@ describe('writing', () => {
   });
 });
 
-describe('the apply hook', () => {
-  it('sets the density attribute on the document element', async () => {
-    const { setSetting } = await loadSettings();
-    setSetting('density', true);
-    expect(globalThis.document.documentElement.dataset.density).toBe('compact');
-    setSetting('density', false);
-    expect(globalThis.document.documentElement.dataset.density).toBe('full');
-  });
-
-  it('is applied at import time, so a stored density is live before the first paint', async () => {
-    globalThis.localStorage.setItem('vlr.settings', JSON.stringify({ density: true }));
-    await loadSettings();
-    expect(globalThis.document.documentElement.dataset.density).toBe('compact');
+// The registry is the persistence SCHEMA, not just the panel's row list, so a setting that
+// leaves the panel MUST stay in it. If one of these is ever deleted from SETTINGS instead of
+// marked panel:false, setSetting throws 'Unknown setting' and the control that owns it stops
+// working with nothing on screen to say why.
+describe('settings kept out of the panel', () => {
+  it('stays writable, so the keybind or overlay that owns it cannot break silently', async () => {
+    const { getSetting, setSetting, SETTINGS } = await loadSettings();
+    for (const id of ['previewsHidden', 'sortMode', 'showcaseSound', 'showcaseVolume']) {
+      expect(SETTINGS.find((setting) => setting.id === id)?.panel).toBe(false);
+    }
+    expect(setSetting('previewsHidden', true)).toBe(true);
+    expect(getSetting('previewsHidden')).toBe(true);
+    expect(setSetting('sortMode', 'label')).toBe('label');
+    expect(setSetting('showcaseSound', true)).toBe(true);
+    expect(setSetting('showcaseVolume', 55)).toBe(55);
   });
 });
 
@@ -142,7 +143,7 @@ describe('migration from the old per-feature keys', () => {
 describe('reset and subscribe', () => {
   it('clears the key and returns every default', async () => {
     const { SETTINGS, getSetting, setSetting, resetSettings } = await loadSettings();
-    setSetting('density', true);
+    setSetting('notifyOnRotation', false);
     resetSettings();
     expect(globalThis.localStorage.getItem('vlr.settings')).toBeNull();
     for (const setting of SETTINGS) expect(getSetting(setting.id)).toEqual(setting.default);
@@ -151,11 +152,11 @@ describe('reset and subscribe', () => {
   it('fires immediately and on every change, and stops after unsubscribe', async () => {
     const { setSetting, subscribeSettings } = await loadSettings();
     const seen = [];
-    const unsubscribe = subscribeSettings((values) => seen.push(values.density));
-    setSetting('density', true);
+    const unsubscribe = subscribeSettings((values) => seen.push(values.notifyOnRotation));
+    setSetting('notifyOnRotation', false);
     unsubscribe();
-    setSetting('density', false);
-    expect(seen).toEqual([false, true]);
+    setSetting('notifyOnRotation', true);
+    expect(seen).toEqual([true, false]);
   });
 
   // This is the contract uiPrefs.js already had, and which its existing tests pin: with
@@ -163,10 +164,10 @@ describe('reset and subscribe', () => {
   it('does not throw when storage is unavailable, and does not pretend the write stuck', async () => {
     const { getSetting, setSetting } = await loadSettings();
     globalThis.localStorage = undefined;
-    expect(() => setSetting('density', true)).not.toThrow();
-    expect(getSetting('density')).toBe(false);
+    expect(() => setSetting('notifyOnRotation', false)).not.toThrow();
+    expect(getSetting('notifyOnRotation')).toBe(true);
     // The return value is the value in effect, not the one that was attempted.
-    expect(setSetting('density', true)).toBe(false);
+    expect(setSetting('notifyOnRotation', false)).toBe(true);
   });
 });
 
@@ -178,10 +179,10 @@ describe('the remembered last account', () => {
 
   it('round-trips a label without disturbing the settings', async () => {
     const { getLastSelection, setLastSelection, getSetting, setSetting } = await loadSettings();
-    setSetting('density', true);
+    setSetting('notifyOnRotation', false);
     setLastSelection('main');
     expect(getLastSelection()).toBe('main');
-    expect(getSetting('density')).toBe(true);
+    expect(getSetting('notifyOnRotation')).toBe(false);
   });
 
   // Regression: this blob also holds state that is not a setting. Writing a setting used
@@ -189,7 +190,7 @@ describe('the remembered last account', () => {
   it('keeps the remembered account when an unrelated setting is written afterwards', async () => {
     const { getLastSelection, setLastSelection, setSetting } = await loadSettings();
     setLastSelection('sec');
-    setSetting('density', true);
+    setSetting('notifyOnRotation', false);
     expect(getLastSelection()).toBe('sec');
   });
 });

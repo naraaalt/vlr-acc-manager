@@ -1,9 +1,19 @@
 // Single source of truth for every persisted user preference.
 //
 // A REGISTRY, not a pile of getters: SettingsPanel renders itself from SETTINGS, so
-// adding a preference later is one entry here and zero UI code. Each entry carries its
-// own `apply`, which is how a value reaches the app (a data attribute, a module store)
-// without the panel knowing anything about it.
+// adding a preference later is one entry here and zero UI code.
+//
+// THE REGISTRY IS THE SCHEMA, NOT THE PANEL'S ROW LIST. Two consequences worth knowing
+// before editing it:
+//   - Removing an entry does not just hide a row. setSetting() looks the id up here and
+//     throws 'Unknown setting' when it is gone, and read()/DEFAULTS are built from this
+//     list, so a value whose entry disappears stops persisting — [H] would toggle nothing,
+//     silently. Settings that live in the panel are the exception, because nothing else
+//     reads them.
+//   - An entry with `panel: false` stays fully persisted and sanitised, and simply is not
+//     rendered. That is for preferences that already have a home elsewhere (a keybind, an
+//     in-context control): the panel holds only what has NO other surface, so nothing is
+//     offered twice.
 //
 // One storage key ('vlr.settings'). Preferences that used to live in their own keys are
 // migrated once, on first load, so nobody loses a choice they already made. uiPrefs.js
@@ -21,23 +31,13 @@ const KEY = 'vlr.settings';
 
 export const SETTINGS = [
   {
-    id: 'density',
-    label: 'COMPACT MODE',
-    hint: 'Tighter rows and panels — more accounts visible at once, which matters most on a small window.',
-    kind: 'toggle',
-    default: false,
-    // Guarded: this module is imported by the unit tests, where there is no DOM.
-    apply: (value) => {
-      if (typeof document === 'undefined') return;
-      document.documentElement.dataset.density = value ? 'compact' : 'full';
-    }
-  },
-  {
     id: 'previewsHidden',
     label: 'HIDE SKIN PREVIEWS',
     hint: 'Replaces the store cards with a one-line summary. The [H] key still toggles this.',
     kind: 'toggle',
-    default: false
+    default: false,
+    // Panel-excluded: the [H] key owns it.
+    panel: false
   },
   {
     id: 'sortMode',
@@ -45,14 +45,19 @@ export const SETTINGS = [
     hint: 'The signed-in account is always first; this orders the rest. The [O] key still cycles it.',
     kind: 'choice',
     default: 'active',
-    options: SORT_MODES.map((mode) => ({ value: mode, label: SORT_LABELS[mode] }))
+    options: SORT_MODES.map((mode) => ({ value: mode, label: SORT_LABELS[mode] })),
+    // Panel-excluded: the [O] key and the sidebar sort button already own it, and two UI
+    // controls for one value is one too many.
+    panel: false
   },
   {
     id: 'showcaseSound',
     label: 'SHOWCASE SOUND',
     hint: 'Play audio in the skin showcase video.',
     kind: 'toggle',
-    default: false
+    default: false,
+    // Panel-excluded: the showcase overlay has its own sound button.
+    panel: false
   },
   {
     id: 'showcaseVolume',
@@ -60,7 +65,10 @@ export const SETTINGS = [
     hint: 'Playback volume for the showcase video.',
     kind: 'range',
     default: 70, min: 0, max: 100, step: 5,
-    format: (value) => `${value}%`
+    format: (value) => `${value}%`,
+    // Panel-excluded: the showcase overlay has its own volume slider, and that is the better
+    // place to set it — while you are listening to it.
+    panel: false
   },
   {
     id: 'notifyOnRotation',
@@ -197,14 +205,12 @@ export function setSetting(id, value) {
   if (accepted === undefined) return getSetting(id);
   persist({ ...read(), [id]: accepted });
   const effective = getSetting(id);
-  setting.apply?.(effective);
   announce();
   return effective;
 }
 
 export function resetSettings() {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
-  for (const setting of SETTINGS) setting.apply?.(DEFAULTS[setting.id]);
   announce();
   return getSettings();
 }
@@ -225,8 +231,3 @@ export function getLastSelection() {
 export function setLastSelection(label) {
   persist({ lastSelectedLabel: label });
 }
-
-// Applied at import time so the app paints at the stored density straight away. A panel
-// that only applied on write would flash the full density on every start.
-const initial = read();
-for (const setting of SETTINGS) setting.apply?.(initial[setting.id]);

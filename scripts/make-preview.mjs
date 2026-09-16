@@ -228,12 +228,6 @@ if (location.hash.startsWith('#rotation')) {
     if (text && window.__toasts[window.__toasts.length - 1] !== text) window.__toasts.push(text);
   }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 }
-if (location.hash === '#compact') {
-  // Seed the store's own key BEFORE the app module runs. The qa hook block executes during
-  // parsing and the app is a deferred module, so this exercises the real load path
-  // (read -> sanitise -> apply at import) instead of poking the DOM directly.
-  localStorage.setItem('vlr.settings', JSON.stringify({ density: true }));
-}
 if (location.hash === '#no-content') {
   // The content service is down: Riot's storefront still answered, so the store
   // renders with unknown names and no previews, plus the note explaining why.

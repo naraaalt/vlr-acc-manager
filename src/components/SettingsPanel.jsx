@@ -7,8 +7,8 @@ import { SETTINGS, getSettings, setSetting, subscribeSettings } from '../lib/set
 //
 // Rows are deliberately one line high. The hint for the FOCUSED row renders in the panel
 // footer: at two lines per row the list overflows its max-height on a 1280x832 window, and
-// ten rows at ~35px each is ~350px against a 466px budget, and the SYSTEM row adds ~40px —
-// both re-measured headlessly rather than trusted (see the plan's phase 7).
+// five rows at ~35px each is ~180px against a 466px budget, plus the SYSTEM row — measured
+// headlessly at both 900px and 700px tall rather than trusted.
 //
 // Escape is handled by App.jsx's keymap guard, which also swallows every other key while
 // this is open. Arrows and Enter are handled here, by the modal itself.
@@ -64,7 +64,9 @@ export default function SettingsPanel({ onClose, version, updateState, onCheckUp
   const [values, setValues] = useState(getSettings);
   const [focused, setFocused] = useState(0);
   const sectionRef = useRef(null);
-  const rows = SETTINGS;
+  // Hanya entri yang opt in. Entri panel:false tetap hidup di store (dipakai keybind/overlay
+  // lain) — lihat catatan skema di src/lib/settings.js.
+  const rows = SETTINGS.filter((setting) => setting.panel !== false);
   // Baris SYSTEM bukan setting (tidak ada yang dipersist), tapi ia tetap satu perhentian panah:
   // permukaan yang keyboard-first ini tidak boleh punya satu-satunya kontrol yang cuma bisa
   // diklik mouse. Karena itu `focused` berjalan 0..rows.length.
