@@ -102,12 +102,17 @@ Individually:
 
 ```powershell
 npm run check   # syntax-check the Electron main-process files
+npm run bridge  # diff renderer bridge calls against the preload bridge
 npm run lint    # ESLint (unresolved identifiers, unused vars, hook rules)
 npm test        # unit tests
 npm run build   # production renderer build
 ```
 
-`npm run lint` is the gate that matters most in practice: it catches identifiers that do not resolve, which otherwise build cleanly and only fail at runtime inside an event listener — a typo'd call there throws and takes the whole keyboard shortcut map down with no visible symptom.
+`npm run bridge` and `npm run lint` cover the two ways a call can fail silently at runtime while every other gate stays green.
+
+`npm run bridge` compares every method the renderer calls on `window.valorant` against what `contextBridge.exposeInMainWorld` actually exposes. A method that was never exposed throws `is not a function` only in the packaged app: the dev mock in `src/devMock.js` implements a superset of the real preload, so the preview looks perfectly healthy. It also reports the opposite direction — exposed but never called — as dead surface.
+
+`npm run lint` catches identifiers that do not resolve, which otherwise build cleanly and only fail at runtime inside an event listener — a typo'd call there throws and takes the whole keyboard shortcut map down with no visible symptom.
 
 `npm run lint:summary` prints the same results grouped by rule, which is easier to triage when there are several.
 
@@ -186,6 +191,7 @@ This app is intended for your own Riot accounts on your own Windows computer.
 | `npm run package:win` | Build Windows installer and portable `.exe` files in `release`. |
 | `npm start` | Open Electron using the built renderer. |
 | `npm run check` | Check Electron JavaScript files for syntax errors. |
+| `npm run bridge` | Diff renderer `window.valorant.*` calls against the preload bridge. |
 | `npm run lint` | Lint the whole project with ESLint. |
 | `npm run lint:summary` | Print lint results grouped by rule. |
 | `npm run css:dead` | List class selectors in `styles.css` that nothing references. |

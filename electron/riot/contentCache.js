@@ -65,6 +65,11 @@ export async function resolveDailyOffers(offers) {
   return offers.map((offer) => {
     const skin = index.get(offer.offerId);
     return {
+      // The renderer keys React lists (and the showcase modal's remount key)
+      // on `offer.id`, and the resolved skin record carries no id of its own —
+      // without this line every card in the daily store shares one undefined
+      // key and the modal stops remounting between skins.
+      id: offer.offerId,
       name: skin?.name ?? 'Unknown skin',
       image: skin?.image ?? null,
       video: skin?.video ?? null,

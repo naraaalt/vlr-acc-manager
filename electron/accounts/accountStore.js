@@ -20,7 +20,12 @@ function normaliseLabel(label) {
   if (!value || value.length > 64) throw new Error('Account labels must be between 1 and 64 characters.');
   return value;
 }
-function accountId(label) { return createHash('sha256').update(label.toLocaleLowerCase()).digest('hex').slice(0, 24); }
+// toLowerCase() deliberately, NOT toLocaleLowerCase(): this id becomes the
+// account's filename and is embedded in the index, so it may depend only on
+// the label text. Locale-aware casing resolves 'MAIN' to a different id on a
+// Turkish-configured machine ('I' lowercases to a dotless 'ı'), and the saved
+// account would then read as missing on that machine.
+function accountId(label) { return createHash('sha256').update(label.toLowerCase()).digest('hex').slice(0, 24); }
 async function ensureStorage() { await fs.mkdir(storageDirectory(), { recursive: true }); }
 async function writeEncrypted(file, value) {
   assertEncryption();

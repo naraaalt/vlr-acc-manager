@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "lint:summary": "node scripts/lint-summary.mjs",
-    "verify": "npm run check && npm run lint && npm test && npm run build",
+    "bridge": "node scripts/audit-bridge.mjs .",
+    "verify": "npm run check && npm run bridge && npm run lint && npm test && npm run build",
     "css:dead": "node scripts/find-dead-css.mjs",
     "js:dead": "node scripts/find-dead-exports.mjs"
   },
