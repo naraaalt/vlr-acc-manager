@@ -26,13 +26,69 @@ function normaliseLabel(label) {
 // Turkish-configured machine ('I' lowercases to a dotless 'ı'), and the saved
 // account would then read as missing on that machine.
 function accountId(label) { return createHash('sha256').update(label.toLowerCase()).digest('hex').slice(0, 24); }
-async function ensureStorage() { await fs.mkdir(storageDirectory(), { recursive: true }); }
+async function ensureStorage() { await fs.mkdir(storageDirectory(), { recursive: true }); await sweepStaleTempFiles(); }
+
+// Windows refuses a rename for a moment while an antivirus scan or the search
+// indexer holds a handle to the file, and a whole write is exactly one rename.
+// Retrying briefly turns that transient refusal into a successful save instead
+// of an EPERM the user has to resolve by hand.
+const RENAME_RETRY_DELAYS_MS = [50, 200, 600];
+const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY']);
+function sleep(milliseconds) { return new Promise((resolve) => { setTimeout(resolve, milliseconds); }); }
+
+async function renameWithRetry(from, to) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await fs.rename(from, to);
+      return;
+    } catch (error) {
+      if (!RETRYABLE_RENAME_CODES.has(error.code) || attempt >= RENAME_RETRY_DELAYS_MS.length) throw error;
+      await sleep(RENAME_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
+// A write killed between its temp file and the rename leaves that temp file
+// behind for good — earlier failures had left 13 MB of them in the accounts
+// directory. Sweep once per run, and only files old enough that no write still
+// in flight could own them.
+const STALE_TEMP_MS = 5 * 60 * 1000;
+let sweptStaleTemps = false;
+async function sweepStaleTempFiles() {
+  if (sweptStaleTemps) return 0;
+  sweptStaleTemps = true;
+  let entries;
+  try { entries = await fs.readdir(storageDirectory()); }
+  catch (error) { if (error.code === 'ENOENT') return 0; throw error; }
+  const cutoff = Date.now() - STALE_TEMP_MS;
+  let removed = 0;
+  for (const name of entries) {
+    if (!name.endsWith('.tmp')) continue;
+    const file = path.join(storageDirectory(), name);
+    try {
+      if ((await fs.stat(file)).mtimeMs > cutoff) continue;
+      await fs.rm(file, { force: true });
+      removed += 1;
+    } catch { /* already gone, or not ours to remove */ }
+  }
+  if (removed) console.log(`Removed ${removed} leftover temporary account file(s).`);
+  return removed;
+}
+
 async function writeEncrypted(file, value) {
   assertEncryption();
   const encrypted = safeStorage.encryptString(JSON.stringify(value));
   const temporary = `${file}.${randomUUID()}.tmp`;
   await fs.writeFile(temporary, encrypted);
-  await fs.rename(temporary, file);
+  try {
+    await renameWithRetry(temporary, file);
+  } catch (error) {
+    // Never leave the temp file behind: it holds an encrypted copy of the
+    // account and nothing would ever collect it. The original code and message
+    // are kept so the failure still classifies as a file-system error.
+    await fs.rm(temporary, { force: true }).catch(() => {});
+    throw new Error(`Unable to write "${path.basename(file)}": ${error.message}`, { cause: error });
+  }
 }
 async function readEncrypted(file, fallback) {
   try {
@@ -143,7 +199,7 @@ export async function renameAccount(oldLabel, newLabel) {
   if (to === from) return;
   await ensureStorage();
   await fs.rm(encryptedPath(nextId), { force: true });
-  await fs.rename(encryptedPath(id), encryptedPath(nextId));
+  await renameWithRetry(encryptedPath(id), encryptedPath(nextId));
   await writeIndex(index.map((account) => account.id === id ? { ...account, label: to, id: nextId } : account));
   if (await getActiveAccountId() === id) {
     await fs.writeFile(path.join(RIOT_CLIENT_ROOT, 'VamAccountId.instance'), nextId, 'utf8');
