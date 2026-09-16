@@ -92,7 +92,6 @@ export function installDevMock() {
   if (typeof window === 'undefined' || window.valorant) return;
   seed();
   window.valorant = {
-    getCurrentStore: async () => respond(freshStore(accounts[0]?.accountName ?? 'Rifat#1337')),
     getDashboard: async () => {
       if (DASHBOARD_DELAY_MS) await sleep(DASHBOARD_DELAY_MS);
       return respond({ accounts, session: { live: true } });

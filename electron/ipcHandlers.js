@@ -1,7 +1,4 @@
 import { BrowserWindow, Notification, ipcMain } from 'electron';
-import { getSessionTokens, resolveShard } from './riot/auth.js';
-import { fetchStorefront, getDailyOffers } from './riot/store.js';
-import { resolveDailyOffers } from './riot/contentCache.js';
 import { deleteAccount, renameAccount } from './accounts/accountStore.js';
 import { addManualAccount, captureCurrentAccount, getDashboard, refreshAccountStore } from './accounts/accountService.js';
 import { findTcnoAccounts, importTcnoAccounts } from './accounts/tcnoImport.js';
@@ -17,25 +14,6 @@ async function result(action) {
 }
 
 export function registerIpcHandlers() {
-  ipcMain.handle('store:current', async () => {
-    try {
-      const session = await getSessionTokens();
-      const shard = await resolveShard(session);
-      const storefront = await fetchStorefront({ ...session, shard });
-      const offers = await resolveDailyOffers(getDailyOffers(storefront));
-      return {
-        ok: true,
-        data: {
-          accountName: session.accountName,
-          offers,
-          expiresIn: storefront?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds ?? null
-        }
-      };
-    } catch (error) {
-      console.error('Failed to retrieve store:', error.message);
-      return { ok: false, error: error.message || 'Unable to retrieve the current store.' };
-    }
-  });
   ipcMain.handle('accounts:dashboard', (event) => {
     const sender = event.sender;
     // Progressive load: forward each account as it resolves so the renderer

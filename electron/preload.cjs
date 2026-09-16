@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('valorant', {
-  getCurrentStore: () => ipcRenderer.invoke('store:current'),
   getDashboard: () => ipcRenderer.invoke('accounts:dashboard'),
   onDashboardProgress: (callback) => {
     ipcRenderer.on('accounts:dashboard-progress', (_event, progress) => callback(progress));
