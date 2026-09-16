@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
+import { useUpdates } from './hooks/useUpdates.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
 import { fmtCountdown, storeCountdownSeconds, crossedStoreReset, parseRank } from './lib/format.js';
 import { presentError } from './lib/errorPresentation.js';
@@ -90,6 +91,12 @@ export default function App() {
   // The settings panel is opened from the header button only (no keybind), but it has to be
   // in the keymap guard: see the first block of keyHandler.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const updates = useUpdates();
+  // DISMISS = diam sampai app ditutup, BUKAN skip versi: penawarannya muncul lagi setelah
+  // restart, jadi tidak ada update yang bisa hilang selamanya gara-gara satu klik nyasar.
+  // Baris SYSTEM di panel tetap menampilkan versi yang tersedia — yang dibuang nag-nya, bukan
+  // faktanya.
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
@@ -308,6 +315,21 @@ export default function App() {
     if (target?.status === 'ready' && !busy) setMarketLabel(label);
   }, [accounts, busy]);
 
+  const startUpdate = useCallback(async () => {
+    const release = updates.release;
+    if (!release?.available) return;
+    const megabytes = release.installer.size ? `~${Math.round(release.installer.size / 1048576)} MB` : 'the installer';
+    const ok = await confirm({
+      title: `UPDATE TO ${String(release.latestVersion).toUpperCase()}`,
+      body: `Sapphire will download ${release.installer.name} (${megabytes}), close, run the installer silently, and start again. Saved accounts and sessions are not touched.`,
+      confirmLabel: 'UPDATE',
+      danger: true
+    });
+    if (!ok) return;
+    const downloaded = await updates.download();
+    if (downloaded) await updates.install();
+  }, [confirm, updates]);
+
   const toggleMarket = useCallback(() => {
     if (busy) return;
     setMarketLabel((current) => (current ? null : selectedAccount?.status === 'ready' ? selectedAccount.label : null));
@@ -477,6 +499,23 @@ export default function App() {
       </div>
       <div className="header-right">
         <button type="button" className="ghost-btn hdr-settings" onClick={() => setSettingsOpen(true)} title="Settings" aria-label="Open settings"><Icon name="settings" /></button>
+        {updates.release?.available && !updateDismissed && (
+          <span className="update-notice">
+            <button
+              type="button" className={`update-pill${updates.status === 'ready' ? ' ready' : ''}`}
+              onClick={startUpdate} title={`Sapphire ${updates.release.latestVersion} is available`}
+            >
+              <Icon name="import" size={11} />
+              {updates.status === 'ready' ? 'RESTART TO UPDATE'
+                : updates.status === 'installing' ? 'INSTALLING…'
+                  : `UPDATE ${updates.release.latestVersion}`}
+            </button>
+            <button
+              type="button" className="update-dismiss" onClick={() => setUpdateDismissed(true)}
+              title="Dismiss until next launch" aria-label="Dismiss update notice"
+            ><Icon name="close" size={10} /></button>
+          </span>
+        )}
         <button type="button" className="ghost-btn" onClick={() => setAdding(true)}><Icon name="plus" />ADD</button>
         <span className="session-pill">
           <span className={`dot ${pill.on ? 'on' : pill.text === 'ERROR' ? 'err' : 'off'}`} />
@@ -581,7 +620,14 @@ export default function App() {
       onClick={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}
       aria-hidden={!settingsOpen}
     >
-      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => setSettingsOpen(false)}
+          version={updates.version}
+          updateState={updates}
+          onCheckUpdate={() => updates.check({ force: true })}
+        />
+      )}
     </div>
 
     {toast && <div className={`toast ${toast.kind}`}>{toast.message}</div>}

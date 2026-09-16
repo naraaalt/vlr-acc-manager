@@ -115,6 +115,7 @@ const accounts = [
 
 const bridge = `
 window.__notifyCalls = [];
+window.__updateCalls = [];
 // Live list, so the mutating methods below really change what the next getDashboard
 // returns. Inlining it into getDashboard (as this used to) made delete and rename
 // unverifiable from the preview: the renderer made the call and the list never changed,
@@ -126,6 +127,21 @@ window.valorant = {
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
+  getAppVersion: async () => '0.1.2',
+  onUpdateProgress: () => {},
+  downloadUpdate: async () => { window.__updateCalls.push('download'); return { ok: true, data: { path: 'X:/fake/Sapphire Setup 0.1.3.exe', bytes: 1, name: 'Sapphire Setup 0.1.3.exe' } }; },
+  installUpdate: async () => { window.__updateCalls.push('install'); return { ok: true, data: { helperPid: 1 } }; },
+  checkForUpdates: async () => {
+    window.__updateCalls.push('check');
+    // Opt-in lewat hash: default preview TIDAK menampilkan pill, supaya screenshot keadaan
+    // normal tidak tiba-tiba menampilkan penawaran update.
+    if (location.hash === '#update') {
+      return { ok: true, data: { available: true, currentVersion: '0.1.2', latestVersion: '0.1.3', reason: 'ok',
+        installer: { name: 'Sapphire Setup 0.1.3.exe', url: 'https://example.invalid/setup.exe', size: 99_000_000, digest: 'sha256:${'a'.repeat(64)}' },
+        notes: null, publishedAt: null } };
+    }
+    return { ok: true, data: { available: false, currentVersion: '0.1.2', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null } };
+  },
   deleteAccount: async (label) => {
     const before = window.__previewAccounts.length;
     window.__previewAccounts = window.__previewAccounts.filter((account) => account.label !== label);

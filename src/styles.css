@@ -673,3 +673,37 @@ input::placeholder { color: var(--faint); }
 }
 .set-focus-hint { color: var(--dim); font-size: 9.5px; letter-spacing: .06em; }
 .set-note { margin-left: auto; color: var(--faint); font-size: 9px; letter-spacing: .12em; }
+
+/* ---------- update ---------- */
+.update-notice { display: flex; align-items: stretch; }
+.update-pill {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--brand); background: var(--brand-soft); color: var(--brand);
+  font-size: 9px; font-weight: 700; letter-spacing: .12em; padding: 4px 9px;
+}
+.update-pill:hover { background: var(--brand); color: #04121F; }
+.update-pill.ready { border-color: var(--cyan); color: var(--cyan); }
+/* Tombol dismiss bersebelahan, BUKAN tombol di dalam tombol: <button> bersarang itu HTML yang
+   tidak valid. Karena itu pula border kirinya dimatikan — dua-duanya terbaca sebagai satu pil. */
+.update-dismiss {
+  border: 1px solid var(--brand); border-left: none; background: var(--brand-soft);
+  color: var(--brand); padding: 0 6px; display: flex; align-items: center;
+}
+.update-dismiss:hover { background: var(--brand); color: #04121F; }
+.set-system {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-top: 1px solid var(--border2);
+}
+/* Baris SYSTEM adalah perhentian panah terakhir di panel, jadi ia memakai penanda yang sama
+   dengan baris setting yang sedang disorot. */
+.set-system.sel { background: var(--panel3); box-shadow: inset 3px 0 0 var(--brand); }
+.set-system-label { color: var(--faint); font-size: 9px; font-weight: 700; letter-spacing: .18em; }
+.set-version { color: var(--dim); font-size: 9.5px; letter-spacing: .1em; }
+.set-update-state { color: var(--brand); font-size: 9px; letter-spacing: .1em; }
+.set-update-state.bad { color: var(--red); }
+.set-action {
+  margin-left: auto; border: 1px solid var(--border2); background: var(--panel2); color: var(--text-bright);
+  font-size: 9px; font-weight: 700; letter-spacing: .12em; padding: 4px 10px;
+}
+.set-action:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.set-action:disabled { color: var(--faint); }

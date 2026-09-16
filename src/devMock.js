@@ -99,6 +99,13 @@ export function installDevMock() {
     // Recorded so the headless harness can assert the rotation notice fired, or that it did
     // NOT: a call that returns true is indistinguishable from one never made.
     notifyStoreReset: async (payload) => { (window.__notifyCalls ??= []).push(payload ?? null); return respond(true); },
+    // Update: dev tidak pernah menyentuh GitHub. `npm run dev` pakai jawaban tetap supaya UI-nya
+    // bisa diperiksa tanpa network, dan supaya tidak ada request pihak ketiga dari dev.
+    getAppVersion: async () => '0.1.2-dev',
+    checkForUpdates: async () => respond({ available: false, currentVersion: '0.1.2-dev', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null }),
+    downloadUpdate: async () => fail('Dev mock: download disabled.'),
+    installUpdate: async () => fail('Dev mock: install disabled.'),
+    onUpdateProgress: () => {},
     captureCurrentAccount: async (label) => {
       accounts = accounts.filter((account) => account.label !== label);
       accounts = [makeAccount(label), ...accounts];

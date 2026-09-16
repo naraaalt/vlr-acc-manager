@@ -60,11 +60,16 @@ function SettingRow({ setting, value, focused, onFocus, onAct }) {
   );
 }
 
-export default function SettingsPanel({ onClose }) {
+export default function SettingsPanel({ onClose, version, updateState, onCheckUpdate }) {
   const [values, setValues] = useState(getSettings);
   const [focused, setFocused] = useState(0);
   const sectionRef = useRef(null);
   const rows = SETTINGS;
+  // Baris SYSTEM bukan setting (tidak ada yang dipersist), tapi ia tetap satu perhentian panah:
+  // permukaan yang keyboard-first ini tidak boleh punya satu-satunya kontrol yang cuma bisa
+  // diklik mouse. Karena itu `focused` berjalan 0..rows.length.
+  const systemIndex = rows.length;
+  const onSystemRow = focused === systemIndex;
 
   useEffect(() => subscribeSettings(setValues), []);
   useEffect(() => { sectionRef.current?.focus(); }, []);
@@ -82,13 +87,26 @@ export default function SettingsPanel({ onClose }) {
     }
   };
 
-  const onKey = (event) => {
-    if (event.key === 'ArrowDown') { event.preventDefault(); setFocused((index) => Math.min(rows.length - 1, index + 1)); }
-    else if (event.key === 'ArrowUp') { event.preventDefault(); setFocused((index) => Math.max(0, index - 1)); }
-    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); act(rows[focused], 1); }
-    else if (event.key === 'ArrowRight') { event.preventDefault(); act(rows[focused], 1); }
-    else if (event.key === 'ArrowLeft') { event.preventDefault(); act(rows[focused], -1); }
+  const runFocused = () => {
+    if (onSystemRow) { onCheckUpdate?.(); return; }
+    act(rows[focused], 1);
   };
+
+  const onKey = (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); setFocused((index) => Math.min(systemIndex, index + 1)); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); setFocused((index) => Math.max(0, index - 1)); }
+    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); runFocused(); }
+    else if (event.key === 'ArrowRight') { event.preventDefault(); runFocused(); }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); if (!onSystemRow) act(rows[focused], -1); }
+  };
+
+  const updateLabel = updateState?.status === 'available' ? `${updateState.release?.latestVersion ?? ''} AVAILABLE`
+    : updateState?.status === 'downloading' ? `DOWNLOADING ${updateState.progress?.total ? `${Math.round((updateState.progress.received / updateState.progress.total) * 100)}%` : '…'}`
+      : updateState?.status === 'ready' ? 'READY — RESTART TO UPDATE'
+        : updateState?.status === 'installing' ? 'INSTALLING…'
+          : updateState?.status === 'checking' ? 'CHECKING…'
+            : updateState?.status === 'error' ? String(updateState.error ?? 'CHECK FAILED').toUpperCase().slice(0, 48)
+              : 'UP TO DATE';
 
   return (
     <section
@@ -109,8 +127,18 @@ export default function SettingsPanel({ onClose }) {
           />
         ))}
       </ul>
+      <div className={`set-system${onSystemRow ? ' sel' : ''}`} onMouseEnter={() => setFocused(systemIndex)}>
+        <span className="set-system-label">SYSTEM</span>
+        <span className="set-version">SAPPHIRE {version ?? '—'}</span>
+        <span className={`set-update-state${updateState?.status === 'error' ? ' bad' : ''}`}>{updateLabel}</span>
+        <button
+          type="button" className="set-action" onClick={onCheckUpdate}
+          onMouseEnter={() => setFocused(systemIndex)}
+          disabled={updateState?.status === 'checking'}
+        >{updateState?.status === 'checking' ? 'CHECKING…' : 'CHECK NOW'}</button>
+      </div>
       <div className="set-foot">
-        <span className="set-focus-hint">{rows[focused]?.hint ?? ''}</span>
+        <span className="set-focus-hint">{rows[focused]?.hint ?? 'Ask GitHub whether a newer Sapphire has been published.'}</span>
         <span className="set-note">STORED ON THIS PC ONLY</span>
       </div>
     </section>

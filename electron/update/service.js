@@ -30,7 +30,9 @@ export function digestMatches(digest, hex) {
   return expected === hex.toLowerCase();
 }
 
-export function updateRoot(scratchRoot) {
+// Tidak diekspor: cuma dipakai installerPath() di file ini, dan js:dead benar menyebutnya
+// sebagai surface mati selama ia diekspor.
+function updateRoot(scratchRoot) {
   return path.join(scratchRoot, 'sapphire-update');
 }
 
