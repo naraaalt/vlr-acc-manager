@@ -605,3 +605,27 @@ input::placeholder { color: var(--faint); }
   .ld-sweep::before, .ld-sweep::after { animation: none; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- compact density ----------
+   One attribute on <html>, set by the settings store (src/lib/settings.js). Only rules
+   whose size is hardcoded in this file need an entry; anything already using a token
+   scales on its own. This is about how much of the sidebar and the panels you can see at
+   once, which only really bites on a small window — at the 1024x700 minimum, roughly four
+   visible accounts become six. */
+:root[data-density='compact'] body { font-size: 11px; }
+:root[data-density='compact'] .app-frame { inset: 6px; }
+:root[data-density='compact'] .app-header { flex: 0 0 34px; }
+:root[data-density='compact'] .app-footer { flex: 0 0 26px; }
+:root[data-density='compact'] .foot-meta { display: none; }
+:root[data-density='compact'] .app-main { grid-template-columns: 288px 1px minmax(0, 1fr); }
+:root[data-density='compact'] .side-head { flex: 0 0 30px; }
+:root[data-density='compact'] .side-filter { margin: 6px 8px 2px; }
+:root[data-density='compact'] .acct-list { padding: 6px; gap: 4px; }
+:root[data-density='compact'] .acct { padding: 5px 8px 5px 12px; gap: 3px; }
+:root[data-density='compact'] .acct-av { width: 18px; height: 18px; flex: 0 0 18px; font-size: 9px; }
+:root[data-density='compact'] .acct-l2 { padding-left: 26px; }
+:root[data-density='compact'] .acct-actions { padding-left: 26px; }
+:root[data-density='compact'] .cmd-panel { padding: 7px 12px 8px; }
+:root[data-density='compact'] .cmd-list li { padding: 3px 6px; font-size: 10px; }
+:root[data-density='compact'] .win-btn { width: 34px; }
+:root[data-density='compact'] .cards { gap: 6px; padding: 7px; }
