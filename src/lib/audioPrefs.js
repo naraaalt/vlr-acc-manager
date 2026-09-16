@@ -1,41 +1,21 @@
-// Persisted audio preferences for the skin showcase. Module-level store so the
-// volume carries across skins, modal open/close cycles, and app restarts
-// (localStorage); the useAudioPrefs hook subscribes React to it.
+// Adapter over the single settings store (src/lib/settings.js). The showcase reads a
+// {soundOn, volume} pair as one object; the store holds them as two independent settings.
+//
+// Note: subscribeAudioPrefs now fires whenever ANY setting changes, because it subscribes
+// to the store rather than to the audio pair. The listener is a setState, so an unrelated
+// change costs one extra render and nothing else.
 
-const KEY = 'vlr.showcase.audio';
-const defaults = { soundOn: false, volume: 70 };
-
-function load() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-    return {
-      soundOn: typeof raw.soundOn === 'boolean' ? raw.soundOn : defaults.soundOn,
-      volume: Number.isFinite(Number(raw.volume)) ? Math.min(100, Math.max(0, Number(raw.volume))) : defaults.volume
-    };
-  } catch {
-    return { ...defaults };
-  }
-}
-
-let state = load();
-const listeners = new Set();
-
-function commit(next) {
-  state = next;
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable; in-memory only */ }
-  for (const listener of listeners) listener(state);
-}
+import { getSetting, setSetting, subscribeSettings } from './settings.js';
 
 export function getAudioPrefs() {
-  return state;
+  return { soundOn: Boolean(getSetting('showcaseSound')), volume: getSetting('showcaseVolume') };
 }
 
 export function setAudioPrefs(patch) {
-  commit({ ...state, ...patch });
+  if ('soundOn' in patch) setSetting('showcaseSound', Boolean(patch.soundOn));
+  if ('volume' in patch) setSetting('showcaseVolume', Number(patch.volume));
 }
 
 export function subscribeAudioPrefs(listener) {
-  listeners.add(listener);
-  listener(state);
-  return () => listeners.delete(listener);
+  return subscribeSettings(() => listener(getAudioPrefs()));
 }
