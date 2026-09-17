@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime } from '../lib/format.js';
 import { SORT_LABELS } from '../lib/accountOrder.js';
+import { canLaunch } from '../lib/errorPresentation.js';
 import { Icon } from './Icons.jsx';
 
 function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPlay, onDelete, onRename, switching, playing, anySwitching }) {
@@ -55,11 +56,11 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
         <span className="acct-rank" style={rank ? { color } : undefined}>{rank ?? 'UNRANKED'}</span>
         {/* PLAY takes this row's RR slot. RR is the one value here the details panel already
             carries three times over (value, meter and season progress), so the slot is the
-            cheapest place for a launcher. An account whose session failed keeps the readout:
-            there is nothing to launch from it. */}
-        {account.status === 'error'
-          ? <span className="acct-rr">{profile?.rr != null ? `${profile.rr} RR` : '—'}</span>
-          : <button
+            cheapest place for a launcher. The entry keeps the readout when it is unusable as an
+            entry (a duplicate, or files that could not be read) — see canLaunch for why an
+            expired session is NOT one of those. */}
+        {canLaunch(account.errorKind)
+          ? <button
               type="button" className="acct-play" disabled={anySwitching}
               onClick={sel(() => onPlay(account.label))}
               title={account.active
@@ -68,7 +69,8 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
             >
               <Icon name="play" size={9} />
               {playing ? 'PLAYING…' : 'PLAY'}
-            </button>}
+            </button>
+          : <span className="acct-rr">{profile?.rr != null ? `${profile.rr} RR` : '—'}</span>}
       </div>
       <div className="acct-actions">
         <button type="button" onClick={sel(onSwitch)} disabled={anySwitching} title="Switch Riot session to this account">

@@ -92,7 +92,10 @@ const readyAccount = (id, label, accountName, level, rank, rr, price) => ({
 const accounts = [
   {
     id: 'acc-glue', label: 'i eat glue', accountName: 'i eat glue#EATER', puuid: 'puuid-glue',
-    active: false, status: 'error', lastCheckedAt: minutesAgo(2),
+    // errorKind is not decoration: the real dashboard attaches one to EVERY error row, and the
+    // renderer decides from it whether the row can be launched from. A fixture that carries the
+    // message without the kind is more lenient than the backend and renders the wrong control.
+    active: false, status: 'error', errorKind: 'fs-error', lastCheckedAt: minutesAgo(2),
     error: `EPERM: operation not permitted, rename '${HOME}/index.vam.0d5a62b8-30a6-4b66-8d67-a74f423ecfba.tmp' -> '${HOME}/index.vam'`,
     store: null
   },
