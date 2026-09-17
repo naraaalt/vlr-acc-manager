@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildLaunchArgs, planPlay, valorantPatchline } from './play.js';
+import { launchRequestPath, planPlay, valorantPatchline } from './play.js';
 
-// Everything here is pure text/decision work: what argument vector reaches the
-// launcher, which patchline this machine actually has installed, and whether a
-// PLAY press should launch, switch first, or refuse. None of it can be checked
-// by pressing the button, because a spawn that succeeds says nothing about
-// whether a game window appears.
+// Everything here is pure text/decision work: which request starts the game, which
+// patchline this machine actually has installed, and whether a PLAY press should launch or
+// refuse. None of it can be checked by pressing the button, because an accepted request
+// says nothing about whether a game window appears.
 
 describe('valorantPatchline', () => {
   const installed = (dir) => ({ associated_client: { [dir]: 'C:/Riot Games/Riot Client/RiotClientServices.exe' } });
@@ -48,32 +47,37 @@ describe('valorantPatchline', () => {
   });
 });
 
-describe('buildLaunchArgs', () => {
-  it('asks the launcher for Valorant on the given patchline', () => {
-    expect(buildLaunchArgs({ product: 'valorant', patchline: 'live' }))
-      .toEqual(['--launch-product=valorant', '--launch-patchline=live']);
+describe('launchRequestPath', () => {
+  it('points at the client plugin route its own Play button calls', () => {
+    expect(launchRequestPath({ patchline: 'live' }))
+      .toBe('/product-launcher/v1/products/valorant/patchlines/live');
   });
 
   it('defaults to Valorant on live', () => {
-    expect(buildLaunchArgs()).toEqual(['--launch-product=valorant', '--launch-patchline=live']);
+    expect(launchRequestPath()).toBe('/product-launcher/v1/products/valorant/patchlines/live');
   });
 
-  it('passes a PBE patchline through', () => {
-    expect(buildLaunchArgs({ patchline: 'pbe' }))
-      .toEqual(['--launch-product=valorant', '--launch-patchline=pbe']);
+  it('addresses the PBE patchline when that is what is installed', () => {
+    expect(launchRequestPath({ patchline: 'pbe' }))
+      .toBe('/product-launcher/v1/products/valorant/patchlines/pbe');
   });
 
-  it('refuses to smuggle extra flags through the patchline', () => {
-    // The patchline comes from a file on disk, so a malformed one must not be
-    // able to append an argument of its choosing to the launcher's command line.
-    const args = buildLaunchArgs({ patchline: 'live --install' });
-    expect(args).toEqual(['--launch-product=valorant', '--launch-patchline=liveinstall']);
-    expect(args.some((arg) => arg.includes(' '))).toBe(false);
+  it('refuses to let a patchline climb out of its path segment', () => {
+    // This value comes from a file on disk and lands in a URL path, so a malformed one
+    // must not be able to address a different route.
+    const path = launchRequestPath({ patchline: 'live/../../admin' });
+    expect(path).toBe('/product-launcher/v1/products/valorant/patchlines/liveadmin');
+    expect(path).not.toContain('..');
   });
 
   it('falls back to live for a patchline that sanitises to nothing', () => {
-    expect(buildLaunchArgs({ patchline: '///' }))
-      .toEqual(['--launch-product=valorant', '--launch-patchline=live']);
+    expect(launchRequestPath({ patchline: '///' }))
+      .toBe('/product-launcher/v1/products/valorant/patchlines/live');
+  });
+
+  it('escapes the product too, since it shares the path', () => {
+    expect(launchRequestPath({ product: 'a/b' }))
+      .toBe('/product-launcher/v1/products/a%2Fb/patchlines/live');
   });
 });
 

@@ -1,7 +1,6 @@
-// Pure decisions behind the PLAY control: which argument vector reaches the
-// launcher, which patchline this machine actually has installed, and whether a
-// press should launch, switch first, or refuse. The spawning itself lives in
-// riotClient.js so this module stays loadable in plain node.
+// Pure decisions behind the PLAY control: which request starts the game, which patchline
+// this machine actually has installed, and whether a press should launch or refuse. The
+// HTTP call itself lives in riotClient.js so this module stays loadable in plain node.
 
 const FALLBACK_PATCHLINE = 'live';
 const PRODUCT = 'valorant';
@@ -32,12 +31,16 @@ export function valorantPatchline(installs) {
   return FALLBACK_PATCHLINE;
 }
 
-// The launcher's own Play button resolves to exactly this: the client, told
-// which product and patchline to start. Spawning the game's executable by hand
-// skips the handshake, the patchline and the anti-cheat context the client
-// sets up around it.
-export function buildLaunchArgs({ product = PRODUCT, patchline = FALLBACK_PATCHLINE } = {}) {
-  return [`--launch-product=${product}`, `--launch-patchline=${safePatchline(patchline)}`];
+// The client's own local API — the request its Play button makes: a POST to the
+// product-launcher plugin for one product + patchline.
+//
+// Handing the launcher `--launch-product/--launch-patchline` is NOT equivalent, and that
+// is the whole reason this exists. The client treats that as an "app command" (direct
+// launch) and gates it behind Riot's direct-launch opt-in, which is disabled on this
+// build; the attempt then restarts the client and loses a process-singleton race, so the
+// game never starts. Pressing Play calls this route, and so do we.
+export function launchRequestPath({ product = PRODUCT, patchline = FALLBACK_PATCHLINE } = {}) {
+  return `/product-launcher/v1/products/${encodeURIComponent(product)}/patchlines/${safePatchline(patchline)}`;
 }
 
 // What a PLAY press means for one account.
