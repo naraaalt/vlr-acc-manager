@@ -251,17 +251,19 @@ export default function App() {
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
   }, [busy, selectedAccount, switchTo, showToast, flash, confirm]);
 
-  // PLAY starts the game for the account that is signed in. It does NOT switch — see
-  // src/lib/playGate.js for why, and the row is muted when it cannot act, so this only
-  // runs when the press is meaningful. Nothing destructive happens here, so no prompt.
+  // PLAY puts this account in the game, in one press: it switches Riot Client to the account
+  // first when that account is not the one signed in, then launches. No prompt — the press is
+  // the instruction, and the one case where it would be destructive (ending a game that is
+  // already open under another account) is refused by the main process rather than confirmed
+  // here. See src/lib/playGate.js for when the control is offered at all.
   const doPlay = useCallback((label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
     play(target)
       .then((data) => {
         if (data?.reason === 'already-running') showToast('VALORANT IS ALREADY RUNNING', 'warn');
-        else if (data?.reason === 'not-signed-in') showToast(`${target.toUpperCase()} IS NOT SIGNED IN — SWITCH FIRST, THEN PLAY`, 'warn');
-        else if (data?.launched) showToast(`LAUNCHING VALORANT — ${target.toUpperCase()}`, 'ok');
+        else if (data?.reason === 'close-game-first') showToast('CLOSE VALORANT FIRST — SWITCHING WOULD END THE OPEN GAME', 'warn');
+        else if (data?.launched) showToast(`${data.switched ? 'SWITCHED + ' : ''}LAUNCHING VALORANT — ${target.toUpperCase()}`, 'ok');
       })
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
   }, [busy, selectedAccount, play, showToast]);
@@ -553,7 +555,7 @@ export default function App() {
             filter={filter} onFilter={setFilter}
             sortMode={sortMode} onCycleSort={cycleSort}
             tcnoAvailable={tcnoAvailable} busy={busy} commandFlash={commandFlash}
-            sessionLive={session.live} switchingLabel={switchingLabel} playingLabel={playingLabel}
+            switchingLabel={switchingLabel} playingLabel={playingLabel}
             onSwitch={doSwitch} onPlay={doPlay} onRefresh={doRefresh} onRefreshAll={doRefreshAll}
             onDelete={doDelete} onRename={doRename} onImport={() => setAdding(true)} onAdd={() => setAdding(true)}
           />

@@ -146,9 +146,12 @@ export function installDevMock() {
     playAccount: async (label) => {
       const target = findAccount(label);
       if (!target) return fail(`No saved account “${label}”.`);
-      (window.__playCalls ??= []).push({ label, active: Boolean(target.active) });
-      if (!target.active) return respond({ label, launched: false, reason: 'not-signed-in' });
-      return respond({ label, launched: true, reason: null });
+      const running = Boolean(window.__valorantRunning);
+      const switched = !target.active;
+      (window.__playCalls ??= []).push({ label, active: Boolean(target.active), switched, running });
+      if (target.active && running) return respond({ label, launched: false, switched: false, reason: 'already-running' });
+      if (running) return respond({ label, launched: false, switched: false, reason: 'close-game-first' });
+      return respond({ label, launched: true, switched, reason: null });
     },
     detectTcno: async () => respond({
       available: true,

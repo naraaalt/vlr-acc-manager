@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { launchRequestPath, planPlay, valorantPatchline } from './play.js';
+import { LAUNCH_RETRY_DELAYS, launchRequestPath, planPlay, valorantPatchline } from './play.js';
 
 // Everything here is pure text/decision work: which request starts the game, which
-// patchline this machine actually has installed, and whether a PLAY press should launch or
-// refuse. None of it can be checked by pressing the button, because an accepted request
+// patchline this machine actually has installed, and what a PLAY press means for one
+// account. None of it can be checked by pressing the button, because an accepted request
 // says nothing about whether a game window appears.
 
 describe('valorantPatchline', () => {
@@ -86,19 +86,43 @@ describe('planPlay', () => {
     expect(planPlay({ isActive: true, valorantRunning: false })).toBe('launch');
   });
 
-  it('refuses to relaunch a game that is already open', () => {
+  it('refuses to relaunch a game that is already open under this account', () => {
     expect(planPlay({ isActive: true, valorantRunning: true })).toBe('already-running');
   });
 
-  it('refuses when the account is not the one signed in', () => {
-    // The launch is requested from Riot Client, and a client that is not signed in
-    // begins restoring the session instead of acting on it — the request is accepted
-    // and then dropped. A real press produced exactly that: the client window opened
-    // and the game never started. Switching is a separate, explicit action.
-    expect(planPlay({ isActive: false, valorantRunning: false })).toBe('not-signed-in');
+  it('switches first when another account owns the session', () => {
+    // The client only acts on a launch request while it is signed in, so a press on any
+    // other row has to make it signed in first. PLAY stays ONE press: switch, wait for the
+    // session to settle, then launch. Refusing here is what made the control useless — on
+    // the machine this was built for, every saved account sat in exactly this state.
+    expect(planPlay({ isActive: false, valorantRunning: false })).toBe('switch-then-launch');
   });
 
-  it('refuses for a non-signed-in account even when the game is open under another one', () => {
-    expect(planPlay({ isActive: false, valorantRunning: true })).toBe('not-signed-in');
+  it('refuses rather than closing a game that is open under another account', () => {
+    // A switch closes every Riot process, the running game included. Mid-match that is a
+    // killed game, so a press on another row must not do it: refuse and let the user decide.
+    expect(planPlay({ isActive: false, valorantRunning: true })).toBe('close-game-first');
+  });
+});
+
+describe('LAUNCH_RETRY_DELAYS', () => {
+  it('asks straight away rather than waiting first', () => {
+    // Riot Client is usually settled by the time a press lands, and making it wait would
+    // add seconds to every launch that was going to work anyway.
+    expect(LAUNCH_RETRY_DELAYS[0]).toBe(0);
+  });
+
+  it('asks more than once, because the client can accept a request and then swallow it', () => {
+    // Right after a switch the client's own lifecycle is still running (region election,
+    // EULA, client config, Vanguard check). A launch request that arrives in that window is
+    // acknowledged and dropped, so one attempt is not enough.
+    expect(LAUNCH_RETRY_DELAYS.length).toBeGreaterThan(1);
+  });
+
+  it('backs off, so a client that is still busy is not hammered', () => {
+    for (let index = 1; index < LAUNCH_RETRY_DELAYS.length; index += 1) {
+      expect(LAUNCH_RETRY_DELAYS[index]).toBeGreaterThanOrEqual(LAUNCH_RETRY_DELAYS[index - 1]);
+    }
+    expect(LAUNCH_RETRY_DELAYS.every((delay) => Number.isFinite(delay) && delay >= 0)).toBe(true);
   });
 });

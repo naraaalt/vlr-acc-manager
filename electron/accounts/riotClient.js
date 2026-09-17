@@ -4,7 +4,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { readLockfile } from '../riot/lockfile.js';
-import { launchRequestPath, valorantPatchline } from './play.js';
+import { launchRequestPath, LAUNCH_APPEAR_TIMEOUT, LAUNCH_RETRY_DELAYS, valorantPatchline } from './play.js';
 
 const exec = promisify(execFile);
 
@@ -50,7 +50,10 @@ export async function launchRiotClient() {
 // authorised with the same basic-auth scheme the client's other local endpoints use.
 // Nothing here is hardcoded about the game's install location: the route names the
 // product and patchline and the client resolves the rest.
-export async function launchValorant() {
+//
+// Not exported: one request is not a launch. Callers want launchValorantWhenReady, which
+// keeps asking until the game is actually up.
+async function launchValorant() {
   const lockfile = await readLockfile();
   const requestPath = launchRequestPath({ patchline: await resolvePatchline() });
   const authorization = Buffer.from(`riot:${lockfile.password}`).toString('base64');
@@ -80,6 +83,42 @@ export async function launchValorant() {
     request.setTimeout(20_000, () => request.destroy(new Error('Riot Client did not answer the launch request within 20 seconds.')));
     request.end('{}');
   });
+}
+
+const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function waitForValorantProcess(timeoutMs) {
+  const started = Date.now();
+  for (;;) {
+    if (await isValorantRunning()) return true;
+    if (Date.now() - started >= timeoutMs) return false;
+    await sleep(750);
+  }
+}
+
+// Ask the client for a launch and keep asking until the game is actually running.
+//
+// One request is not enough, and this wrapper exists for exactly that: the client accepts a
+// launch request and then drops it while its own lifecycle is still settling — region
+// election, EULA, client config, Vanguard health check — which is precisely the window just
+// after a switch. A single request that returns 200 and produces nothing is the failure this
+// is written to stop reporting as a success, so the verdict here is the game PROCESS, never
+// the response code.
+export async function launchValorantWhenReady({
+  delays = LAUNCH_RETRY_DELAYS,
+  appearTimeout = LAUNCH_APPEAR_TIMEOUT
+} = {}) {
+  const refusals = [];
+  for (const delay of delays) {
+    if (delay) await sleep(delay);
+    try { await launchValorant(); }
+    catch (error) { refusals.push(error.message); continue; }
+    if (await waitForValorantProcess(appearTimeout)) return true;
+  }
+  const last = refusals[refusals.length - 1];
+  throw new Error(last
+    ? `Riot Client would not start the game: ${last}`
+    : 'Riot Client accepted the launch request but Valorant never started. Try PLAY again, or press Play in the Riot Client.');
 }
 
 // Whether the game is open right now. Used to refuse a second launch rather than to

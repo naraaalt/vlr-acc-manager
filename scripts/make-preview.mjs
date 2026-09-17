@@ -123,6 +123,10 @@ const bridge = `
 window.__notifyCalls = [];
 window.__updateCalls = [];
 window.__playCalls = [];
+// Whether a game is open right now. A hash hook rather than a constant, because two of
+// PLAY's four outcomes only exist while something is running and neither would ever render
+// from the default fixture.
+window.__valorantRunning = location.hash === '#running';
 // Live list, so the mutating methods below really change what the next getDashboard
 // returns. Inlining it into getDashboard (as this used to) made delete and rename
 // unverifiable from the preview: the renderer made the call and the list never changed,
@@ -133,15 +137,20 @@ window.valorant = {
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
-  // PLAY mirrors the real backend exactly: it launches ONLY for the account that owns the
-  // session, and reports not-signed-in otherwise, because that refusal is what the UI has to
-  // render. A mock that always succeeded would show a healthy button on rows that cannot act.
+  // PLAY mirrors the real backend: one press switches Riot Client to the account first when
+  // that account does not own the session, then launches. It refuses in the two cases the
+  // backend refuses in — the game is already open under the signed-in account, or switching
+  // would close the game that is open under another one. A mock that always succeeded would
+  // show a healthy button for states the backend would never honour.
   playAccount: async (label) => {
     const target = window.__previewAccounts.find((account) => account.label === label);
     if (!target) return { ok: false, error: 'No saved account “' + label + '”.' };
-    window.__playCalls.push({ label: label, active: Boolean(target.active) });
-    if (!target.active) return { ok: true, data: { label: label, launched: false, reason: 'not-signed-in' } };
-    return { ok: true, data: { label: label, launched: true, reason: null } };
+    const running = Boolean(window.__valorantRunning);
+    const switched = !target.active;
+    window.__playCalls.push({ label: label, active: Boolean(target.active), switched: switched, running: running });
+    if (target.active && running) return { ok: true, data: { label: label, launched: false, switched: false, reason: 'already-running' } };
+    if (running) return { ok: true, data: { label: label, launched: false, switched: false, reason: 'close-game-first' } };
+    return { ok: true, data: { label: label, launched: true, switched: switched, reason: null } };
   },
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
   getAppVersion: async () => '0.1.2',

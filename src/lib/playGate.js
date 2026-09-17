@@ -1,27 +1,32 @@
 // Whether the PLAY control may be used for one account row, and what it should say.
 //
-// The rule came out of a real test on a real machine. Pressing PLAY opened Riot Client and
-// never started the game: the client accepts a launch request but refuses to act on it
-// while the account is not signed in — it starts restoring the session instead and asks for
-// a region. From this app the row looked perfectly launchable, which is the bug.
+// This rule was rewritten after a real test on a real machine. The first version refused the
+// press unless the account was ALREADY the signed-in one, on the evidence that a client
+// which is not signed in accepts a launch request and then drops it. That part was true; the
+// conclusion drawn from it was wrong. It made the control refuse on every row the user
+// actually cares about, because a manager holds the accounts you are NOT currently in — on
+// the machine this was built for, all three saved accounts sat in exactly that state and the
+// button was muted everywhere.
 //
-// Two conditions, and both are load-bearing:
-//   - the account owns the session that is signed in right now (`account.active`), and
-//   - a session is actually readable (`sessionLive`).
-// `active` alone is not enough, and that is the subtle half: the dashboard falls back to a
-// marker file this app's own switcher writes when no live session can be read, so `active`
-// can be true with Riot Client closed or parked at its sign-in screen. That state is
-// exactly what produced the failed launch.
+// What the client will not do is launch while somebody else is signed in. It is perfectly
+// willing to be switched first, which is what this app already does, so PLAY performs the
+// switch itself and then launches. One press, no refusal.
+//
+// The gate therefore asks one question, not two: can this ENTRY be used at all? An entry
+// pointing at another entry's account, or one whose files could not be read, cannot be
+// switched and so cannot be launched either. Everything else can, signed in or not.
 import { canLaunch } from './errorPresentation.js';
 
-export function canPlay(account, sessionLive) {
-  if (!account || !sessionLive) return false;
-  return Boolean(account.active) && canLaunch(account.errorKind);
+export function canPlay(account) {
+  if (!account) return false;
+  return canLaunch(account.errorKind);
 }
 
-export function playTitle(account, sessionLive) {
+export function playTitle(account) {
   const label = account?.label ?? 'this account';
-  if (!sessionLive) return 'No account is signed in to Riot Client right now — sign in first';
+  if (!canLaunch(account?.errorKind)) {
+    return `PLAY is off for ${label} — its saved login cannot be used to switch`;
+  }
   if (account?.active) return `Launch Valorant — ${label} is signed in`;
-  return `Sign in to ${label} first — PLAY only starts the game for the account already signed in`;
+  return `Launch Valorant with ${label} — switches the Riot Client first`;
 }

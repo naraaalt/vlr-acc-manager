@@ -45,13 +45,29 @@ export function launchRequestPath({ product = PRODUCT, patchline = FALLBACK_PATC
 
 // What a PLAY press means for one account.
 //
-// Launching goes through Riot Client, and the client accepts a launch request long before
-// it is willing to act on one: while the account is not signed in it starts restoring the
-// session and asks the user to confirm a region, then drops the launch. A real press on a
-// non-signed-in row opened the client window and never started the game, so PLAY is now
-// launch-only — switching is its own explicit action, and the UI disables PLAY until the
-// account is the one signed in.
+// Launching goes through Riot Client, and the client only acts on a launch request while it
+// is signed in — handed one while it is parked, it starts restoring the session instead and
+// drops the launch. That is a fact about the client, not a reason to refuse the press. A
+// switch is what makes it signed in, and this app already switches, so PLAY does it here:
+// one press, switch then launch, and the user never sees the client window.
 export function planPlay({ isActive, valorantRunning }) {
-  if (!isActive) return 'not-signed-in';
-  return valorantRunning ? 'already-running' : 'launch';
+  if (isActive) return valorantRunning ? 'already-running' : 'launch';
+  // Switching closes every Riot process on the way through, the game included. That is fine
+  // when nothing is open, and it is a killed match when something is — a mis-click on
+  // another row must not end a game in progress. Refuse and say so instead of deciding for
+  // the user; the press costs one toast and no match.
+  if (valorantRunning) return 'close-game-first';
+  return 'switch-then-launch';
 }
+
+// Delays before each launch request, in milliseconds, first attempt included. More than one
+// because the client can accept a request and then swallow it: right after a switch its own
+// lifecycle is still running (region election, EULA, client config, Vanguard health check),
+// and a launch that arrives in that window is acknowledged and dropped. Ascending so a
+// client that is still busy is not hammered while it works.
+export const LAUNCH_RETRY_DELAYS = [0, 2_000, 5_000, 9_000];
+
+// How long to wait for the game process to appear after one accepted request. A launch that
+// works produces VALORANT.exe in about three seconds; this leaves room without dragging out
+// a retry.
+export const LAUNCH_APPEAR_TIMEOUT = 6_000;

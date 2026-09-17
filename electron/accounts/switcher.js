@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { captureLiveCredentials, getRiotClientRoot, loadAccount, managedPaths } from './accountStore.js';
 import { isAccountLive, refreshSwitchedAccount } from './accountService.js';
-import { isValorantRunning, launchRiotClient, launchValorant } from './riotClient.js';
+import { isValorantRunning, launchRiotClient, launchValorantWhenReady } from './riotClient.js';
 import { planPlay } from './play.js';
 
 const exec = promisify(execFile);
@@ -87,31 +87,43 @@ export async function switchToAccount(label) {
   }
 }
 
-// PLAY: start the game for the account that is signed in right now.
+// PLAY: get this account into the game, in one press.
 //
-// Launch-only, deliberately. The alternative — switch, then launch — does not work:
-// Riot Client accepts the launch request but will not act on it until its own login and
-// region election have finished, and a switch is exactly what restarts that cycle. A real
-// press on another account opened the client and produced no game. So a press here either
-// launches or refuses, and refusing is reported rather than papered over.
+// The press does whatever that takes. If the account is already the signed-in one it just
+// asks Riot Client to start the game; otherwise it switches first, and the switch waits for
+// the new session to be readable before returning, so the launch is asked for as an account
+// the client is actually signed in as.
+//
+// This replaced a launch-only rule that refused every other row. The refusal was built on a
+// true observation — a client that is not signed in accepts a launch and drops it — but the
+// answer to it is to switch, not to refuse: a manager exists to hold the accounts you are
+// not currently in, so a control that only works on the account already open is a control
+// that is almost always off.
 export async function playAccount(label) {
-  if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before launching.');
+  if (switchInProgress) throw new Error('Another account operation is still in progress. Wait for it to finish before launching.');
   switchInProgress = true;
   try {
     const account = await loadAccount(label);
     const isActive = await isAccountLive(account);
-    // Only worth asking whether the game is open when this account owns the running
-    // session; otherwise the answer cannot change the outcome.
+    // Only worth asking whether the game is open when this account owns the running session;
+    // otherwise the answer cannot change what happens next.
     const valorantRunning = isActive && await isValorantRunning();
     const decision = planPlay({ isActive, valorantRunning });
-    if (decision === 'not-signed-in') {
-      return { label: account.label, launched: false, reason: 'not-signed-in' };
-    }
     if (decision === 'already-running') {
-      return { label: account.label, launched: false, reason: 'already-running' };
+      return { label: account.label, launched: false, switched: false, reason: 'already-running' };
     }
-    await launchValorant();
-    return { label: account.label, launched: true, reason: null };
+    if (decision === 'close-game-first') {
+      // Reported, not acted on: the switch would close the game that is open under the
+      // account signed in now, and that is the user's call to make, not a mis-click's.
+      return { label: account.label, launched: false, switched: false, reason: 'close-game-first' };
+    }
+    const switched = decision === 'switch-then-launch';
+    if (switched) await performSwitch(account.label);
+    // Reports success only once the game process is actually up: the client acknowledging a
+    // request is not the same as a game starting, and conflating the two is what made an
+    // earlier build report a launch that never happened.
+    await launchValorantWhenReady();
+    return { label: account.label, launched: true, switched, reason: null };
   } finally {
     switchInProgress = false;
   }
