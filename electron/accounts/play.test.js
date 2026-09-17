@@ -86,13 +86,15 @@ describe('planPlay', () => {
     expect(planPlay({ isActive: true, valorantRunning: true })).toBe('already-running');
   });
 
-  it('switches first when another account is signed in', () => {
-    expect(planPlay({ isActive: false, valorantRunning: false })).toBe('switch-and-launch');
+  it('refuses when the account is not the one signed in', () => {
+    // The launch is requested from Riot Client, and a client that is not signed in
+    // begins restoring the session instead of acting on it — the request is accepted
+    // and then dropped. A real press produced exactly that: the client window opened
+    // and the game never started. Switching is a separate, explicit action.
+    expect(planPlay({ isActive: false, valorantRunning: false })).toBe('not-signed-in');
   });
 
-  it('still switches when the game is open under the other account', () => {
-    // Switching closes the game as part of writing the new session, so the
-    // "already running" guard must not apply here.
-    expect(planPlay({ isActive: false, valorantRunning: true })).toBe('switch-and-launch');
+  it('refuses for a non-signed-in account even when the game is open under another one', () => {
+    expect(planPlay({ isActive: false, valorantRunning: true })).toBe('not-signed-in');
   });
 });

@@ -40,11 +40,15 @@ export function buildLaunchArgs({ product = PRODUCT, patchline = FALLBACK_PATCHL
   return [`--launch-product=${product}`, `--launch-patchline=${safePatchline(patchline)}`];
 }
 
-// What a PLAY press means for one account. Switching is not a lighter version
-// of launching — it closes the running game in order to write the new session
-// — so the "already running" guard applies only when that account is the one
-// already signed in.
+// What a PLAY press means for one account.
+//
+// Launching goes through Riot Client, and the client accepts a launch request long before
+// it is willing to act on one: while the account is not signed in it starts restoring the
+// session and asks the user to confirm a region, then drops the launch. A real press on a
+// non-signed-in row opened the client window and never started the game, so PLAY is now
+// launch-only — switching is its own explicit action, and the UI disables PLAY until the
+// account is the one signed in.
 export function planPlay({ isActive, valorantRunning }) {
-  if (!isActive) return 'switch-and-launch';
+  if (!isActive) return 'not-signed-in';
   return valorantRunning ? 'already-running' : 'launch';
 }

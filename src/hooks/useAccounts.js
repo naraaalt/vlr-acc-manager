@@ -97,13 +97,10 @@ export function useAccounts() {
     try {
       const response = await window.valorant.playAccount(label);
       if (!response.ok) throw new Error(response.error);
-      // A PLAY that had to switch really changes which session is live, so the
-      // dashboard is re-read rather than patched in place. A plain launch changes
-      // no account state at all.
-      if (response.data?.switched) await refresh();
+      // A launch changes no account state, so the dashboard is not re-read.
       return response.data;
     } finally { setPlayingLabel(null); }
-  }, [refresh]);
+  }, []);
   const refreshAccount = useCallback(async (label) => {
     const response = await window.valorant.refreshAccountMarket(label);
     if (!response.ok) throw new Error(response.error);

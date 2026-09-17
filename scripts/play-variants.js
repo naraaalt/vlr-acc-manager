@@ -162,13 +162,14 @@
     if (!rows.length) return false;
     var count = 0;
     rows.forEach(function (row) {
-      var rr = row.querySelector('.acct-rr');
-      if (!rr) return;
-      var dot = row.querySelector('.acct-l1 .dot');
-      if (dot && dot.classList.contains('err')) return;
-      var btn = el('<a class="pv-play" title="Launch Valorant with this account"><b>' +
-        PLAY + '</b> PLAY</a>');
-      row.querySelector('.acct-l2').replaceChild(btn, rr);
+      // PLAY sekarang benar-benar hidup di baris akun, jadi slot RR yang dulu ditempati
+      // kandidat sudah tidak dirender lagi. Kandidat ini disimpan sebagai pembanding (dan
+      // screenshot-nya), jadi tombolnya ditempel ke ujung baris kedua — bukan menggantikan
+      // elemen yang sudah tidak ada, yang akan membuat kandidat ini diam-diam kosong.
+      var l2 = row.querySelector('.acct-l2');
+      if (!l2 || l2.querySelector('.pv-play')) return;
+      l2.appendChild(el('<a class="pv-play" title="Launch Valorant with this account"><b>' +
+        PLAY + '</b> PLAY</a>'));
       count++;
     });
     return count > 0;

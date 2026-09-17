@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime } from '../lib/format.js';
 import { SORT_LABELS } from '../lib/accountOrder.js';
-import { canLaunch } from '../lib/errorPresentation.js';
+import { canPlay, playTitle } from '../lib/playGate.js';
 import { Icon } from './Icons.jsx';
 
-function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPlay, onDelete, onRename, switching, playing, anySwitching }) {
+function AccountRow({ account, selected, sessionLive, onSelect, onOpenMarket, onSwitch, onPlay, onDelete, onRename, switching, playing, anySwitching }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const store = account.status === 'ready' ? account.store : null;
@@ -56,21 +56,18 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
         <span className="acct-rank" style={rank ? { color } : undefined}>{rank ?? 'UNRANKED'}</span>
         {/* PLAY takes this row's RR slot. RR is the one value here the details panel already
             carries three times over (value, meter and season progress), so the slot is the
-            cheapest place for a launcher. The entry keeps the readout when it is unusable as an
-            entry (a duplicate, or files that could not be read) — see canLaunch for why an
-            expired session is NOT one of those. */}
-        {canLaunch(account.errorKind)
-          ? <button
-              type="button" className="acct-play" disabled={anySwitching}
-              onClick={sel(() => onPlay(account.label))}
-              title={account.active
-                ? `Launch Valorant with ${account.label} — already signed in`
-                : `Switch the Riot session to ${account.label}, then launch Valorant`}
-            >
-              <Icon name="play" size={9} />
-              {playing ? 'PLAYING…' : 'PLAY'}
-            </button>
-          : <span className="acct-rr">{profile?.rr != null ? `${profile.rr} RR` : '—'}</span>}
+            cheapest place for a launcher. It stays visible on every row and is MUTED when it
+            cannot act, because a press only starts the game for the account already signed in
+            — see playGate for why, and what a real press on the wrong row did. */}
+        <button
+          type="button" className="acct-play"
+          disabled={!canPlay(account, sessionLive) || anySwitching}
+          onClick={sel(() => onPlay(account.label))}
+          title={playTitle(account, sessionLive)}
+        >
+          <Icon name="play" size={9} />
+          {playing ? 'PLAYING…' : 'PLAY'}
+        </button>
       </div>
       <div className="acct-actions">
         <button type="button" onClick={sel(onSwitch)} disabled={anySwitching} title="Switch Riot session to this account">
@@ -134,7 +131,7 @@ function CommandPanel({ commandFlash, tcnoAvailable, busy, onCommand, onOpenAdd 
 }
 
 export default function Sidebar({
-  accounts, visible, totalCount, selectedIndex, onSelect, onOpenMarket,
+  accounts, visible, totalCount, selectedIndex, sessionLive, onSelect, onOpenMarket,
   filter, onFilter, sortMode, onCycleSort,
   tcnoAvailable, busy, commandFlash, switchingLabel, playingLabel,
   onSwitch, onPlay, onRefresh, onRefreshAll, onDelete, onRename, onImport, onAdd
@@ -171,6 +168,7 @@ export default function Sidebar({
           <AccountRow
             key={account.id} account={account}
             selected={index === selectedIndex}
+            sessionLive={sessionLive}
             onSelect={() => onSelect(account.label)}
             onOpenMarket={onOpenMarket}
             onSwitch={() => onSwitch(account.label)}

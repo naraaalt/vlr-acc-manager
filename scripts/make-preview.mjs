@@ -129,20 +129,19 @@ window.__playCalls = [];
 // which looks exactly like a broken setting.
 window.__previewAccounts = ${JSON.stringify(accounts)};
 window.valorant = {
-  getDashboard: async () => ({ ok: true, data: { accounts: window.__previewAccounts, session: { live: true } } }),
+  getDashboard: async () => ({ ok: true, data: { accounts: window.__previewAccounts, session: { live: location.hash !== '#nosession' } } }),
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
-  // PLAY. Mutating like delete and rename, so the preview really changes state, and
-  // recorded so a harness can assert the CALL — a launch is not observable from the
-  // renderer, and a stub that returns success looks identical to one never invoked.
+  // PLAY mirrors the real backend exactly: it launches ONLY for the account that owns the
+  // session, and reports not-signed-in otherwise, because that refusal is what the UI has to
+  // render. A mock that always succeeded would show a healthy button on rows that cannot act.
   playAccount: async (label) => {
     const target = window.__previewAccounts.find((account) => account.label === label);
     if (!target) return { ok: false, error: 'No saved account “' + label + '”.' };
-    const switched = !target.active;
-    window.__playCalls.push({ label: label, switched: switched });
-    window.__previewAccounts = window.__previewAccounts.map((account) => ({ ...account, active: account.label === label }));
-    return { ok: true, data: { label: label, launched: true, switched: switched, reason: null } };
+    window.__playCalls.push({ label: label, active: Boolean(target.active) });
+    if (!target.active) return { ok: true, data: { label: label, launched: false, reason: 'not-signed-in' } };
+    return { ok: true, data: { label: label, launched: true, reason: null } };
   },
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
   getAppVersion: async () => '0.1.2',

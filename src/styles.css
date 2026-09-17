@@ -179,7 +179,6 @@ input::placeholder { color: var(--faint); }
 .acct-rankic { width: 14px; height: 14px; flex: 0 0 14px; object-fit: contain; }
 .acct-rankic-empty { border: 1px solid var(--faint); width: 10px; height: 10px; }
 .acct-rank { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; }
-.acct-rr { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--dim); letter-spacing: .04em; }
 /* The row's launch control, sitting in the slot the RR readout used to occupy. Sized like a
    launcher's Play button and pushed right, never stretched across the row — a control that fills
    its bar reads as a banner. */
@@ -190,7 +189,10 @@ input::placeholder { color: var(--faint); }
   display: inline-flex; align-items: center; gap: 5px;
 }
 .acct-play:hover:not(:disabled) { background: rgba(var(--brand-rgb), .22); }
-.acct-play:disabled { opacity: .5; cursor: default; }
+/* Muted, not faded: the control stays legible on every row while only the account signed in can
+   use it. Dropping just the opacity kept the brand colours and read as a button that was merely
+   dimmed, which is the opposite of "not usable here". */
+.acct-play:disabled { border-color: var(--border2); background: var(--panel2); color: var(--faint); cursor: default; }
 .acct-actions { display: none; gap: 6px; padding: 2px 0 0 32px; }
 .acct-actions button {
   border: 1px solid var(--border2); background: var(--panel2);
@@ -208,7 +210,7 @@ input::placeholder { color: var(--faint); }
 .acct.sel::before { content: ''; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 3px; background: var(--brand); box-shadow: 0 0 6px rgba(var(--brand-rgb), .8); z-index: 1; }
 .acct.sel .name, .acct.sel .acct-name { color: #fff; }
 .acct-rename { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--cyan); color: var(--text-bright); font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 2px 6px; }
-.acct.sel .acct-rr { color: var(--brand); }
+.acct.sel .acct-play:disabled { border-color: var(--border2); color: var(--faint); }
 .acct.busy { border-color: var(--cyan); }
 .acct.busy .acct-name { color: var(--cyan); }
 

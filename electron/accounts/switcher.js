@@ -87,29 +87,31 @@ export async function switchToAccount(label) {
   }
 }
 
-// PLAY: start the game now, switching the Riot session first when the account
-// asked for is not the one already signed in.
+// PLAY: start the game for the account that is signed in right now.
 //
-// The launch is a separate step AFTER the switch rather than a flag on the
-// client's first spawn, so a failed switch leaves the game closed instead of
-// half-started. The extra spawn is harmless: the client is running by then, and
-// a second invocation of RiotClientServices.exe hands its arguments to the
-// running instance — the same path a desktop shortcut to the game takes.
+// Launch-only, deliberately. The alternative — switch, then launch — does not work:
+// Riot Client accepts the launch request but will not act on it until its own login and
+// region election have finished, and a switch is exactly what restarts that cycle. A real
+// press on another account opened the client and produced no game. So a press here either
+// launches or refuses, and refusing is reported rather than papered over.
 export async function playAccount(label) {
   if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before launching.');
   switchInProgress = true;
   try {
     const account = await loadAccount(label);
     const isActive = await isAccountLive(account);
-    // Only worth asking whether the game is open when this account owns the
-    // running session; a switch closes it regardless.
+    // Only worth asking whether the game is open when this account owns the running
+    // session; otherwise the answer cannot change the outcome.
     const valorantRunning = isActive && await isValorantRunning();
-    if (planPlay({ isActive, valorantRunning }) === 'already-running') {
-      return { label: account.label, launched: false, switched: false, reason: 'already-running' };
+    const decision = planPlay({ isActive, valorantRunning });
+    if (decision === 'not-signed-in') {
+      return { label: account.label, launched: false, reason: 'not-signed-in' };
     }
-    if (!isActive) await performSwitch(label);
+    if (decision === 'already-running') {
+      return { label: account.label, launched: false, reason: 'already-running' };
+    }
     await launchValorant();
-    return { label: account.label, launched: true, switched: !isActive, reason: null };
+    return { label: account.label, launched: true, reason: null };
   } finally {
     switchInProgress = false;
   }

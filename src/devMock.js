@@ -139,17 +139,16 @@ export function installDevMock() {
       accounts = accounts.map((account) => ({ ...account, active: account.label === label }));
       return respond();
     },
-    // PLAY. Recorded the same way as notifyStoreReset: a launch is not
-    // observable from the renderer, so a harness has to assert the CALL, and a
-    // stub that silently succeeds is indistinguishable from one never invoked.
-    // The mock never starts a game.
+    // PLAY, mirroring the real backend: launch only for the account that owns the session,
+    // report not-signed-in otherwise. Recorded the same way as notifyStoreReset, because a
+    // launch is not observable from the renderer — a stub that silently succeeds is
+    // indistinguishable from one never invoked. The mock never starts a game.
     playAccount: async (label) => {
       const target = findAccount(label);
       if (!target) return fail(`No saved account “${label}”.`);
-      const switched = !target.active;
-      (window.__playCalls ??= []).push({ label, switched });
-      accounts = accounts.map((account) => ({ ...account, active: account.label === label }));
-      return respond({ label, launched: true, switched, reason: null });
+      (window.__playCalls ??= []).push({ label, active: Boolean(target.active) });
+      if (!target.active) return respond({ label, launched: false, reason: 'not-signed-in' });
+      return respond({ label, launched: true, reason: null });
     },
     detectTcno: async () => respond({
       available: true,
