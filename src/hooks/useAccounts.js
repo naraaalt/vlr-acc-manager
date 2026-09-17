@@ -10,6 +10,9 @@ export function useAccounts() {
   const [session, setSession] = useState({ live: false });
   const [tcno, setTcno] = useState({ available: false, accounts: [] });
   const [switchingLabel, setSwitchingLabel] = useState(null);
+  // Kept apart from switchingLabel: PLAY switches on the way to launching, and the
+  // row has to be able to say which of the two it is doing.
+  const [playingLabel, setPlayingLabel] = useState(null);
 
   const [progress, setProgress] = useState(null);
 
@@ -89,6 +92,18 @@ export function useAccounts() {
       await refresh();
     } finally { setSwitchingLabel(null); }
   }, [refresh]);
+  const play = useCallback(async (label) => {
+    setPlayingLabel(label);
+    try {
+      const response = await window.valorant.playAccount(label);
+      if (!response.ok) throw new Error(response.error);
+      // A PLAY that had to switch really changes which session is live, so the
+      // dashboard is re-read rather than patched in place. A plain launch changes
+      // no account state at all.
+      if (response.data?.switched) await refresh();
+      return response.data;
+    } finally { setPlayingLabel(null); }
+  }, [refresh]);
   const refreshAccount = useCallback(async (label) => {
     const response = await window.valorant.refreshAccountMarket(label);
     if (!response.ok) throw new Error(response.error);
@@ -104,5 +119,5 @@ export function useAccounts() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  return { accounts, loading, error, errorKind, progress, session, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno };
+  return { accounts, loading, error, errorKind, progress, session, tcno, switchingLabel, playingLabel, refresh, capture, addManually, remove, rename, switchTo, play, refreshAccount, importTcno };
 }

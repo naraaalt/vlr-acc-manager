@@ -48,6 +48,20 @@ export default [
     }
   },
 
+  // The placement-variant harness is BROWSER code that lives in scripts/: it is injected into the
+  // generated preview as one inline script, so it runs in the renderer and its `document` is real.
+  // Without its own block after the scripts/** rule, every DOM reference in it is a no-undef error.
+  // `script` (not `module`) is also the honest sourceType — the preview concatenates it into one
+  // inline tag, so a stray `export` there is a syntax error that kills every candidate silently.
+  {
+    files: ['scripts/*-variants.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'script',
+      globals: { ...globals.browser }
+    }
+  },
+
   // Preload bridge is CommonJS.
   {
     files: ['electron/**/*.cjs'],

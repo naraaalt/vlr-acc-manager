@@ -180,6 +180,17 @@ input::placeholder { color: var(--faint); }
 .acct-rankic-empty { border: 1px solid var(--faint); width: 10px; height: 10px; }
 .acct-rank { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; }
 .acct-rr { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--dim); letter-spacing: .04em; }
+/* The row's launch control, sitting in the slot the RR readout used to occupy. Sized like a
+   launcher's Play button and pushed right, never stretched across the row — a control that fills
+   its bar reads as a banner. */
+.acct-play {
+  margin-left: auto; border: 1px solid var(--brand); background: var(--brand-soft);
+  color: var(--brand); font-family: inherit; font-size: 8.5px; font-weight: 700;
+  letter-spacing: .12em; padding: 2px 10px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.acct-play:hover:not(:disabled) { background: rgba(var(--brand-rgb), .22); }
+.acct-play:disabled { opacity: .5; cursor: default; }
 .acct-actions { display: none; gap: 6px; padding: 2px 0 0 32px; }
 .acct-actions button {
   border: 1px solid var(--border2); background: var(--panel2);
@@ -311,10 +322,10 @@ input::placeholder { color: var(--faint); }
 .refresh-strip { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 12px; padding: 9px 14px; }
 .refresh-strip .icon { opacity: .8; color: var(--dim); }
 .rs-lbl { color: var(--dim); font-size: 9.5px; font-weight: 700; letter-spacing: .2em; }
-.rs-count {
-  color: var(--danger); font-size: 22px; font-weight: 800; letter-spacing: .06em;
-  text-shadow: 0 0 14px rgba(var(--danger-rgb), .35);
-}
+/* Same size as the label beside it. The countdown is a readout on a strip, not the headline number
+   of the screen; the glow was tuned for a large figure and reads as a smudge at label size, so it
+   goes with the size. The strip is also 13px shorter without it, which the card area keeps. */
+.rs-count { color: var(--danger); font-size: 9.5px; font-weight: 800; letter-spacing: .1em; }
 
 /* ---------- daily store ---------- */
 .store { flex: 1; }

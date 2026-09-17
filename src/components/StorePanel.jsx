@@ -100,7 +100,7 @@ export function AccountOverview({ account, busy, onSwitch, onRefresh, onRefreshA
 export function StoreRefreshStrip({ countdown }) {
   return (
     <section className="panel refresh-strip" aria-label="Store refresh countdown">
-      <Icon name="clock" size={15} />
+      <Icon name="clock" size={12} />
       <span className="rs-lbl">STORE REFRESHES IN</span>
       <span className="rs-count">{countdown}</span>
     </section>

@@ -101,7 +101,7 @@ export default function App() {
   const [busyLabel, setBusyLabel] = useState(null);
   const flashTimer = useRef(null);
   const toastTimer = useRef(null);
-  const { accounts: loadedAccounts, loading, error, errorKind, progress, session, tcno, switchingLabel, refresh, capture, addManually, remove, rename, switchTo, refreshAccount, importTcno } = useAccounts();
+  const { accounts: loadedAccounts, loading, error, errorKind, progress, session, tcno, switchingLabel, playingLabel, refresh, capture, addManually, remove, rename, switchTo, play, refreshAccount, importTcno } = useAccounts();
   const { confirm, pending: confirmPending } = useConfirm();
 
   // The signed-in account always sits at the top of the list, even after an
@@ -114,7 +114,7 @@ export default function App() {
     [loadedAccounts, sortMode]
   );
 
-  const busy = Boolean(switchingLabel) || Boolean(busyLabel);
+  const busy = Boolean(switchingLabel) || Boolean(playingLabel) || Boolean(busyLabel);
   const tcnoAvailable = Boolean(tcno.available);
 
   // Keep a selection once accounts load: the remembered account when REOPEN LAST ACCOUNT is
@@ -250,6 +250,32 @@ export default function App() {
       .then(() => showToast(`SWITCHED SESSION → ${target.toUpperCase()}`, 'ok'))
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
   }, [busy, selectedAccount, switchTo, showToast, flash, confirm]);
+
+  // PLAY is SWITCH followed by a launch, so it inherits the switch's confirmation:
+  // pressing it on another row closes the running game before signing the new
+  // account in. Pressing it on the account already signed in only starts the game,
+  // which is harmless and needs no prompt.
+  const doPlay = useCallback(async (label) => {
+    const target = label ?? selectedAccount?.label;
+    if (!target || busy) return;
+    const wouldSwitch = !accounts.find((account) => account.label === target)?.active;
+    if (wouldSwitch && getSetting('confirmDestructive')) {
+      const ok = await confirm({
+        title: 'PLAY VALORANT',
+        body: `Sapphire will switch the Riot Client to “${target}”, then start Valorant. The client restarts, and the game closes first if it is running.`,
+        confirmLabel: 'SWITCH & PLAY',
+        danger: true
+      });
+      if (!ok) return;
+    }
+    play(target)
+      .then((data) => {
+        if (data?.reason === 'already-running') showToast('VALORANT IS ALREADY RUNNING', 'warn');
+        else if (data?.switched) showToast(`SWITCHED → ${target.toUpperCase()} · LAUNCHING VALORANT`, 'ok');
+        else showToast(`LAUNCHING VALORANT — ${target.toUpperCase()}`, 'ok');
+      })
+      .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
+  }, [busy, selectedAccount, accounts, play, showToast, confirm]);
 
   // Rate limiting: Riot dislikes bursts. Manual refreshes are gated to one
   // per account per 30s (refresh-all marks every account + its own timer).
@@ -538,8 +564,8 @@ export default function App() {
             filter={filter} onFilter={setFilter}
             sortMode={sortMode} onCycleSort={cycleSort}
             tcnoAvailable={tcnoAvailable} busy={busy} commandFlash={commandFlash}
-            switchingLabel={switchingLabel}
-            onSwitch={doSwitch} onRefresh={doRefresh} onRefreshAll={doRefreshAll}
+            switchingLabel={switchingLabel} playingLabel={playingLabel}
+            onSwitch={doSwitch} onPlay={doPlay} onRefresh={doRefresh} onRefreshAll={doRefreshAll}
             onDelete={doDelete} onRename={doRename} onImport={() => setAdding(true)} onAdd={() => setAdding(true)}
           />
           <div className="v-divider" aria-hidden="true" />

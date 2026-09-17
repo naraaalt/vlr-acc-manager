@@ -99,10 +99,17 @@ async function getSavedAccountStore(label) {
   return store;
 }
 
+// Which signed-in account a record belongs to, resolved the same way the
+// dashboard resolves it. Imported by the switcher so "is this account the live
+// one?" has exactly one answer in the codebase.
+export async function isAccountLive(account) {
+  const storedPuuid = account.puuid ?? account.apiSession?.puuid ?? null;
+  return isLiveAccount(storedPuuid, account.id, await readLivePuuid(), await getActiveAccountId());
+}
+
 export async function refreshAccountStore(label) {
   const account = await loadAccount(label);
-  const livePuuid = await readLivePuuid();
-  if (isLiveAccount(account.puuid ?? account.apiSession?.puuid ?? null, account.id, livePuuid, await getActiveAccountId())) {
+  if (await isAccountLive(account)) {
     const refreshed = await captureCurrentAccount(label);
     return { store: refreshed.store, active: true };
   }

@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('valorant', {
     ipcRenderer.on('window:maximized-changed', (_event, maximized) => callback(maximized));
   },
   switchAccount: (label) => ipcRenderer.invoke('accounts:switch', label),
+  playAccount: (label) => ipcRenderer.invoke('accounts:play', label),
   getAppVersion: () => ipcRenderer.invoke('app:version'),
   checkForUpdates: (options) => ipcRenderer.invoke('update:check', options),
   downloadUpdate: (info) => ipcRenderer.invoke('update:download', { info }),

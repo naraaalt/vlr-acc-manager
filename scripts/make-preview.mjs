@@ -9,6 +9,9 @@ import path from 'node:path';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dist = path.join(root, 'dist');
 
+// Mockup penempatan tombol PLAY (QA-only, tidak ikut build produksi). Dipilih lewat #pv1..#pv5.
+const playVariants = readFileSync(path.join(root, 'scripts', 'play-variants.js'), 'utf8');
+
 const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
 const HOME = 'C:/Users/rifat/AppData/Roaming/valorant-account-manager/accounts';
 const VID = (uuid) => `https://valorant.dyn.riotcdn.net/x/videos/release-13.05/${uuid}_default_universal.mp4`;
@@ -116,6 +119,7 @@ const accounts = [
 const bridge = `
 window.__notifyCalls = [];
 window.__updateCalls = [];
+window.__playCalls = [];
 // Live list, so the mutating methods below really change what the next getDashboard
 // returns. Inlining it into getDashboard (as this used to) made delete and rename
 // unverifiable from the preview: the renderer made the call and the list never changed,
@@ -126,6 +130,17 @@ window.valorant = {
   detectTcno: async () => ({ ok: true, data: { available: false, accounts: [] } }),
   refreshAccountMarket: async () => ({ ok: false, error: 'Preview mock: refresh disabled.' }),
   switchAccount: async () => ({ ok: false, error: 'Preview mock: switching disabled.' }),
+  // PLAY. Mutating like delete and rename, so the preview really changes state, and
+  // recorded so a harness can assert the CALL — a launch is not observable from the
+  // renderer, and a stub that returns success looks identical to one never invoked.
+  playAccount: async (label) => {
+    const target = window.__previewAccounts.find((account) => account.label === label);
+    if (!target) return { ok: false, error: 'No saved account “' + label + '”.' };
+    const switched = !target.active;
+    window.__playCalls.push({ label: label, switched: switched });
+    window.__previewAccounts = window.__previewAccounts.map((account) => ({ ...account, active: account.label === label }));
+    return { ok: true, data: { label: label, launched: true, switched: switched, reason: null } };
+  },
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
   getAppVersion: async () => '0.1.2',
   onUpdateProgress: () => {},
@@ -281,5 +296,5 @@ if (location.hash === '#confirm') {
 }
 </script>`;
 writeFileSync(path.join(dist, 'preview.html'),
-  `<!doctype html><html><head><meta charset="UTF-8"><title>VLR PREVIEW</title><script>${bridge}</script>${tail}${qaHook}`);
+  `<!doctype html><html><head><meta charset="UTF-8"><title>VLR PREVIEW</title><script>${bridge}</script>${tail}${qaHook}<script>${playVariants}</script>`);
 console.log('dist/preview.html regenerated');

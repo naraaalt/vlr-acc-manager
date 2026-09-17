@@ -4,8 +4,9 @@ import { promisify } from 'node:util';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { captureLiveCredentials, getRiotClientRoot, loadAccount, managedPaths } from './accountStore.js';
-import { refreshSwitchedAccount } from './accountService.js';
-import { launchRiotClient } from './riotClient.js';
+import { isAccountLive, refreshSwitchedAccount } from './accountService.js';
+import { isValorantRunning, launchRiotClient, launchValorant } from './riotClient.js';
+import { planPlay } from './play.js';
 
 const exec = promisify(execFile);
 const processes = ['LeagueClient.exe', 'LoR.exe', 'VALORANT.exe', 'RiotClientServices.exe', 'RiotClientUx.exe', 'RiotClientUxRender.exe'];
@@ -63,18 +64,52 @@ export async function openRiotSignIn() {
   }
 }
 
+// Shared body: the caller owns the re-entrancy flag so PLAY can switch without
+// tripping the guard its own entry point sets.
+async function performSwitch(label) {
+  const account = await loadAccount(label);
+  await backupLiveCredentials();
+  await closeRiotProcesses();
+  await writeBundle(account.credentials);
+  await fs.writeFile(path.join(riotRoot, 'VamAccountId.instance'), account.id, 'utf8');
+  await launchRiotClient();
+  const refreshed = await refreshSwitchedAccount(account.label);
+  return { label: account.label, store: refreshed.store };
+}
+
 export async function switchToAccount(label) {
   if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before switching again.');
   switchInProgress = true;
   try {
+    return await performSwitch(label);
+  } finally {
+    switchInProgress = false;
+  }
+}
+
+// PLAY: start the game now, switching the Riot session first when the account
+// asked for is not the one already signed in.
+//
+// The launch is a separate step AFTER the switch rather than a flag on the
+// client's first spawn, so a failed switch leaves the game closed instead of
+// half-started. The extra spawn is harmless: the client is running by then, and
+// a second invocation of RiotClientServices.exe hands its arguments to the
+// running instance — the same path a desktop shortcut to the game takes.
+export async function playAccount(label) {
+  if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before launching.');
+  switchInProgress = true;
+  try {
     const account = await loadAccount(label);
-    await backupLiveCredentials();
-    await closeRiotProcesses();
-    await writeBundle(account.credentials);
-    await fs.writeFile(path.join(riotRoot, 'VamAccountId.instance'), account.id, 'utf8');
-    await launchRiotClient();
-    const refreshed = await refreshSwitchedAccount(account.label);
-    return { label: account.label, store: refreshed.store };
+    const isActive = await isAccountLive(account);
+    // Only worth asking whether the game is open when this account owns the
+    // running session; a switch closes it regardless.
+    const valorantRunning = isActive && await isValorantRunning();
+    if (planPlay({ isActive, valorantRunning }) === 'already-running') {
+      return { label: account.label, launched: false, switched: false, reason: 'already-running' };
+    }
+    if (!isActive) await performSwitch(label);
+    await launchValorant();
+    return { label: account.label, launched: true, switched: !isActive, reason: null };
   } finally {
     switchInProgress = false;
   }

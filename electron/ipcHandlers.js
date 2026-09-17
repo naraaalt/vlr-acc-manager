@@ -3,7 +3,7 @@ import path from 'node:path';
 import { deleteAccount, renameAccount } from './accounts/accountStore.js';
 import { addManualAccount, captureCurrentAccount, getDashboard, refreshAccountStore } from './accounts/accountService.js';
 import { findTcnoAccounts, importTcnoAccounts } from './accounts/tcnoImport.js';
-import { switchToAccount } from './accounts/switcher.js';
+import { switchToAccount, playAccount } from './accounts/switcher.js';
 import { checkForUpdates, downloadInstaller } from './update/service.js';
 import { runUpdateHelper } from './update/install.js';
 import { classifyError } from './lib/errorKind.js';
@@ -31,6 +31,9 @@ export function registerIpcHandlers() {
   ipcMain.handle('accounts:delete', (_, label) => result(async () => { await deleteAccount(label); return null; }));
   ipcMain.handle('accounts:rename', (_, oldLabel, newLabel) => result(async () => { await renameAccount(oldLabel, newLabel); return null; }));
   ipcMain.handle('accounts:switch', (_, label) => result(() => switchToAccount(label)));
+  // PLAY. Launching the game is a main-process decision: the renderer asks for
+  // an account, never for a command line.
+  ipcMain.handle('accounts:play', (_, label) => result(() => playAccount(label)));
   ipcMain.handle('accounts:tcno-detect', () => result(findTcnoAccounts));
   ipcMain.handle('accounts:tcno-import', (_, ids) => result(() => importTcnoAccounts(ids)));
 
