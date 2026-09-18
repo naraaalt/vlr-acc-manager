@@ -30,9 +30,10 @@ export function digestMatches(digest, hex) {
   return expected === hex.toLowerCase();
 }
 
-// Tidak diekspor: cuma dipakai installerPath() di file ini, dan js:dead benar menyebutnya
-// sebagai surface mati selama ia diekspor.
-function updateRoot(scratchRoot) {
+// Diekspor karena sweep start-up (housekeeping.js) perlu langsung menyebut direktori yang SAMA:
+// kalau dua tempat merakit path ini sendiri-sendiri, sweep-nya akan membersihkan folder yang bukan
+// dipakai updater — dan tidak ada yang gagal, cuma tidak ada yang terbersihkan.
+export function updateRoot(scratchRoot) {
   return path.join(scratchRoot, 'sapphire-update');
 }
 

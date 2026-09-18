@@ -62,7 +62,15 @@ const log = (message) => {
   const args = ['/S'];
   if (installDir) args.push('/D=' + installDir);
   const child = spawn(installer, args, { stdio: 'ignore' });
-  await new Promise((resolve) => child.on('exit', (code) => { log('installer exit ' + code); resolve(); }));
+  const exitCode = await new Promise((resolve) => child.on('exit', (code) => { log('installer exit ' + code); resolve(code); }));
+
+  // Installer-nya sudah dipakai. Dulu file ini dibiarkan: 100 MB per versi, menumpuk di temp tanpa
+  // pernah dibuka lagi. Hanya dihapus kalau install-nya BERHASIL — setelah gagal, file itu justru
+  // satu-satunya jalan mencoba lagi tanpa mengunduh ulang.
+  if (exitCode === 0) {
+    try { fs.rmSync(installer, { force: true }); log('removed installer'); }
+    catch (error) { log('could not remove installer: ' + error.message); }
+  }
 
   if (fs.existsSync(exePath)) {
     log('relaunching ' + exePath);

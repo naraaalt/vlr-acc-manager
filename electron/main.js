@@ -2,6 +2,8 @@ import { app, BrowserWindow, Menu, powerMonitor } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerIpcHandlers } from './ipcHandlers.js';
+import { sweepScratch } from './lib/housekeeping.js';
+import { updateRoot } from './update/service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -75,6 +77,20 @@ if (!isPrimaryInstance) {
     app.setAppUserModelId('com.naraaalt.valorantaccountmanager');
     registerIpcHandlers();
     mainWindow = createWindow();
+
+    // Sampah dari update SEBELUMNYA dibuang di sini. Satu update meninggalkan dua jejak yang tidak
+    // pernah diambil siapa pun: installer NSIS memindahkan Sapphire.exe lama ke %TEMP%\nsXXXX.tmp
+    // (225 MB per install — terukur 1,3 GB setelah enam update) dan installer yang sudah dipakai
+    // tidak dihapus (100 MB per versi).
+    //
+    // Sengaja TIDAK di-await dan sengaja tidak pernah throw: hasilnya tidak dibutuhkan siapa pun,
+    // window sudah harus terlihat, dan housekeeping tidak boleh menjadi alasan Sapphire gagal buka.
+    // Ini juga yang menutup kasus helper milik build lama, yang belum tahu cara menghapus installer.
+    sweepScratch({ tempRoot: app.getPath('temp'), updateDir: updateRoot(app.getPath('temp')) })
+      .then((swept) => {
+        if (swept.bytes) console.log(`Reclaimed ${(swept.bytes / 1048576).toFixed(1)} MB of leftover update files.`);
+      })
+      .catch(() => {});
 
     // System sleep/resume: all timers (countdown, rate-limit map) and the Riot
     // session state are stale after sleep. Tell the renderer to re-sync; it

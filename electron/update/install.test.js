@@ -46,6 +46,15 @@ describe('buildHelperSource', () => {
     expect(source).toContain('dry-run-marker.txt');
     expect(source).toContain('not running the installer');
   });
+  it('deletes the installer after a SUCCESSFUL install, and only then', () => {
+    // 100 MB per versi pernah tinggal di temp selamanya. Bersyarat pada exit code: setelah install
+    // GAGAL, file itu justru satu-satunya jalan mencoba lagi tanpa mengunduh ulang.
+    expect(source).toContain('exitCode === 0');
+    expect(source).toContain('fs.rmSync(installer, { force: true })');
+    // Urutannya yang penting: penjaga harus lebih dulu, karena rmSync tanpa syarat akan menghapus
+    // jalan retry-nya. Dua assertion di atas lolos untuk kode yang salah urutan; yang ini tidak.
+    expect(source.indexOf('exitCode === 0')).toBeLessThan(source.indexOf('fs.rmSync(installer'));
+  });
   it('writes a log, because stdio is ignored and a silent failure is undiagnosable', () => {
     expect(source).toContain('update.log');
   });

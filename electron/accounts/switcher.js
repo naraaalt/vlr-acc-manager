@@ -7,6 +7,7 @@ import { captureLiveCredentials, getRiotClientRoot, loadAccount, managedPaths } 
 import { isAccountLive, refreshSwitchedAccount } from './accountService.js';
 import { isValorantRunning, launchRiotClient, launchValorantWhenReady } from './riotClient.js';
 import { planPlay } from './play.js';
+import { backupsToPrune } from '../lib/housekeeping.js';
 
 const exec = promisify(execFile);
 const processes = ['LeagueClient.exe', 'LoR.exe', 'VALORANT.exe', 'RiotClientServices.exe', 'RiotClientUx.exe', 'RiotClientUxRender.exe'];
@@ -42,6 +43,23 @@ async function backupLiveCredentials(prefix = 'before-switch') {
   await fs.mkdir(backupDirectory(), { recursive: true });
   if (!safeStorage.isEncryptionAvailable()) throw new Error('OS encryption is unavailable, so switching is disabled.');
   await fs.writeFile(path.join(backupDirectory(), `${prefix}-${Date.now()}.vam`), safeStorage.encryptString(JSON.stringify(backup)));
+  await pruneBackups();
+}
+
+// Backup ditulis sebelum SETIAP switch dan dulu tidak pernah dibuang: 27 file / 245 MB dalam tiga
+// hari, tumbuh tanpa batas. Best-effort dengan sengaja — gagal membersihkan backup tidak boleh
+// menggagalkan switch yang sedang berjalan, karena backup itu ada justru untuk melindungi operasi
+// ini, bukan sebaliknya.
+async function pruneBackups() {
+  try {
+    const directory = backupDirectory();
+    const entries = [];
+    for (const name of await fs.readdir(directory)) {
+      const info = await fs.stat(path.join(directory, name)).catch(() => null);
+      if (info) entries.push({ name, mtimeMs: info.mtimeMs });
+    }
+    for (const name of backupsToPrune(entries)) await fs.rm(path.join(directory, name), { force: true }).catch(() => {});
+  } catch { /* housekeeping tidak pernah fatal */ }
 }
 async function clearLiveSession() {
   await writeBundle({ version: 1, files: [] });
