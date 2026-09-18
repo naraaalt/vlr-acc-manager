@@ -5,33 +5,75 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { readLockfile } from '../riot/lockfile.js';
 import { launchRequestPath, LAUNCH_APPEAR_TIMEOUT, LAUNCH_RETRY_DELAYS, valorantPatchline } from './play.js';
+import { clientCandidates, conventionalClientPath, protocolExecutable, registryCommand, uniqueClients } from './riotClientPath.js';
 
 const exec = promisify(execFile);
 
 // Riot Client serves its own API over 127.0.0.1 with a self-signed certificate.
 const localAgent = new https.Agent({ rejectUnauthorized: false });
 
-function clientExecutable() {
-  return path.join(process.env.SystemDrive ?? 'C:', 'Riot Games', 'Riot Client', 'RiotClientServices.exe');
-}
-
 // RiotClientInstalls.json is a plain map of installed products to the client that owns
 // them. It is the only place on the machine that says which patchline Valorant was
 // installed under, so it is read rather than assumed — a PBE install has its own entry.
+// It is also one of the two records that name the client's own location.
 function installsPath() {
   const programData = process.env.ProgramData ?? path.join(process.env.SystemDrive ?? 'C:', 'ProgramData');
   return path.join(programData, 'Riot Games', 'RiotClientInstalls.json');
 }
 
+async function readInstalls() {
+  try { return JSON.parse(await fs.readFile(installsPath(), 'utf8')); }
+  catch { return null; }
+}
+
 async function resolvePatchline() {
-  try { return valorantPatchline(JSON.parse(await fs.readFile(installsPath(), 'utf8'))); }
-  catch { return valorantPatchline(null); }
+  return valorantPatchline(await readInstalls());
+}
+
+// Windows' own record of where the client lives: the handler for the `riotclient://`
+// protocol. Read on top of the install map because that map can be missing or stale — on a
+// machine that has not run an update since the client was moved, this is the only place
+// that still knows, and it is the one Windows itself uses to open the client.
+async function registeredClientPath() {
+  try {
+    const { stdout } = await exec('reg', ['query', 'HKEY_CLASSES_ROOT\\riotclient\\shell\\open\\command', '/ve']);
+    return protocolExecutable(registryCommand(stdout));
+  } catch { return null; }
+}
+
+// Every place this machine might have put RiotClientServices.exe, most authoritative first.
+export async function clientExecutableCandidates() {
+  const [installs, registered] = await Promise.all([readInstalls(), registeredClientPath()]);
+  return uniqueClients([
+    ...clientCandidates(installs),
+    registered,
+    conventionalClientPath(process.env.SystemDrive)
+  ]);
+}
+
+// The first candidate that is actually on disk, or null. Exported so a harness can prove the
+// order with files it creates on any drive, without touching a real Riot install.
+export async function firstExisting(candidates) {
+  for (const candidate of candidates ?? []) {
+    try { await fs.access(candidate); return candidate; } catch { /* not this one */ }
+  }
+  return null;
+}
+
+// Riot Client is not required to live on the system drive, so its location is discovered
+// rather than assumed, and the failure below says what was looked at. The old code composed
+// C:\Riot Games\Riot Client\RiotClientServices.exe, which made every machine that installed
+// the client elsewhere permanently unusable while reporting the miss as a missing file.
+async function resolveClientExecutable() {
+  const candidates = await clientExecutableCandidates();
+  const found = await firstExisting(candidates);
+  if (found) return found;
+  throw new Error(`Riot Client was not found on this PC. Looked in ${candidates.length} place(s): ${candidates.join(' · ')}. Install Riot Client, or start it once so Windows records where it lives.`);
 }
 
 // Both entries go through here so the client is located in exactly one place.
 async function spawnClient(args) {
-  const executable = clientExecutable();
-  await fs.access(executable);
+  const executable = await resolveClientExecutable();
   const client = spawn(executable, args, { detached: true, stdio: 'ignore' });
   client.unref();
 }

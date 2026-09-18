@@ -50,7 +50,7 @@ describe('the presentation table', () => {
   it('decides launchability for every error kind it knows', () => {
     // A guard, not a behaviour test: adding a kind without answering "can we launch
     // from this?" would otherwise inherit whatever the fallback happens to be.
-    const kinds = ['expired', 'fs-error', 'network', 'duplicate', 'store', 'unknown'];
+    const kinds = ['expired', 'riot-missing', 'fs-error', 'network', 'duplicate', 'store', 'unknown'];
     for (const kind of kinds) {
       expect(typeof presentError('boom', kind).launchable, kind).toBe('boolean');
     }

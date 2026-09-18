@@ -28,6 +28,17 @@ const ERROR_PRESENTATION = {
     hint: 'Switching restarts the Riot Client with this account and re-saves a fresh session.',
     launchable: true
   },
+  'riot-missing': {
+    title: 'RIOT CLIENT NOT FOUND',
+    explain: 'RiotClientServices.exe is not where this PC keeps it — Riot Client may not be installed, or Windows has no record of where it was put.',
+    action: 'refresh-all',
+    actionLabel: 'RETRY',
+    hint: 'Install Riot Client, or start it once so Windows records its location, then retry.',
+    // Launchable, despite reading like a dead end. The failure is the MACHINE's, not this
+    // entry's, and muting every row for it is the mistake this table already made once: a
+    // per-kind rule that hid PLAY on every account the user actually had.
+    launchable: true
+  },
   'fs-error': {
     title: 'LOCAL FILE LOCKED',
     explain: 'Windows refused the file write that keeps your accounts index up to date.',

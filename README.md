@@ -29,7 +29,7 @@ Download [`Sapphire Setup <version>.exe`](../../releases) and run it. The portab
 5. **Preview a skin** with `P` on an offer to play its in-game video.
 6. **Switch the Riot session to an account** with `S`: the saved session is restored and Riot Client opens.
 
-Riot Client must be running and signed in before the app can read a session, and installed at `C:\Riot Games\Riot Client` for automatic launching and switching.
+Riot Client must be running and signed in before the app can read a session. Its install location does not matter: Sapphire reads where this PC put it, so another drive is fine.
 
 ## Keyboard shortcuts
 
@@ -97,7 +97,7 @@ Then create the release for that tag with `release\Sapphire Setup <version>.exe`
 
 ## Development
 
-Needs Windows 10+, Node.js LTS, npm, and Riot Client with Valorant in the default Riot Games location.
+Needs Windows 10+, Node.js LTS, npm, and Riot Client with Valorant installed.
 
 ```powershell
 npm install

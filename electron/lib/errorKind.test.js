@@ -31,6 +31,15 @@ describe('classifyError', () => {
     expect(classifyError('This Riot account is already saved as “main”.')).toBe('duplicate');
   });
 
+  it('classifies a Riot Client that is not where it was looked for', () => {
+    // Ahead of the filesystem rule on purpose: a missing client arrives as a message full of
+    // ENOENT-style paths, which the fs-error rule claims and answers with "close the Riot
+    // Client and any antivirus scan in progress" — advice that cannot fix a client installed
+    // on another drive.
+    expect(classifyError('Riot Client was not found on this PC. Looked in 2 place(s): C:\\Riot Games\\Riot Client\\RiotClientServices.exe. Install Riot Client, or start it once so Windows records where it lives.'))
+      .toBe('riot-missing');
+  });
+
   it('classifies storefront failures', () => {
     expect(classifyError('storefront unavailable')).toBe('store');
     expect(classifyError('daily skin offers request failed')).toBe('store');
@@ -61,7 +70,7 @@ describe('classifyError', () => {
 
 describe('isValidKind', () => {
   it('accepts every declared kind', () => {
-    for (const kind of ['expired', 'fs-error', 'network', 'duplicate', 'store', 'unknown']) {
+    for (const kind of ['expired', 'riot-missing', 'fs-error', 'network', 'duplicate', 'store', 'unknown']) {
       expect(isValidKind(kind)).toBe(true);
     }
   });
@@ -87,7 +96,7 @@ describe('fail', () => {
   });
 
   it('preserves the kind for every declared value', () => {
-    for (const kind of ['expired', 'fs-error', 'network', 'duplicate', 'store', 'unknown']) {
+    for (const kind of ['expired', 'riot-missing', 'fs-error', 'network', 'duplicate', 'store', 'unknown']) {
       expect(fail(kind, 'x').kind).toBe(kind);
     }
   });

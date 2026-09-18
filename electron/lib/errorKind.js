@@ -5,6 +5,7 @@
 
 const KINDS = {
   expired: 'expired',       // saved API session/token no longer valid → switch & re-save
+  'riot-missing': 'riot-missing', // Riot Client is not where it can be run → install it / start it once
   'fs-error': 'fs-error',   // local file lock/permission (EPERM/EACCES/EBUSY) → close Riot/AV, retry
   network: 'network',       // Riot service unreachable/timeout → check connection, retry later
   duplicate: 'duplicate',   // saved session duplicates another account → delete the dup
@@ -16,6 +17,11 @@ const KINDS = {
 // the earlier kind).
 const RULES = [
   ['expired', /expired/i],
+  // Ahead of the filesystem rule on purpose. A missing Riot Client reaches this classifier as
+  // an ENOENT-style message ("... access 'C:\Riot Games\Riot Client\...'"), which the fs-error
+  // rule claims and answers with "close the Riot Client and your antivirus" — advice that
+  // cannot fix a client installed on another drive.
+  ['riot-missing', /riot client was not found/i],
   ['duplicate', /duplicates?\s|already saved as/i],
   ['fs-error', /\bEPERM\b|\bEACCES\b|\bEBUSY\b|\bENOENT\b|operation not permitted|permission denied/i],
   ['network', /took too long|timed?\s?out|ENOTFOUND|ECONNRESET|ECONNREFUSED|EAI_AGAIN|network|fetch failed|status service|content service/i],
