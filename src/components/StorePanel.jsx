@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { divisionColor, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
+import { tierRgb } from '../lib/tierColor.js';
 import { getAudioPrefs, setAudioPrefs, subscribeAudioPrefs } from '../lib/audioPrefs.js';
 import { presentError } from '../lib/errorPresentation.js';
 import { BrandMark, Icon } from './Icons.jsx';
@@ -139,9 +140,15 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
         : <div className="cards">
             {offers.map((offer, index) => {
               const selected = index === activeOffer;
+              // Warna tier dipasang sebagai custom property, bukan kelas: nilainya datang dari Riot
+              // saat runtime, jadi tidak bisa ada di styles.css. Kartu tanpa tier tidak mendapat
+              // kelas .tiered sama sekali — dengan begitu tidak pernah ada rgba(var(--tier-rgb))
+              // yang variabelnya kosong, yang akan membatalkan seluruh deklarasinya.
+              const tierRgbValue = tierRgb(offer.tier?.color);
               return (
                 <article
-                  key={offer.id} className={`card${selected ? ' sel' : ''}`}
+                  key={offer.id} className={`card${selected ? ' sel' : ''}${tierRgbValue ? ' tiered' : ''}`}
+                  style={tierRgbValue ? { '--tier': offer.tier.color, '--tier-rgb': tierRgbValue } : undefined}
                   onClick={() => onSelectOffer(index)}
                   onKeyDown={(event) => { if (event.key === 'Enter') onSelectOffer(index); }}
                   role="button" tabIndex={0} aria-pressed={selected}
@@ -154,7 +161,7 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
                     {!offer.video && !offer.levels?.some((level) => level.video) && (
                       <span className="novideo-tag" title="Riot provides no showcase video for this skin">NO VIDEO</span>
                     )}
-                    {selected && (offer.video || offer.levels?.length > 1) && (
+                    {(offer.video || offer.levels?.length > 1) && (
                       <button
                         type="button" className="preview-btn"
                         onClick={(event) => { event.stopPropagation(); onPreview(index); }}

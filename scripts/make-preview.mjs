@@ -68,8 +68,19 @@ const SHOWCASE = {
     ]
   }
 };
-const offerOf = (id, name, image, price, bare = false) => ({
-  id: 'mock-' + id, name, image, price,
+// Tier warna skin, nilai ASLI dari valorant-api /v1/contenttiers (diambil 2026-09-18).
+// highlightColor Riot delapan digit (RRGGBBAA, alpha 33); yang dipakai enam digit pertamanya —
+// sama seperti yang dilakukan electron/riot/contentCache.js saat membacanya.
+const TIER = {
+  ultra: { rank: 4, label: 'Ultra Edition', color: '#FAD663' },
+  exclusive: { rank: 3, label: 'Exclusive Edition', color: '#F5955B' },
+  premium: { rank: 2, label: 'Premium Edition', color: '#D1548D' },
+  deluxe: { rank: 1, label: 'Deluxe Edition', color: '#009587' },
+  select: { rank: 0, label: 'Select Edition', color: '#5A9FE2' }
+};
+
+const offerOf = (id, name, image, price, bare = false, tier = null) => ({
+  id: 'mock-' + id, name, image, price, tier,
   video: bare ? null : (SHOWCASE[name]?.levels?.[0]?.video ?? null),
   levels: bare ? [] : (SHOWCASE[name]?.levels ?? []),
   chromas: bare ? [] : (SHOWCASE[name]?.chromas ?? []).filter((chroma) => chroma.swatch || chroma.render)
@@ -106,11 +117,16 @@ const accounts = [
       accountName: 'Main#SEVEN', expiresIn: 52337,
       profile: { level: 121, rank: 'Diamond 2', rr: 85, placementsRemaining: 0 },
       offers: [
-        offerOf('1', 'Reaver Vandal', 'https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png', 1775),
-        offerOf('2', 'Singularity Knife', 'https://media.valorant-api.com/weaponskinlevels/ea441610-42da-e46f-8d7b-1b9759c105cd/displayicon.png', 3550),
-        offerOf('3', 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', 1275),
-        offerOf('4', 'Prime Spectre', 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', 1775),
-        offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/f7c2e1e0-4c1e-6a11-9f0d-a75b4a6b1e11/displayicon.png', 1975, true)
+        offerOf('1', 'Reaver Vandal', 'https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png', 1775, false, TIER.premium),
+        offerOf('2', 'Singularity Knife', 'https://media.valorant-api.com/weaponskinlevels/ea441610-42da-e46f-8d7b-1b9759c105cd/displayicon.png', 3550, false, TIER.exclusive),
+        // Dua kartu terakhir sengaja TIDAK memakai tier asli skinnya (Prime Classic dan Prime Spectre
+        // dua-duanya Premium). Lima kartu Premium hanya akan memperlihatkan satu warna, sementara
+        // fixture ini ada untuk memperlihatkan tampilannya — jadi rentangnya disebar ke Ultra dan
+        // Deluxe, dan kartu terakhir sengaja dibiarkan tanpa tier supaya keadaan "Riot tidak
+        // mendaftarkan tier untuk skin ini" ikut terlihat di layar.
+        offerOf('3', 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', 1275, false, TIER.ultra),
+        offerOf('4', 'Prime Spectre', 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', 1775, false, TIER.deluxe),
+        offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/f7c2e1e0-4c1e-6a11-9f0d-a75b4a6b1e11/displayicon.png', 1975, true, null)
       ]
     }
   },
@@ -293,7 +309,7 @@ if (location.hash === '#no-content') {
             ...account.store,
             contentUnavailable: true,
             offers: account.store.offers.map((offer) => ({
-              ...offer, name: 'Unknown skin', image: null, video: null, levels: [], chromas: []
+              ...offer, name: 'Unknown skin', image: null, video: null, levels: [], chromas: [], tier: null
             }))
           }
         } : account)

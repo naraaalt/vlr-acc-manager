@@ -370,16 +370,47 @@ input::placeholder { color: var(--faint); }
 .skrow { display: flex; align-items: baseline; gap: 8px; }
 .wcat { font-size: 9px; color: var(--dim); font-weight: 600; letter-spacing: .18em; }
 .vp { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .03em; }
-.card.sel { border-color: var(--brand); box-shadow: 0 0 14px rgba(var(--brand-rgb), .22), inset 0 0 18px rgba(var(--brand-rgb), .04); }
-.card.sel .num { background: var(--brand); border-color: var(--brand); color: #0A0508; }
-.card.sel .prev {
+/* Tier: warna skin dipakai sebagai penanda, tapi TIDAK sebagai penanda pilihan.
+   Kalau keduanya memakai warna, keduanya jadi sinyal yang sama dan tidak ada lagi cara membedakan
+   "kursor ada di kartu ini" dari "kartu ini yang dipegang [kiri/kanan]". Jadi warna = tier, dan
+   pilihan memakai sesuatu yang bukan warna. Warna tier dipasang inline per kartu (--tier/--tier-rgb)
+   karena datang dari Riot saat runtime, dan kartu tanpa tier tidak mendapat kelas .tiered sama
+   sekali sehingga tidak ada rgba() dengan variabel kosong. */
+.card.tiered { border-color: rgba(var(--tier-rgb), .3); }
+.card.tiered .num { border-color: rgba(var(--tier-rgb), .5); color: rgba(var(--tier-rgb), .95); }
+.card.tiered .wcat { color: rgba(var(--tier-rgb), .8); }
+
+/* HOVER = highlight-nya, dan warnanya warna tier: yang sedang ditunjuk kursor adalah SKIN-nya. */
+.card.tiered:hover {
+  border-color: var(--tier);
+  background: rgba(var(--tier-rgb), .06);
+  box-shadow: 0 0 16px rgba(var(--tier-rgb), .3), inset 0 0 20px rgba(var(--tier-rgb), .05);
+}
+.card.tiered:hover .prev {
   background:
-    linear-gradient(rgba(var(--brand-rgb), .05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--brand-rgb), .05) 1px, transparent 1px),
+    linear-gradient(rgba(var(--tier-rgb), .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--tier-rgb), .06) 1px, transparent 1px),
     var(--bg);
   background-size: 14px 14px, 14px 14px, auto;
 }
+.card.tiered:hover .skname { color: #fff; }
+
+/* Pilihan: nomor bidak yang terisi penuh. Terbaca jelas, dan tidak bisa tertukar dengan hover karena
+   hover adalah warna dan ini bukan. */
+.card.sel { border-color: var(--border2); box-shadow: none; }
+.card.sel .num {
+  background: var(--text-bright); border-color: var(--text-bright); color: #0A0508;
+  box-shadow: 0 0 0 3px rgba(232, 239, 245, .16);
+}
 .card.sel .skname { color: #fff; }
+
+/* PREVIEW muncul saat hover juga, bukan hanya saat terpilih: kalau kursor sudah ada di atas kartu,
+   menyembunyikan satu-satunya aksinya membuat kartu itu terasa mati. Tombolnya karena itu selalu
+   dirender (kalau skin-nya memang punya materi showcase) dan visibilitasnya diatur di sini.
+   `visibility` dan `pointer-events` ikut diatur, bukan hanya opacity: opacity 0 menyisakan tombol
+   yang tidak terlihat TAPI masih bisa diklik dan masih bisa dijangkau Tab. */
+.card .preview-btn { opacity: 0; visibility: hidden; pointer-events: none; }
+.card:hover .preview-btn, .card.sel .preview-btn { opacity: 1; visibility: visible; pointer-events: auto; }
 
 /* ---------- market page ---------- */
 .market-page { padding: 10px; display: flex; flex-direction: column; gap: 10px; }

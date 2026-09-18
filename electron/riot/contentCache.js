@@ -28,48 +28,67 @@ function getSkinIndex() {
   return skinIndexPromise;
 }
 
+// Warna tier datang dari Riot sendiri lewat endpoint kedua di layanan konten yang sama — warna
+// yang sama dengan yang dipakai game untuk menandai Select sampai Ultra. highlightColor di payload
+// itu DELAPAN digit (RRGGBBAA, alpha selalu 33); hanya enam digit pertama yang sebuah warna. Nilai
+// mentahnya adalah warna 20% transparan, yang di layar terbaca sebagai "tiernya pudar" alih-alih
+// sebagai bug parsing — jadi justru begitulah cara paling mudah mengirimnya ke user tanpa sadar.
+function tierFromPayload(tiers, uuid) {
+  const tier = tiers.find((entry) => entry.uuid === uuid);
+  if (!tier) return null;
+  const hex = String(tier.highlightColor ?? '').replace(/^#/, '');
+  if (!/^[0-9a-f]{6,8}$/i.test(hex)) return null;
+  return { rank: Number(tier.rank) || 0, label: tier.displayName ?? 'Unknown', color: `#${hex.slice(0, 6).toUpperCase()}` };
+}
+
 async function buildSkinIndex() {
-  return fetchWithTimeout('https://valorant-api.com/v1/weapons/skins')
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Could not retrieve Valorant skin content (${response.status}).`);
-        return response.json();
-      })
-      .then((payload) => {
-        const index = new Map();
-        for (const skin of payload.data ?? []) {
-          // Per-skin showcase material: one video per upgrade level plus per-
-          // variant video/full-render from the chroma endpoint.
-          const levels = (skin.levels ?? []).map((level) => ({
-            name: level.displayName ?? skin.displayName ?? 'Skin',
-            item: level.levelItem ?? null,
-            video: level.streamedVideo ?? null,
-            icon: level.displayIcon ?? null
-          }));
-          const chromas = (skin.chromas ?? [])
-            .filter((chroma) => chroma.swatch)
-            .map((chroma) => ({
-              name: (chroma.displayName ?? '').replace(/\s+/g, ' ').trim(),
-              swatch: chroma.swatch,
-              // Variant-specific showcase: most newer skins have a per-chroma
-              // video; every chroma has a full-quality render as fallback.
-              video: chroma.streamedVideo ?? null,
-              render: chroma.fullRender ?? null
-            }));
-          for (const level of skin.levels ?? []) {
-            index.set(level.uuid, {
-              name: level.displayName ?? skin.displayName ?? 'Unknown skin',
-              image: level.displayIcon ?? skin.displayIcon ?? null,
-              video: level.streamedVideo ?? null,
-              levels,
-              chromas,
-              // valorant-api's /weapons/skins payload carries no category
-              // field (verified 2026-09); kept for when it does.
-              category: skin.category ?? null
-            });
-          }
-        }
-        return index;
+  const [skinsResponse, tiersResponse] = await Promise.all([
+    fetchWithTimeout('https://valorant-api.com/v1/weapons/skins'),
+    // Daftar tier itu dekorasi di atas store, bukan store-nya: kegagalannya tidak boleh menggagalkan
+    // akun ini. Kartunya hanya kehilangan warna, dan itu keadaan yang sama dengan skin yang memang
+    // tidak punya tier.
+    fetchWithTimeout('https://valorant-api.com/v1/contenttiers').catch(() => null)
+  ]);
+  if (!skinsResponse.ok) throw new Error(`Could not retrieve Valorant skin content (${skinsResponse.status}).`);
+  const payload = await skinsResponse.json();
+  const tiers = tiersResponse?.ok ? (await tiersResponse.json()).data ?? [] : [];
+
+  const index = new Map();
+  for (const skin of payload.data ?? []) {
+    const tier = tierFromPayload(tiers, skin.contentTierUuid);
+    // Per-skin showcase material: one video per upgrade level plus per-
+    // variant video/full-render from the chroma endpoint.
+    const levels = (skin.levels ?? []).map((level) => ({
+      name: level.displayName ?? skin.displayName ?? 'Skin',
+      item: level.levelItem ?? null,
+      video: level.streamedVideo ?? null,
+      icon: level.displayIcon ?? null
+    }));
+    const chromas = (skin.chromas ?? [])
+      .filter((chroma) => chroma.swatch)
+      .map((chroma) => ({
+        name: (chroma.displayName ?? '').replace(/\s+/g, ' ').trim(),
+        swatch: chroma.swatch,
+        // Variant-specific showcase: most newer skins have a per-chroma
+        // video; every chroma has a full-quality render as fallback.
+        video: chroma.streamedVideo ?? null,
+        render: chroma.fullRender ?? null
+      }));
+    for (const level of skin.levels ?? []) {
+      index.set(level.uuid, {
+        name: level.displayName ?? skin.displayName ?? 'Unknown skin',
+        image: level.displayIcon ?? skin.displayIcon ?? null,
+        video: level.streamedVideo ?? null,
+        levels,
+        chromas,
+        // valorant-api's /weapons/skins payload carries no category
+        // field (verified 2026-09); kept for when it does.
+        category: skin.category ?? null,
+        tier
       });
+    }
+  }
+  return index;
 }
 
 export async function resolveDailyOffers(offers) {
@@ -88,7 +107,10 @@ export async function resolveDailyOffers(offers) {
       levels: skin?.levels ?? [],
       chromas: skin?.chromas ?? [],
       category: skin?.category ?? null,
-      price: offer.price
+      price: offer.price,
+      // Null untuk skin yang Riot tidak daftarkan tiernya (40 dari 1405). Kartunya tetap dirender,
+      // hanya tanpa warna tier — bukan dibuang dari daftar.
+      tier: skin?.tier ?? null
     };
   });
 }
@@ -106,7 +128,11 @@ export function unavailableDailyOffers(offers) {
     levels: [],
     chromas: [],
     category: null,
-    price: offer.price
+    price: offer.price,
+    // Tiernya ikut hilang bersama nama dan gambarnya, karena sumbernya layanan yang sama. Sama
+    // dengan tier null milik skin yang memang tidak punya tier: kartunya kehilangan warna, bukan
+    // kehilangan diri.
+    tier: null
   }));
 }
 

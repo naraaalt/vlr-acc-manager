@@ -4,11 +4,22 @@
 
 const DASHBOARD_DELAY_MS = 0; // raise to e.g. 1500 to inspect the loading skeleton
 
+// Tier: nilai asli dari valorant-api /v1/contenttiers. Kartu tanpa tier (null) adalah keadaan yang
+// nyata — 40 dari 1405 skin Riot tidak punya contentTierUuid — jadi satu offer sengaja dibiarkan
+// tanpa tier: kartunya harus tetap dirender, hanya tanpa warna.
+const TIERS = {
+  ultra: { rank: 4, label: 'Ultra Edition', color: '#FAD663' },
+  exclusive: { rank: 3, label: 'Exclusive Edition', color: '#F5955B' },
+  premium: { rank: 2, label: 'Premium Edition', color: '#D1548D' },
+  deluxe: { rank: 1, label: 'Deluxe Edition', color: '#009587' },
+  select: { rank: 0, label: 'Select Edition', color: '#5A9FE2' }
+};
+
 const OFFERS = [
-  { id: 'mock-offer-1', name: 'Prime Vandal', image: null, price: 1775 },
-  { id: 'mock-offer-2', name: 'Oni Phantom', image: null, price: 1775 },
-  { id: 'mock-offer-3', name: 'Elderflame Operator', image: null, price: 2475 },
-  { id: 'mock-offer-4', name: 'Glitchpop Phantom', image: null, price: 2175 }
+  { id: 'mock-offer-1', name: 'Prime Vandal', image: null, price: 1775, tier: TIERS.premium },
+  { id: 'mock-offer-2', name: 'Oni Phantom', image: null, price: 1775, tier: TIERS.exclusive },
+  { id: 'mock-offer-3', name: 'Elderflame Operator', image: null, price: 2475, tier: TIERS.ultra },
+  { id: 'mock-offer-4', name: 'Glitchpop Phantom', image: null, price: 2175, tier: null }
 ];
 
 const RANKS = [
