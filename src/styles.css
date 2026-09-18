@@ -370,28 +370,38 @@ input::placeholder { color: var(--faint); }
 .skrow { display: flex; align-items: baseline; gap: 8px; }
 .wcat { font-size: 9px; color: var(--dim); font-weight: 600; letter-spacing: .18em; }
 .vp { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .03em; }
-/* Tier: warna skin dipakai sebagai penanda, tapi TIDAK sebagai penanda pilihan.
-   Kalau keduanya memakai warna, keduanya jadi sinyal yang sama dan tidak ada lagi cara membedakan
-   "kursor ada di kartu ini" dari "kartu ini yang dipegang [kiri/kanan]". Jadi warna = tier, dan
-   pilihan memakai sesuatu yang bukan warna. Warna tier dipasang inline per kartu (--tier/--tier-rgb)
-   karena datang dari Riot saat runtime, dan kartu tanpa tier tidak mendapat kelas .tiered sama
-   sekali sehingga tidak ada rgba() dengan variabel kosong. */
-.card.tiered { border-color: rgba(var(--tier-rgb), .3); }
+/* Tier: warnanya membingkai KOTAK GAMBAR skin, bukan seluruh kartu.
+   Di situ warnanya menempel pada bendanya — "skin ini tier Premium" — sementara border kartu tetap
+   netral dan karenanya tidak ikut bersaing dengan penanda pilihan. Efek sampingnya juga benar:
+   gambar tiap skin sudah punya warna dominannya sendiri, dan bingkai di sekelilingnya membaca sebagai
+   milik gambar itu, bukan sebagai hiasan kartu.
+   Warna dipasang inline per kartu (--tier/--tier-rgb) karena datang dari Riot saat runtime; kartu
+   yang memang tidak punya tier tidak mendapat kelas .tiered sama sekali, sehingga tidak pernah ada
+   rgba(var(--tier-rgb)) dengan variabel kosong — yang akan membatalkan seluruh deklarasinya. */
+.card.tiered .prev { border: 1px solid rgba(var(--tier-rgb), .45); }
 .card.tiered .num { border-color: rgba(var(--tier-rgb), .5); color: rgba(var(--tier-rgb), .95); }
 .card.tiered .wcat { color: rgba(var(--tier-rgb), .8); }
 
-/* HOVER = highlight-nya, dan warnanya warna tier: yang sedang ditunjuk kursor adalah SKIN-nya. */
-.card.tiered:hover {
-  border-color: var(--tier);
-  background: rgba(var(--tier-rgb), .06);
-  box-shadow: 0 0 16px rgba(var(--tier-rgb), .3), inset 0 0 20px rgba(var(--tier-rgb), .05);
-}
+/* HOVER = highlight-nya, dan warnanya warna tier: yang sedang ditunjuk kursor adalah SKIN-nya.
+   Glow di luar kotak + glow di dalam kotak, supaya efeknya terbaca sebagai "kotak ini menyala"
+   alih-alih sebagai garis yang kebetulan berwarna. */
 .card.tiered:hover .prev {
+  border-color: var(--tier);
+  box-shadow:
+    0 0 14px rgba(var(--tier-rgb), .38),
+    inset 0 0 22px rgba(var(--tier-rgb), .09);
   background:
-    linear-gradient(rgba(var(--tier-rgb), .06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--tier-rgb), .06) 1px, transparent 1px),
+    linear-gradient(rgba(var(--tier-rgb), .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--tier-rgb), .07) 1px, transparent 1px),
     var(--bg);
   background-size: 14px 14px, 14px 14px, auto;
+}
+/* Gambarnya sendiri ikut menyala, bukan hanya kotaknya: drop-shadow pada PNG transparan mengikuti
+   SILUET skin-nya, jadi yang menyala adalah bentuk senjatanya. Warna hitam lama dipertahankan —
+   itu yang memisahkan skin dari latar, dan melepasnya membuat gambar tenggelam. */
+.card.tiered:hover .prev img {
+  opacity: 1;
+  filter: drop-shadow(0 0 10px rgba(var(--tier-rgb), .55)) drop-shadow(0 4px 10px rgba(0, 0, 0, .5));
 }
 .card.tiered:hover .skname { color: #fff; }
 
