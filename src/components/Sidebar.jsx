@@ -65,7 +65,7 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
           onClick={sel(() => onPlay(account.label))}
           title={playTitle(account)}
         >
-          <Icon name="play" size={9} />
+          <Icon name="play" size={13} />
           {/* The press switches first when this account does not own the session, and that
               takes far longer than a launch. Saying which of the two is happening is the
               difference between a slow button and a broken one. */}
