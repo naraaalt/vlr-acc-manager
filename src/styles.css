@@ -24,6 +24,7 @@
   --danger-rgb: 255, 70, 85;
   --green: #20E693;
   --green-soft: rgba(32, 230, 147, .14);
+  --green-rgb: 32, 230, 147;
   --cyan: #3DD8F5;
   --gold: #E8C468;
   --mono: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', monospace;
@@ -182,16 +183,24 @@ input::placeholder { color: var(--faint); }
 /* The row's launch control, sitting in the slot the RR readout used to occupy. Sized like a
    launcher's Play button and pushed right, never stretched across the row — a control that fills
    its bar reads as a banner. */
+/* PLAY is the one GREEN control in the app, and deliberately so. Green is reserved here for
+   "this is fine / this works": the signed-in dot, the OK toast edge, the market's live badge.
+   A launcher is the same kind of statement — the dot says the session is good, this says the
+   session is ready to start, so the two read as one idea on the row. The other accents are
+   already spoken for and would collide: cyan is the row's BUSY state (.acct.busy), gold is
+   numbers (LV, VP), and red is errors and deletes. Brand blue stays the identity colour
+   (selection bars, card selection, primary buttons); leaving PLAY out of it is what makes the
+   control read as an action rather than as more chrome. */
 .acct-play {
-  margin-left: auto; border: 1px solid var(--brand); background: var(--brand-soft);
-  color: var(--brand); font-family: inherit; font-size: 8.5px; font-weight: 700;
+  margin-left: auto; border: 1px solid var(--green); background: var(--green-soft);
+  color: var(--green); font-family: inherit; font-size: 8.5px; font-weight: 700;
   letter-spacing: .12em; padding: 2px 10px; cursor: pointer; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 5px;
 }
-.acct-play:hover:not(:disabled) { background: rgba(var(--brand-rgb), .22); }
-/* Muted, not faded: the control stays legible on every row while only the account signed in can
-   use it. Dropping just the opacity kept the brand colours and read as a button that was merely
-   dimmed, which is the opposite of "not usable here". */
+.acct-play:hover:not(:disabled) { background: rgba(var(--green-rgb), .22); }
+/* Muted, not faded: a row the press cannot act on stays legible as a control, it just loses the
+   green. Dropping only the opacity left the brand colours in place and read as a button that was
+   merely dimmed, which is the opposite of "not usable here". */
 .acct-play:disabled { border-color: var(--border2); background: var(--panel2); color: var(--faint); cursor: default; }
 .acct-actions { display: none; gap: 6px; padding: 2px 0 0 32px; }
 .acct-actions button {
