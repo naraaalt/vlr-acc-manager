@@ -66,7 +66,15 @@ const log = (message) => {
 
   if (fs.existsSync(exePath)) {
     log('relaunching ' + exePath);
-    spawn(exePath, [], { detached: true, stdio: 'ignore' }).unref();
+    // ELECTRON_RUN_AS_NODE harus DILEPAS sebelum menjalankan app, dan ini bukan kehati-hatian
+    // teoretis: helper ini dijalankan DENGAN variabel itu diset 1, proses anak mewarisi seluruh
+    // environment, jadi Sapphire bangun sebagai Node biasa tanpa script — keluar seketika tanpa
+    // jendela dan tanpa pesan. Gejalanya: update selesai, versi di disk sudah baru, app tidak
+    // pernah muncul lagi. Dibuktikan dengan spawn dua kali, bedanya hanya variabel ini:
+    // 0 proses vs 4 proses.
+    const cleanEnv = Object.assign({}, process.env);
+    delete cleanEnv.ELECTRON_RUN_AS_NODE;
+    spawn(exePath, [], { detached: true, stdio: 'ignore', env: cleanEnv }).unref();
   } else {
     log('exe missing after install: ' + exePath);
   }

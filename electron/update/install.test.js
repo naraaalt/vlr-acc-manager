@@ -31,6 +31,14 @@ describe('buildHelperSource', () => {
   it('relaunches the app afterwards', () => {
     expect(source).toContain('detached: true');
   });
+  it('relaunches the app WITHOUT the flag that would turn it into a bare Node process', () => {
+    // Helper dijalankan dengan ELECTRON_RUN_AS_NODE=1, dan spawn() mewariskan environment —
+    // jadi tanpa membersihkannya, Sapphire yang dijalankan ulang bangun sebagai Node tanpa
+    // script: keluar seketika, tanpa jendela. Versi pertama dari tes ini hanya memeriksa
+    // 'detached: true' dan lolos, karena masalahnya ada di environment, bukan di cara spawn.
+    expect(source).toContain('delete cleanEnv.ELECTRON_RUN_AS_NODE');
+    expect(source).toMatch(/spawn\(exePath, \[\], \{[^}]*env: cleanEnv/);
+  });
   it('supports a dry run so the mechanism can be verified without an update', () => {
     // Dry run = lewati installer tapi tetap tinggalkan jejak. Itu yang membuat T3.5 bisa
     // membuktikan mekanismenya TANPA benar-benar mengupdate app.
