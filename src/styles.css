@@ -383,22 +383,24 @@ input::placeholder { color: var(--faint); }
 .card.tiered .wcat { color: rgba(var(--tier-rgb), .8); }
 
 /* HOVER = highlight-nya, dan warnanya warna tier: yang sedang ditunjuk kursor adalah SKIN-nya.
-   Yang menyala adalah KOTAK gambar ('sekitar box-nya'), bukan gambarnya: glow keluar dari tepi
-   kotak, jadi bentuknya persegi mengikuti kotak dan bukan mengikuti siluet senjata. Glow tipis di
-   dalam kotak hanya supaya isinya tidak terlihat datar di sebelah tepi yang terang. */
+   Glow-nya DI DALAM kotak (inset), bukan memancar ke luar: cahayanya memenuhi interior box dan
+   mengikuti tepinya dari dalam, sehingga highlight-nya berada di dalam bidang item — bukan halo
+   yang meluber ke kartu di sebelahnya.
+   Sengaja HANYA inset, tanpa lapisan luar: satu sinyal hover saja, dan tidak ada cahaya yang bocor
+   keluar dari batas kartu. Tepi kotak tetap warna tier penuh sebagai garis bacanya. */
 .card.tiered:hover .prev {
   border-color: var(--tier);
   box-shadow:
-    0 0 16px rgba(var(--tier-rgb), .45),
-    inset 0 0 22px rgba(var(--tier-rgb), .09);
+    inset 0 0 18px rgba(var(--tier-rgb), .55),
+    inset 0 0 6px rgba(var(--tier-rgb), .35);
   background:
     linear-gradient(rgba(var(--tier-rgb), .07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(var(--tier-rgb), .07) 1px, transparent 1px),
     var(--bg);
   background-size: 14px 14px, 14px 14px, auto;
 }
-/* Gambarnya cuma naik ke opasitas penuh saat hover. TIDAK diberi drop-shadow warna tier — itu
-   membuat glow-nya mengikuti siluet senjata, dan yang diminta justru glow di sekitar kotaknya. */
+/* Gambarnya cuma naik ke opasitas penuh saat hover — TIDAK diberi drop-shadow warna tier. Itu akan
+   membuat glow-nya mengikuti siluet senjata alih-alih duduk di dalam kotaknya. */
 .card.tiered:hover .prev img { opacity: 1; }
 .card.tiered:hover .skname { color: #fff; }
 
