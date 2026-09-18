@@ -445,6 +445,71 @@ input::placeholder { color: var(--faint); }
 .market-table .price { color: var(--gold); font-weight: 800; text-align: right; }
 .market-foot { color: var(--faint); font-size: 9px; letter-spacing: .14em; }
 
+/* ---------- night market ---------- */
+
+/* Pintunya, di dalam baris refresh yang sudah ada. `margin-left:auto` mendorongnya ke ujung kanan
+   baris; pemisah tipis di kirinya memisahkan dua hitungan yang tidak berhubungan — milik daily
+   store yang sudah ada di baris ini, dan milik market yang hanya ada di halaman di balik kontrol
+   ini. Emas, tanpa token baru: di aplikasi ini emas berarti "angka yang layak dibaca". */
+.rs-nm {
+  margin-left: auto; display: flex; align-items: center; gap: 9px; padding: 4px 9px;
+  border: 1px solid rgba(232, 196, 104, .35); background: rgba(232, 196, 104, .07);
+  cursor: pointer; user-select: none;
+}
+.rs-nm:hover { background: rgba(232, 196, 104, .18); border-color: rgba(232, 196, 104, .6); }
+.rs-nm:focus-visible { outline: 1px solid var(--gold); outline-offset: 1px; }
+.rs-nm .icon { color: var(--gold); opacity: .95; }
+.nm-lbl { color: var(--gold); font-size: 9.5px; font-weight: 800; letter-spacing: .2em; }
+.nm-go { color: var(--text-bright); font-size: 9.5px; font-weight: 800; letter-spacing: .12em; }
+.rs-nm:hover .nm-go { color: var(--gold); }
+
+.nm-head-live {
+  margin-left: auto; display: flex; align-items: center; gap: 7px;
+  color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+}
+
+/* Kartu night market: 3 kolom supaya enam offer jadi dua baris penuh. Grid, bukan tabel — halaman
+   ini soal bendanya, bukan soal daftar, dan di situlah warnanya bisa memenuhi kartu.
+   Warna tier dipasang INLINE per kartu (datang dari Riot saat runtime), jadi tidak ada aturan di
+   sini yang boleh menyetel border-color atau box-shadow pada .nm-prev — aturan di file ini akan
+   kalah dari inline style milik kartu yang punya tier, atau lebih buruk lagi menang untuk kartu
+   yang tidak punya. */
+.nm-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.nm-card {
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border); background: var(--panel);
+}
+/* Garis tepi tier: penanda yang terbaca sekilas di grid enam kartu, sebelum mata sempat membaca
+   warnanya. */
+.nm-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.nm-seen {
+  position: absolute; top: 9px; right: 10px; z-index: 2;
+  color: var(--faint); font-size: 8.5px; font-weight: 700; letter-spacing: .14em;
+}
+.nm-prev {
+  height: 104px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel2); border-bottom: 1px solid var(--border);
+}
+.nm-prev img { max-height: 88px; max-width: 90%; object-fit: contain; }
+.nm-noimg { color: var(--faint); font-size: 9.5px; letter-spacing: .16em; }
+.nm-meta { padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 8px; }
+.nm-name {
+  color: var(--text-bright); font-size: 11.5px; font-weight: 700; letter-spacing: .04em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nm-bottom { display: flex; align-items: baseline; gap: 8px; }
+/* Sama dengan daily store: warna tier membingkai KOTAK gambarnya, dan saat hover glow-nya masuk ke
+   DALAM kotak. Ini bahasa visual yang sama supaya kedua layar tidak terasa seperti dua aplikasi. */
+.nm-card.tiered .nm-prev { border: 1px solid rgba(var(--tier-rgb), .45); }
+.nm-card.tiered:hover .nm-prev {
+  border-color: var(--tier);
+  box-shadow: inset 0 0 18px rgba(var(--tier-rgb), .55), inset 0 0 6px rgba(var(--tier-rgb), .35);
+}
+.nm-pct { font-size: 16px; font-weight: 800; letter-spacing: -.01em; color: var(--gold); }
+.nm-now { color: var(--text-bright); font-size: 11.5px; font-weight: 800; }
+.nm-was { color: var(--faint); font-size: 10px; text-decoration: line-through; }
+.nm-pv { align-self: flex-start; }
+
 /* ---------- footer ---------- */
 .app-footer {
   flex: 0 0 34px; border-top: 1px solid var(--border2);

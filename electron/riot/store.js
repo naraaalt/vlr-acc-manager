@@ -120,6 +120,15 @@ export async function fetchAccountProfile({ accessToken, entitlementsToken, puui
   return { level, ...(rank ?? { rank: null, rr: null, placementsRemaining: null }) };
 }
 
+// Riot selalu memberi harga satu item, tapi mata uangnya berupa map berkunci id mata uang dan satu
+// offer bisa membawa lebih dari satu. Mengambil nilai finite terbesar benar untuk store VP maupun
+// night market. null untuk map kosong itu penting: Math.max() dari tidak ada apa-apa adalah
+// -Infinity, dan itu akan dirender sebagai harga.
+function maxCost(cost) {
+  const values = Object.values(cost ?? {}).map(Number).filter(Number.isFinite);
+  return values.length ? Math.max(...values) : null;
+}
+
 export function getDailyOffers(storefront) {
   const layout = storefront?.SkinsPanelLayout;
   const ids = layout?.SingleItemOffers;
@@ -127,7 +136,46 @@ export function getDailyOffers(storefront) {
   if (!Array.isArray(ids) || !Array.isArray(offers)) throw new Error('Riot returned a storefront without daily skin offers.');
   return ids.map((id) => {
     const offer = offers.find((item) => item.OfferID === id);
-    const price = offer ? Math.max(...Object.values(offer.Cost ?? {}).map(Number).filter(Number.isFinite)) : null;
-    return { offerId: id, price };
+    return { offerId: id, price: maxCost(offer?.Cost) };
   });
+}
+
+// Night Market. Riot membukanya per act dan selebihnya field BonusStore cukup tidak ada, jadi tidak
+// ada yang perlu diprediksi dan tidak ada jadwal yang perlu disimpan — yang dilaporkan adalah apa
+// yang dikatakan storefront. Dua hal di dokumentasi publik salah dan keduanya penting di sini:
+// BonusStoreOffers itu array, dan BonusStoreRemainingDurationInSeconds tidak terdaftar sama sekali.
+// Keduanya diperlakukan opsional: jendela yang tampil tanpa hitungan lebih baik daripada yang throw.
+//
+// Offer-nya dikunci pada Rewards[0].ItemID — uuid skin LEVEL — karena itulah namespace yang sudah
+// dipakai SkinsPanelLayout.SingleItemOffers, dan karenanya namespace tempat indeks konten dibangun.
+// Mengunci pada BonusOfferID akan menghasilkan tanpa nama dan tanpa gambar.
+export function getNightMarket(storefront) {
+  const raw = storefront?.BonusStore?.BonusStoreOffers;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const offers = raw.map((entry) => {
+    const cost = maxCost(entry?.Offer?.Cost);
+    const discounted = maxCost(entry?.DiscountCosts);
+    const percent = Number(entry?.DiscountPercent);
+    return {
+      offerId: entry?.Offer?.Rewards?.[0]?.ItemID ?? entry?.Offer?.OfferID ?? null,
+      price: discounted ?? cost,
+      originalPrice: cost,
+      discountPercent: Number.isFinite(percent) ? percent : null,
+      seen: Boolean(entry?.IsSeen)
+    };
+  }).filter((offer) => offer.offerId !== null);
+  if (!offers.length) return null;
+  const remaining = Number(storefront?.BonusStore?.BonusStoreRemainingDurationInSeconds);
+  return { offers, endsInSeconds: Number.isFinite(remaining) ? remaining : null };
+}
+
+// Jendelanya, dengan akhir yang sudah jadi instant absolut. `now` adalah parameter supaya aturannya
+// bisa diuji tanpa membekukan jam — alasan yang sama dengan nextStoreReset(now) di renderer.
+export function nightMarketWindow(storefront, now = Date.now()) {
+  const parsed = getNightMarket(storefront);
+  if (!parsed) return null;
+  return {
+    offers: parsed.offers,
+    endsAt: parsed.endsInSeconds === null ? null : now + parsed.endsInSeconds * 1000
+  };
 }

@@ -41,6 +41,19 @@ function freshStore(accountName) {
     accountName,
     offers: OFFERS.map((offer) => ({ ...offer })),
     expiresIn: 52_337,
+    // Night Market, bentuk yang sama dengan yang datang dari main process. `seen` disebar supaya
+    // tanda OPENED dan urutan di dalam tier kelihatan di dev.
+    nightMarket: {
+      endsAt: Date.now() + (12 * 24 * 3600_000) + (22 * 3600_000),
+      contentUnavailable: false,
+      offers: OFFERS.map((offer, index) => ({
+        ...offer,
+        originalPrice: offer.price,
+        price: Math.round(offer.price * 0.6),
+        discountPercent: 40,
+        seen: index > 1
+      }))
+    },
     profile: null
   };
 }

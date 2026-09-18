@@ -71,6 +71,20 @@ export function fmtCountdown(totalSeconds) {
   return `${hh}:${mm}:${ss}`;
 }
 
+// Countdown yang sama, tapi jujur soal skalanya. fmtCountdown mencetak jam, dan itu benar untuk
+// daily store (selalu di bawah 24 jam) serta salah untuk Night Market (~2 minggu): 13 hari jadi
+// '312:00:00', angka yang tidak ada yang membacanya sebagai tiga belas hari. Di atas satu hari ia
+// beralih ke D/H/M — satuan yang juga dipakai layar in-game.
+export function fmtDuration(totalSeconds) {
+  if (!Number.isFinite(totalSeconds)) return '--:--:--';
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(seconds / 86400);
+  if (days === 0) return fmtCountdown(seconds);
+  const hh = String(Math.floor((seconds % 86400) / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  return `${days}D ${hh}H ${mm}M`;
+}
+
 export function relativeTime(input) {
   if (!input) return '—';
   const then = new Date(input).getTime();

@@ -85,6 +85,15 @@ export const SETTINGS = [
     default: true
   },
   {
+    id: 'notifyNightMarket',
+    label: 'NIGHT MARKET NOTICE',
+    hint: 'One Windows notification when a Night Market opens for a saved account.',
+    kind: 'toggle',
+    // Default ON, sama seperti STORE ROTATION NOTICE: jendela Night Market hanya terbuka ~2 minggu
+    // sekali per act, jadi justru inilah hal yang paling tidak boleh terlewat.
+    default: true
+  },
+  {
     id: 'confirmDestructive',
     label: 'CONFIRM SWITCH & DELETE',
     hint: 'Ask before restarting the Riot Client or deleting a saved account.',
@@ -230,4 +239,21 @@ export function getLastSelection() {
 
 export function setLastSelection(label) {
   persist({ lastSelectedLabel: label });
+}
+
+// Bukan setting yang dilihat user: Night Market mana yang sudah diumumkan, per label akun. Ia
+// menumpang blob yang sama supaya tetap ada tepat satu kunci penyimpanan. Berbeda dari setting, ia
+// tidak pernah disanitasi — nilainya sidik jari yang tidak transparan, bukan pilihan user, dan
+// sanitise() akan membuang kunci yang tidak dikenalnya.
+//
+// Ditulis SEBELUM notice dikirim. persist() menulis lewat localStorage secara sinkron, jadi render
+// ulang yang menjalankan efek pengumuman sekali lagi sudah melihat sidik jarinya dan tetap diam —
+// tanpa itu, satu jendela bisa diumumkan berkali-kali dalam satu sesi.
+export function getAnnouncedNightMarkets() {
+  const stored = readStorage();
+  return stored?.nightMarkets && typeof stored.nightMarkets === 'object' ? stored.nightMarkets : {};
+}
+
+export function setAnnouncedNightMarket(label, signature) {
+  persist({ nightMarkets: { ...getAnnouncedNightMarkets(), [label]: signature } });
 }

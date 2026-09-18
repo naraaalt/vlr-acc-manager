@@ -86,6 +86,28 @@ const offerOf = (id, name, image, price, bare = false, tier = null) => ({
   chromas: bare ? [] : (SHOWCASE[name]?.chromas ?? []).filter((chroma) => chroma.swatch || chroma.render)
 });
 
+// Night Market: enam offer, satu per tier kecuali Premium yang dapat dua, dan tepat SATU yang sudah
+// dilihat — dua keadaan yang dirender berbeda oleh halaman (tanda OPENED, dan urutan di dalam tier).
+// Ditulis dalam urutan yang mungkin dikirim Riot, yaitu TIDAK terurut: halaman yang mengurutkan, dan
+// fixture yang datang sudah terurut akan membuat sortir yang belum tersambung terlihat bekerja.
+// Perhatikan nm-p1 (Reaver, -34%) sengaja ada SETELAH nm-p2 (Prime Spectre, -40%): keduanya Premium,
+// jadi diskon yang menentukan — persis yang diperiksa probe.
+const NIGHT_MARKET_OFFERS = [
+  { id: 'nm-e', tier: TIER.exclusive, name: 'Singularity Knife', image: 'https://media.valorant-api.com/weaponskinlevels/ea441610-42da-e46f-8d7b-1b9759c105cd/displayicon.png', price: 2274, originalPrice: 2675, discountPercent: 15, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-d', tier: TIER.deluxe, name: 'Comet Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/e271a430-4282-847b-3a51-5d97839ce221/displayicon.png', price: 638, originalPrice: 1275, discountPercent: 50, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-p1', tier: TIER.premium, name: 'Reaver Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png', price: 1172, originalPrice: 1775, discountPercent: 34, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-s', tier: TIER.select, name: 'MK.VII Liberty Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/6dee8259-4620-920a-cef7-14944bbed130/displayicon.png', price: 613, originalPrice: 875, discountPercent: 30, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-u', tier: TIER.ultra, name: 'Elderflame Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/18609205-4edb-5966-cff8-0fba0230ba1e/displayicon.png', price: 1856, originalPrice: 2475, discountPercent: 25, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-p2', tier: TIER.premium, name: 'Prime Spectre', image: 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', price: 1065, originalPrice: 1775, discountPercent: 40, seen: true, video: null, levels: [], chromas: [] }
+];
+// endsAt dihitung ulang tiap kali preview dimuat, jadi hitungannya selalu punya ~13 hari di atasnya
+// dan halaman tidak pernah memulai dalam keadaan "sudah berakhir".
+const nightMarketFixture = () => ({
+  endsAt: Date.now() + (12 * 24 * 3600_000) + (22 * 3600_000) + (41 * 60_000),
+  contentUnavailable: false,
+  offers: NIGHT_MARKET_OFFERS.map((offer) => ({ ...offer }))
+});
+
 // A ready account with a small store. Levels/ranks differ across the fixture so
 // every sort mode produces a visibly different order.
 const readyAccount = (id, label, accountName, level, rank, rr, price) => ({
@@ -127,7 +149,10 @@ const accounts = [
         offerOf('3', 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', 1275, false, TIER.ultra),
         offerOf('4', 'Prime Spectre', 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', 1775, false, TIER.deluxe),
         offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/f7c2e1e0-4c1e-6a11-9f0d-a75b4a6b1e11/displayicon.png', 1975, true, null)
-      ]
+      ],
+      // Night Market hanya dipasang di akun 'main', supaya "satu akun punya, yang lain tidak" juga
+      // terlihat di layar — dan supaya keadaan null (tanpa market) tetap terwakili oleh akun lain.
+      nightMarket: nightMarketFixture()
     }
   },
   readyAccount('acc-zyrox', 'zyrox', 'Zyrox#6942', 128, 'Diamond 1', 78, 1775),
@@ -257,6 +282,41 @@ if (location.hash === '#dash-error') {
     ok: false, errorKind: 'network',
     error: 'The Riot service took too long to respond. Please try again.'
   });
+}
+if (location.hash === '#night') {
+  // Klik kontrol pintu masuknya yang asli, sampai halaman ter-mount — cara yang sama dengan
+  // #settings membuka panel: event keyboard sintetis menyala sebelum React memasang keymap-nya dan
+  // tidak berefek.
+  const timer = setInterval(() => {
+    const entry = document.querySelector('.rs-nm');
+    if (!entry) return;
+    clearInterval(timer);
+    entry.click();
+  }, 300);
+}
+if (location.hash === '#night-ended') {
+  // Jendela yang akhirnya sudah lewat: pintunya harus HILANG dari baris refresh, dan halamannya
+  // tidak boleh mencetak hitungan negatif.
+  const realDashboard = window.valorant.getDashboard;
+  window.valorant.getDashboard = async () => {
+    const payload = await realDashboard();
+    if (!payload?.ok) return payload;
+    return { ...payload, data: { ...payload.data, accounts: payload.data.accounts.map((account) => account.store?.nightMarket
+      ? { ...account, store: { ...account.store, nightMarket: { ...account.store.nightMarket, endsAt: Date.now() - 1000 } } }
+      : account) } };
+  };
+}
+if (location.hash === '#night-none') {
+  // Tidak ada night market di mana pun — keadaan sepanjang sebagian besar tahun, dan satu-satunya
+  // yang harus identik dengan aplikasi sebelum fitur ini ada.
+  const realDashboard = window.valorant.getDashboard;
+  window.valorant.getDashboard = async () => {
+    const payload = await realDashboard();
+    if (!payload?.ok) return payload;
+    return { ...payload, data: { ...payload.data, accounts: payload.data.accounts.map((account) => account.store
+      ? { ...account, store: { ...account.store, nightMarket: null } }
+      : account) } };
+  };
 }
 if (location.hash === '#settings') {
   // Click the real header control until the panel is mounted, rather than firing a

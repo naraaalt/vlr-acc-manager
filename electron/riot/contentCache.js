@@ -91,36 +91,40 @@ async function buildSkinIndex() {
   return index;
 }
 
-export async function resolveDailyOffers(offers) {
-  const index = await getSkinIndex();
-  return offers.map((offer) => {
-    const skin = index.get(offer.offerId);
-    return {
-      // The renderer keys React lists (and the showcase modal's remount key)
-      // on `offer.id`, and the resolved skin record carries no id of its own —
-      // without this line every card in the daily store shares one undefined
-      // key and the modal stops remounting between skins.
-      id: offer.offerId,
-      name: skin?.name ?? 'Unknown skin',
-      image: skin?.image ?? null,
-      video: skin?.video ?? null,
-      levels: skin?.levels ?? [],
-      chromas: skin?.chromas ?? [],
-      category: skin?.category ?? null,
-      price: offer.price,
-      // Null untuk skin yang Riot tidak daftarkan tiernya (40 dari 1405). Kartunya tetap dirender,
-      // hanya tanpa warna tier — bukan dibuang dari daftar.
-      tier: skin?.tier ?? null
-    };
-  });
+// Satu tempat yang tahu cara mengubah id offer menjadi sebuah skin. Daily store dan Night Market
+// menghias offer dengan cara yang sama persis, jadi jalur keduanya wajib memakai ini — dua salinan
+// berarti dua tempat yang harus diperbaiki saat layanan konten berubah.
+function decorate(index, offer) {
+  const skin = index.get(offer.offerId);
+  return {
+    // Renderer memberi key React (dan key remount modal showcase) pada `offer.id`, sementara record
+    // skin tidak membawa id-nya sendiri — tanpa baris ini setiap kartu memakai key undefined yang
+    // sama dan modalnya berhenti me-remount antar skin.
+    id: offer.offerId,
+    name: skin?.name ?? 'Unknown skin',
+    image: skin?.image ?? null,
+    video: skin?.video ?? null,
+    levels: skin?.levels ?? [],
+    chromas: skin?.chromas ?? [],
+    category: skin?.category ?? null,
+    price: offer.price,
+    // Null untuk skin yang Riot tidak daftarkan tiernya (40 dari 1405). Kartunya tetap dirender,
+    // hanya tanpa warna tier — bukan dibuang dari daftar.
+    tier: skin?.tier ?? null
+  };
 }
 
-// The offer ids and their prices came from Riot; only the decorative labels
-// (name, image, showcase video) come from the content service. This produces
-// the same record shape with those labels absent, so the cards, the keyboard
-// navigation and the prices all keep working while the previews do not.
-export function unavailableDailyOffers(offers) {
-  return offers.map((offer) => ({
+export async function resolveDailyOffers(offers) {
+  const index = await getSkinIndex();
+  return offers.map((offer) => decorate(index, offer));
+}
+
+// Id offer dan harganya datang dari Riot; hanya label dekoratifnya (nama, gambar, video showcase)
+// yang datang dari layanan konten pihak ketiga. Ini menghasilkan bentuk record yang sama dengan
+// label-label itu absen, sehingga kartu, navigasi keyboard dan harganya tetap bekerja sementara
+// preview-nya tidak.
+function bareOffer(offer) {
+  return {
     id: offer.offerId,
     name: 'Unknown skin',
     image: null,
@@ -129,11 +133,38 @@ export function unavailableDailyOffers(offers) {
     chromas: [],
     category: null,
     price: offer.price,
-    // Tiernya ikut hilang bersama nama dan gambarnya, karena sumbernya layanan yang sama. Sama
-    // dengan tier null milik skin yang memang tidak punya tier: kartunya kehilangan warna, bukan
-    // kehilangan diri.
+    // Tiernya ikut hilang bersama nama dan gambarnya, karena sumbernya layanan yang sama.
     tier: null
-  }));
+  };
+}
+
+export function unavailableDailyOffers(offers) {
+  return offers.map(bareOffer);
+}
+
+// Discount yang Riot kirim adalah alasan halaman Night Market ada, jadi ia ditempelkan TERAKHIR —
+// setelah hiasan, apa pun jalur yang ditempuh. Dengan begitu jalur fallback tidak bisa diam-diam
+// menghilangkan angka yang justru jadi konten utamanya.
+function withDiscount(resolved, source) {
+  return {
+    ...resolved,
+    originalPrice: source?.originalPrice ?? null,
+    discountPercent: source?.discountPercent ?? null,
+    seen: Boolean(source?.seen)
+  };
+}
+
+export async function resolveNightMarketOffers(offers) {
+  const index = await getSkinIndex();
+  return offers.map((offer) => withDiscount(decorate(index, offer), offer));
+}
+
+export async function resolveNightMarketOrFallback(nightMarket) {
+  try {
+    return { offers: await resolveNightMarketOffers(nightMarket.offers), contentUnavailable: false };
+  } catch {
+    return { offers: nightMarket.offers.map((offer) => withDiscount(bareOffer(offer), offer)), contentUnavailable: true };
+  }
 }
 
 export async function resolveDailyOffersOrFallback(offers) {

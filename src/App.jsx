@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddAccountModal from './components/AddAccountModal.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
-import { AccountOverview, DailyStore, MarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
+import { AccountOverview, DailyStore, MarketView, NightMarketEntry, NightMarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useUpdates } from './hooks/useUpdates.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
@@ -10,7 +10,8 @@ import { fmtCountdown, storeCountdownSeconds, crossedStoreReset, parseRank } fro
 import { presentError } from './lib/errorPresentation.js';
 import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortMode, setSortMode as persistSortMode, nextSortMode } from './lib/uiPrefs.js';
 import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
-import { getSetting, subscribeSettings, getLastSelection, setLastSelection } from './lib/settings.js';
+import { getSetting, subscribeSettings, getLastSelection, setLastSelection, getAnnouncedNightMarkets, setAnnouncedNightMarket } from './lib/settings.js';
+import { isNewNightMarket, nightMarketOpen, nightMarketSignature } from './lib/nightMarket.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { updateBusyLabel, updateInFlight, updatePillText } from './lib/updatePill.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
@@ -79,13 +80,18 @@ export default function App() {
   const [filter, setFilter] = useState('');
   const [adding, setAdding] = useState(false);
   const [marketLabel, setMarketLabel] = useState(null);
+  // Mekanisme yang sama dengan marketLabel: satu label, bukan boolean, karena halamannya harus tetap
+  // menampilkan akun yang benar kalau pilihannya berpindah di belakangnya.
+  const [nightMarketLabel, setNightMarketLabel] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
   const [selectedOffer, setSelectedOffer] = useState(0);
   // [H] skin-preview toggle persists across restarts via uiPrefs.
   const [previewsHidden, setPreviewsHidden] = useState(getPreviewsHidden);
   // Account sort mode (active-first is the invariant; this reorders the rest).
   const [sortMode, setSortMode] = useState(getSortMode);
-  const [previewIndex, setPreviewIndex] = useState(null);
+  // Objek offer-nya sendiri, bukan indeks ke salah satu daftar: sekarang ada dua layar yang membuka
+  // showcase, dan indeks harus menyebutkan daftar yang mana.
+  const [previewOffer, setPreviewOffer] = useState(null);
   const [commandFlash, setCommandFlash] = useState(null);
   const [toast, setToast] = useState(null);
   const [quitOpen, setQuitOpen] = useState(false);
@@ -158,6 +164,7 @@ export default function App() {
       ?? null;
   const activeIndex = selectedAccount ? visible.indexOf(selectedAccount) : -1;
   const marketAccount = accounts.find((account) => account.label === marketLabel && account.status === 'ready');
+  const nightMarketAccount = accounts.find((account) => account.label === nightMarketLabel && account.status === 'ready');
   // The pill reports the Riot Client session itself, not saved-account
   // bookkeeping: a signed-in client is ACTIVE even with zero accounts saved.
   const sessionActive = Boolean(session.live);
@@ -231,6 +238,35 @@ export default function App() {
       showToast('DAILY STORE RESET', 'ok');
     }
   }, [now, loading, accounts.length, refresh, showToast]);
+
+  // Night Market tidak punya jadwal yang bisa dipakai menggantungkan notice — Riot membukanya kapan
+  // ia membukanya. Jadi notice-nya digerakkan oleh DATANYA, bukan oleh jam: sync pertama yang
+  // melaporkan jendela yang sidik jarinya belum pernah diumumkan untuk akun itu. Berjalan dari
+  // daftar akun dan bukan dari timer juga berarti jendela yang terbuka saat aplikasi tertutup
+  // diumumkan pada peluncuran berikutnya, yang memang saat paling awal aplikasi bisa tahu.
+  //
+  // Ingatannya ditulis SEBELUM notice dikirim: persist() menulis lewat localStorage secara sinkron,
+  // jadi render ulang yang menjalankan efek ini lagi sudah melihat sidik jarinya dan tetap diam,
+  // alih-alih mengumumkan jendela yang sama dua kali dalam satu sesi.
+  useEffect(() => {
+    const announced = getAnnouncedNightMarkets();
+    const fresh = accounts
+      .filter((account) => account.status === 'ready')
+      .map((account) => ({ label: account.label, signature: nightMarketSignature(account.store?.nightMarket) }))
+      .filter((entry) => isNewNightMarket(entry.signature, announced[entry.label]));
+    if (!fresh.length) return;
+    for (const entry of fresh) setAnnouncedNightMarket(entry.label, entry.signature);
+    const names = fresh.map((entry) => entry.label.toUpperCase());
+    if (getSetting('notifyNightMarket')) {
+      window.valorant?.notifyStoreReset?.({
+        title: 'Night Market',
+        // Bukan "store rotated": ini satu-satunya event yang per-akun dan layak membuka aplikasi,
+        // jadi isinya menyebut berapa akun yang punya alih-alih memakai kalimat daily store.
+        body: names.length === 1 ? `${names[0]} — a Night Market is open.` : `${names.length} accounts — a Night Market is open.`
+      });
+    }
+    showToast(`NIGHT MARKET — ${names.join(', ')}`, 'ok');
+  }, [accounts, showToast]);
 
   const doSwitch = useCallback(async (label) => {
     const target = label ?? selectedAccount?.label;
@@ -396,17 +432,18 @@ export default function App() {
       if (event.key === 'Escape') setAdding(false);
       return;
     }
-    if (previewIndex != null) {
-      if (event.key === 'Escape') setPreviewIndex(null);
+    if (previewOffer) {
+      if (event.key === 'Escape') setPreviewOffer(null);
       return;
     }
     const target = event.target;
     const inText = target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
     // Overlay close beats input blur: one Escape always closes the topmost
     // layer, whether or not the modal input currently holds focus.
-    if (event.key === 'Escape' && (inText || marketLabel)) {
+    if (event.key === 'Escape' && (inText || marketLabel || nightMarketLabel)) {
       event.preventDefault();
       if (inText) target.blur();
+      else if (nightMarketLabel) setNightMarketLabel(null);
       else setMarketLabel(null);
       return;
     }
@@ -467,7 +504,7 @@ export default function App() {
       case 'p':
       case 'P': {
         const offer = selectedAccount?.status === 'ready' ? selectedAccount.store?.offers?.[Math.min(selectedOffer, (selectedAccount.store?.offers?.length ?? 1) - 1)] : null;
-        if (offer && (offer.video || (offer.levels?.length ?? 0) > 1)) { flash('P'); setPreviewIndex(Math.min(selectedOffer, (selectedAccount.store.offers.length) - 1)); }
+        if (offer && (offer.video || (offer.levels?.length ?? 0) > 1)) { flash('P'); setPreviewOffer(offer); }
         return;
       }
       case 'i':
@@ -495,7 +532,8 @@ export default function App() {
         setQuitOpen(true);
         return;
       case 'Escape':
-        if (marketLabel) setMarketLabel(null);
+        if (nightMarketLabel) setNightMarketLabel(null);
+        else if (marketLabel) setMarketLabel(null);
         return;
       default:
     }
@@ -520,7 +558,6 @@ export default function App() {
   }), []);
 
   const pill = error ? { on: false, text: 'ERROR' } : loading ? { on: false, text: 'SYNCING' } : sessionActive ? { on: true, text: 'ACTIVE' } : { on: false, text: 'STANDBY' };
-  const offersCount = selectedAccount?.status === 'ready' ? (selectedAccount.store?.offers?.length ?? 0) : 0;
 
   return <div className="app-frame">
     <header className="app-header">
@@ -570,7 +607,16 @@ export default function App() {
       <WindowControls />
     </header>
 
-    {marketAccount
+    {nightMarketAccount
+      ? <main className="app-main market-main">
+          <NightMarketView
+            account={nightMarketAccount}
+            now={now}
+            onBack={() => setNightMarketLabel(null)}
+            onPreview={setPreviewOffer}
+          />
+        </main>
+      : marketAccount
       ? <main className="app-main market-main"><MarketView account={marketAccount} countdown={countdown} onBack={() => setMarketLabel(null)} /></main>
       : <main className="app-main">
           <Sidebar
@@ -618,13 +664,18 @@ export default function App() {
               <>
                 <AccountOverview account={selectedAccount} busy={busy} onSwitch={doSwitch} onRefresh={doRefresh} onRefreshAll={doRefreshAll} onDelete={doDelete} />
                 {selectedAccount.status === 'ready' && <>
-                  <StoreRefreshStrip countdown={countdown} offersCount={offersCount} />
+                  <StoreRefreshStrip
+                    countdown={countdown}
+                    entry={nightMarketOpen(selectedAccount.store?.nightMarket, now) && (
+                      <NightMarketEntry onOpen={() => setNightMarketLabel(selectedAccount.label)} />
+                    )}
+                  />
                   <DailyStore
                     account={selectedAccount}
                     selectedOffer={selectedOffer}
                     onSelectOffer={setSelectedOffer}
                     previewsHidden={previewsHidden}
-                    onPreview={setPreviewIndex}
+                    onPreview={setPreviewOffer}
                   />
                 </>}
               </>
@@ -632,11 +683,8 @@ export default function App() {
           </section>
         </main>}
 
-    {previewIndex != null && marketAccount == null && selectedAccount?.status === 'ready' && (
-      <SkinPreviewModal
-        offer={selectedAccount.store?.offers?.[Math.min(previewIndex, (selectedAccount.store?.offers?.length ?? 1) - 1)]}
-        onClose={() => setPreviewIndex(null)}
-      />
+    {previewOffer && (
+      <SkinPreviewModal offer={previewOffer} onClose={() => setPreviewOffer(null)} />
     )}
 
     <footer className="app-footer">

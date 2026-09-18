@@ -212,3 +212,85 @@ describe('skin tier', () => {
     expect(tierCalls()).toBe(1);
   });
 });
+
+
+// Offer Night Market adalah offer daily store dengan tiga field tambahan, jadi ia dihias oleh
+// indeks yang SAMA — satu tempat yang tahu cara mengubah id offer jadi sebuah skin. Yang khas dari
+// night market adalah diskonnya, dan itu harus selamat bahkan di jalur fallback: kalau layanan
+// konten mati, nama skinnya boleh hilang, tapi angka diskon yang jadi alasan halaman ini ada tidak.
+describe('resolveNightMarketOffers', () => {
+  const market = (offers) => ({ offers, endsAt: null });
+
+  it('decorates the discounted offers from the same content index', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveNightMarketOffers } = await import('./contentCache.js');
+    const offers = await resolveNightMarketOffers([
+      { offerId: LEVEL_UUID, price: 1172, originalPrice: 1775, discountPercent: 34, seen: false },
+      { offerId: OTHER_LEVEL_UUID, price: 2354, originalPrice: 2675, discountPercent: 12, seen: true }
+    ]);
+    expect(offers[0]).toMatchObject({
+      id: LEVEL_UUID, name: 'Reaver Vandal', image: 'reaver-level.png', video: 'reaver.mp4',
+      price: 1172, originalPrice: 1775, discountPercent: 34, seen: false
+    });
+    // Kartu di halaman night market membuka showcase yang sama, jadi levels/chromas harus ikut.
+    expect(offers[0].levels.length).toBeGreaterThan(0);
+    // Dan tiernya ikut terbawa — warna kartunya berasal dari sini.
+    expect(offers[0].tier).toEqual({ rank: 2, label: 'Premium Edition', color: '#D1548D' });
+  });
+
+  it('keeps an offer whose skin Riot lists no tier for, with a null tier', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveNightMarketOffers } = await import('./contentCache.js');
+    const [offer] = await resolveNightMarketOffers([{ offerId: OTHER_LEVEL_UUID, price: 100, originalPrice: 200, discountPercent: 50, seen: false }]);
+    expect(offer.name).toBe('Oni Phantom');
+    expect(offer.tier).toBeNull();
+  });
+
+  it('degrades to unknown names without losing the discounts', async () => {
+    // Layanan konten itu pihak ketiga. Kehilangannya tidak boleh menyembunyikan offer dari Riot.
+    vi.resetModules();
+    stubContentApi({ tiersOk: false });
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    const { resolveNightMarketOrFallback } = await import('./contentCache.js');
+    const result = await resolveNightMarketOrFallback(market([
+      { offerId: LEVEL_UUID, price: 1172, originalPrice: 1775, discountPercent: 34, seen: false }
+    ]));
+    expect(result.contentUnavailable).toBe(true);
+    expect(result.offers[0]).toMatchObject({
+      id: LEVEL_UUID, name: 'Unknown skin', image: null, price: 1172, originalPrice: 1775, discountPercent: 34, tier: null
+    });
+  });
+
+  it('flags nothing when the content service works', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveNightMarketOrFallback } = await import('./contentCache.js');
+    const result = await resolveNightMarketOrFallback(market([
+      { offerId: LEVEL_UUID, price: 1172, originalPrice: 1775, discountPercent: 34, seen: false }
+    ]));
+    expect(result.contentUnavailable).toBe(false);
+    expect(result.offers[0].name).toBe('Reaver Vandal');
+  });
+
+  it('gives the fallback records the same shape as resolved ones', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveNightMarketOffers, resolveNightMarketOrFallback } = await import('./contentCache.js');
+    const [resolved] = await resolveNightMarketOffers([{ offerId: LEVEL_UUID, price: 1, originalPrice: 2, discountPercent: 50, seen: false }]);
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    const fallback = await resolveNightMarketOrFallback({ offers: [{ offerId: LEVEL_UUID, price: 1, originalPrice: 2, discountPercent: 50, seen: false }], endsAt: null });
+    expect(Object.keys(fallback.offers[0]).sort()).toEqual(Object.keys(resolved).sort());
+  });
+
+  it('shares the one index: no extra fetch for a second market load', async () => {
+    vi.resetModules();
+    stubContentApi();
+    const { resolveNightMarketOffers } = await import('./contentCache.js');
+    await resolveNightMarketOffers([{ offerId: LEVEL_UUID, price: 1, originalPrice: 2, discountPercent: 50, seen: false }]);
+    const callsAfterFirst = globalThis.fetch.mock.calls.length;
+    await resolveNightMarketOffers([{ offerId: OTHER_LEVEL_UUID, price: 1, originalPrice: 2, discountPercent: 50, seen: false }]);
+    expect(globalThis.fetch.mock.calls.length).toBe(callsAfterFirst);
+  });
+});

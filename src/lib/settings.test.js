@@ -27,13 +27,13 @@ describe('defaults', () => {
     for (const setting of SETTINGS) expect(getSetting(setting.id)).toEqual(setting.default);
   });
 
-  it('declares exactly nine settings, five of them rendered in the panel', async () => {
+  it('declares exactly ten settings, six of them rendered in the panel', async () => {
     const { SETTINGS } = await loadSettings();
-    expect(SETTINGS).toHaveLength(9);
-    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(9);
+    expect(SETTINGS).toHaveLength(10);
+    expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(10);
     // The panel shows only what has no other surface; the rest are owned by a keybind or an
     // in-context control. Defaults are covered by the loop test above.
-    expect(SETTINGS.filter((setting) => setting.panel !== false)).toHaveLength(5);
+    expect(SETTINGS.filter((setting) => setting.panel !== false)).toHaveLength(6);
   });
 });
 
@@ -192,5 +192,66 @@ describe('the remembered last account', () => {
     setLastSelection('sec');
     setSetting('notifyOnRotation', false);
     expect(getLastSelection()).toBe('sec');
+  });
+});
+// Bukan setting yang dilihat user: Night Market mana yang sudah diumumkan, per label akun. Ia
+// menumpang blob yang sama supaya tetap ada tepat satu kunci penyimpanan, dan berbeda dari setting
+// ia tidak pernah disanitasi — nilainya sidik jari yang tidak transparan, bukan pilihan user.
+describe('the announced night market memory', () => {
+  it('is empty before anything is written', async () => {
+    const { getAnnouncedNightMarkets } = await loadSettings();
+    expect(getAnnouncedNightMarkets()).toEqual({});
+  });
+
+  it('remembers one signature per account label', async () => {
+    const { getAnnouncedNightMarkets, setAnnouncedNightMarket } = await loadSettings();
+    setAnnouncedNightMarket('main', 'a|b');
+    setAnnouncedNightMarket('sec', 'c|d');
+    expect(getAnnouncedNightMarkets()).toEqual({ main: 'a|b', sec: 'c|d' });
+  });
+
+  it('replaces the signature for a label rather than appending', async () => {
+    const { getAnnouncedNightMarkets, setAnnouncedNightMarket } = await loadSettings();
+    setAnnouncedNightMarket('main', 'a|b');
+    setAnnouncedNightMarket('main', 'e|f');
+    expect(getAnnouncedNightMarkets()).toEqual({ main: 'e|f' });
+  });
+
+  // Regression guard for the whole reason this lives in the settings blob: writing a setting used to
+  // replace the blob wholesale, which would have silently forgotten every announced market and made
+  // the app announce the same window again on the next launch.
+  it('survives an unrelated settings write, and does not disturb settings', async () => {
+    const { getAnnouncedNightMarkets, setAnnouncedNightMarket, getSetting, setSetting } = await loadSettings();
+    setAnnouncedNightMarket('main', 'a|b');
+    setSetting('notifyNightMarket', false);
+    setSetting('sortMode', 'label');
+    expect(getAnnouncedNightMarkets()).toEqual({ main: 'a|b' });
+    expect(getSetting('notifyNightMarket')).toBe(false);
+    expect(getSetting('sortMode')).toBe('label');
+  });
+
+  it('is not persisted as a setting, so it has no default to reset to', async () => {
+    const { SETTINGS, setAnnouncedNightMarket } = await loadSettings();
+    setAnnouncedNightMarket('main', 'a|b');
+    expect(SETTINGS.some((setting) => setting.id === 'nightMarkets')).toBe(false);
+    expect(globalThis.localStorage.getItem('vlr.settings')).toContain('a|b');
+  });
+});
+
+// Night Market tidak punya jadwal, jadi notice-nya tidak bisa digantung pada jam seperti rotasi
+// daily store. Setting-nya ada supaya user tetap punya satu saklar untuk mematikannya.
+describe('the night market notice setting', () => {
+  it('is on by default and rendered in the panel', async () => {
+    const { SETTINGS, getSetting } = await loadSettings();
+    const setting = SETTINGS.find((entry) => entry.id === 'notifyNightMarket');
+    expect(setting).toBeTruthy();
+    expect(setting.panel).not.toBe(false);
+    expect(getSetting('notifyNightMarket')).toBe(true);
+  });
+
+  it('round-trips', async () => {
+    const { getSetting, setSetting } = await loadSettings();
+    expect(setSetting('notifyNightMarket', false)).toBe(false);
+    expect(getSetting('notifyNightMarket')).toBe(false);
   });
 });

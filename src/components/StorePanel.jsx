@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { divisionColor, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
+import { divisionColor, fmtDuration, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
+import { nightMarketCountdown, sortNightMarketOffers } from '../lib/nightMarket.js';
 import { tierRgb } from '../lib/tierColor.js';
 import { getAudioPrefs, setAudioPrefs, subscribeAudioPrefs } from '../lib/audioPrefs.js';
 import { presentError } from '../lib/errorPresentation.js';
@@ -98,13 +99,41 @@ export function AccountOverview({ account, busy, onSwitch, onRefresh, onRefreshA
   );
 }
 
-export function StoreRefreshStrip({ countdown }) {
+// `entry` adalah slot yang dipakai Night Market. Ia INLINE — tepat setelah countdown di baris yang
+// sama — bukan barisnya sendiri, karena baris penuh kedua untuk event langka akan menghabiskan 44px
+// di setiap peluncuran sepanjang ~50 minggu setahun saat tidak ada apa pun untuk ditaruh di situ.
+//
+// Prop `offersCount` yang lama sudah dibuang: App.jsx menghitungnya dan mengoperkannya, tapi
+// komponen ini tidak pernah membacanya. Prop yang tidak dipakai lebih buruk daripada tidak ada prop
+// — ia terbaca sebagai fitur yang ada.
+export function StoreRefreshStrip({ countdown, entry = null }) {
   return (
     <section className="panel refresh-strip" aria-label="Store refresh countdown">
       <Icon name="clock" size={12} />
       <span className="rs-lbl">STORE REFRESHES IN</span>
       <span className="rs-count">{countdown}</span>
+      {entry}
     </section>
+  );
+}
+
+// Pintu masuk Night Market, dirender KE DALAM baris refresh yang sudah ada. Ia menyebut namanya dan
+// menawarkan VIEW — sengaja tanpa jumlah offer dan tanpa hitungan waktu: hitungannya ada di halaman,
+// tempat angka yang dijelaskannya berada, dan sebuah pintu tidak perlu jadwalnya dicetak di pintu.
+// App.jsx hanya merendernya kalau akun terpilih memang punya market, jadi ia tidak memakan apa pun
+// sepanjang minggu-minggu saat tidak ada.
+export function NightMarketEntry({ onOpen }) {
+  return (
+    <span
+      className="rs-nm" role="button" tabIndex={0}
+      title="Open the night market"
+      onClick={onOpen}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
+    >
+      <Icon name="cart" size={12} />
+      <span className="nm-lbl">NIGHT MARKET</span>
+      <span className="nm-go">VIEW</span>
+    </span>
   );
 }
 
@@ -164,7 +193,7 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
                     {(offer.video || offer.levels?.length > 1) && (
                       <button
                         type="button" className="preview-btn"
-                        onClick={(event) => { event.stopPropagation(); onPreview(index); }}
+                        onClick={(event) => { event.stopPropagation(); onPreview(offer); }}
                         title="Open the skin showcase video"
                       ><Icon name="eye" size={11} />PREVIEW</button>
                     )}
@@ -217,6 +246,84 @@ export function MarketView({ account, countdown, onBack }) {
         </tbody>
       </table>
       <p className="market-foot">DATA FROM RIOT STOREFRONT API · PRICES IN VP · [ESC] BACK</p>
+    </section>
+  );
+}
+
+// Halaman Night Market: enam kartu, dan warnanya adalah TIER skin itu — tidak ada label "TIER:
+// PREMIUM" di mana pun, karena kata adalah pembawa warna yang lebih buruk daripada warna itu sendiri.
+// Tiernya datang sudah jadi dari main process (rank, warna), jadi tidak ada yang diturunkan ulang
+// di sini.
+//
+// Diurutkan tier dulu, diskon kedua. Riot mengirim urutannya sendiri dan daily store mempertahankan
+// urutan itu; Night Market dengan sengaja tidak, karena yang dicari user di layar ini adalah offer
+// terbaiknya, dan tier adalah potongan pertama yang jujur untuk itu — diskon 40% untuk skin Select
+// nilainya di bawah 20% untuk skin Ultra.
+//
+// Header dan footer sengaja pendek: hitungan waktunya ada di sini (bukan di pintu masuk), dan label
+// seperti "SESSION ACTIVE", "SORTED BY SKIN TIER" serta "PRICES IN VP" dibuang atas permintaan —
+// ketiganya menjelaskan hal yang sudah terlihat dari halamannya sendiri.
+export function NightMarketView({ account, now, onBack, onPreview }) {
+  const market = account.status === 'ready' ? account.store?.nightMarket : null;
+  // Diurutkan DI SINI, bukan di App.jsx, dan hasilnya array baru: payload akun tetap berisi urutan
+  // asli dari Riot (state akun tetap salinan yang setia), sementara halaman ini yang memutuskan cara
+  // menyajikannya. Urutan itu keputusan tampilan, jadi tempatnya di komponen tampilan.
+  const offers = sortNightMarketOffers(market?.offers);
+  const remaining = nightMarketCountdown(market?.endsAt, now);
+
+  return (
+    <section className="market-page nm-page" aria-label="Night market">
+      <div className="market-top">
+        <button type="button" className="ghost-btn" onClick={onBack}><Icon name="back" />BACK TO ACCOUNTS</button>
+        <span className="market-meta">{remaining === null ? 'NO END DATE' : `ENDS IN ${fmtDuration(remaining)}`}</span>
+      </div>
+      <div className="market-head">
+        <BrandMark size={18} />
+        <h2>{account.label.toUpperCase()} — NIGHT MARKET</h2>
+        <span className="nm-head-live">{offers.length} OFFERS</span>
+      </div>
+      {market?.contentUnavailable && (
+        <p className="snap-note">SKIN NAMES AND PREVIEWS UNAVAILABLE — RIOT&apos;S OFFERS AND PRICES BELOW.</p>
+      )}
+      <div className="nm-cards">
+        {offers.map((offer) => {
+          const tierRgbValue = tierRgb(offer.tier?.color);
+          const tierStyle = tierRgbValue ? { '--tier': offer.tier.color, '--tier-rgb': tierRgbValue } : undefined;
+          return (
+            <article
+              key={offer.id}
+              className={`nm-card${tierRgbValue ? ' tiered' : ''}`}
+              style={tierStyle}
+            >
+              {/* Garis tepi: penanda tier yang terbaca sekilas di grid enam kartu. */}
+              <span className="nm-edge" style={{ background: offer.tier?.color ?? 'var(--border2)' }} />
+              {offer.seen && <span className="nm-seen">OPENED</span>}
+              <div className="nm-prev">
+                {offer.image
+                  ? <img src={offer.image} alt={offer.name} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                  : <span className="nm-noimg">NO IMAGE</span>}
+              </div>
+              <div className="nm-meta">
+                <span className="nm-name" title={offer.name}>{offer.name}</span>
+                <div className="nm-bottom">
+                  {/* Persentase memakai warna tier saat ada; tanpa tier ia jatuh ke gold, satu-satunya
+                      warna yang tersisa yang berarti "angka". */}
+                  <span className="nm-pct" style={offer.tier?.color ? { color: offer.tier.color } : undefined}>
+                    {offer.discountPercent == null ? '—' : `-${offer.discountPercent}%`}
+                  </span>
+                  <span className="nm-now">{offer.price?.toLocaleString('en-US') ?? '—'} VP</span>
+                  <span className="nm-was">{offer.originalPrice?.toLocaleString('en-US') ?? '—'}</span>
+                </div>
+                <button
+                  type="button" className="ghost-btn nm-pv"
+                  onClick={() => onPreview(offer)} title="Open the skin showcase"
+                ><Icon name="eye" size={11} />PREVIEW</button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <p className="market-foot">DISCOUNTS AS SENT BY RIOT · [ESC] BACK</p>
     </section>
   );
 }

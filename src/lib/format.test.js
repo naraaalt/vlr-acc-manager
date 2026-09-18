@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   cx, parseRank, divisionColor, weaponCategory,
-  fmtCountdown, relativeTime, nextStoreReset, storeCountdownSeconds, crossedStoreReset
+  fmtCountdown, fmtDuration, relativeTime, nextStoreReset, storeCountdownSeconds, crossedStoreReset
 } from './format.js';
 
 describe('nextStoreReset', () => {
@@ -269,5 +269,29 @@ describe('relativeTime', () => {
 describe('cx', () => {
   it('joins truthy class names', () => {
     expect(cx('acct', false, 'sel', null, undefined, '')).toBe('acct sel');
+  });
+});
+// fmtCountdown mencetak jam, dan itu benar untuk daily store yang selalu di bawah 24 jam. Night
+// Market berjalan sekitar dua minggu, jadi 13 hari tercetak sebagai '312:00:00' — angka yang tidak
+// ada yang membacanya sebagai tiga belas hari.
+describe('fmtDuration', () => {
+  it('prints days once there is at least one', () => {
+    expect(fmtDuration((12 * 86400) + (22 * 3600) + (41 * 60))).toBe('12D 22H 41M');
+    expect(fmtDuration(86400)).toBe('1D 00H 00M');
+    expect(fmtDuration((3 * 86400) + 90)).toBe('3D 00H 01M');
+  });
+
+  it('falls back to the clock format under a day, so a short window reads normally', () => {
+    expect(fmtDuration(3661)).toBe('01:01:01');
+    expect(fmtDuration(59)).toBe('00:00:59');
+    expect(fmtDuration(0)).toBe('00:00:00');
+  });
+
+  it('never prints a negative or a NaN', () => {
+    expect(fmtDuration(-5)).toBe('00:00:00');
+    expect(fmtDuration(undefined)).toBe('--:--:--');
+    expect(fmtDuration(null)).toBe('--:--:--');
+    expect(fmtDuration(NaN)).toBe('--:--:--');
+    expect(fmtDuration(Infinity)).toBe('--:--:--');
   });
 });

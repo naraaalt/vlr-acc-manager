@@ -1,7 +1,7 @@
 import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, saveAccount, updateAccountSession } from './accountStore.js';
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
-import { fetchAccountProfile, fetchStorefront, getDailyOffers } from '../riot/store.js';
-import { resolveDailyOffersOrFallback } from '../riot/contentCache.js';
+import { fetchAccountProfile, fetchStorefront, getDailyOffers, nightMarketWindow } from '../riot/store.js';
+import { resolveDailyOffersOrFallback, resolveNightMarketOrFallback } from '../riot/contentCache.js';
 import { fail, classifyError } from '../lib/errorKind.js';
 
 function expiry(accessToken) {
@@ -18,9 +18,22 @@ async function resolvedStore(session) {
     accountName: session.accountName ?? null,
     offers,
     contentUnavailable,
+    nightMarket: await resolvedNightMarket(storefront),
     expiresIn: storefront?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds ?? null,
     profile
   };
+}
+
+// Night Market tidak ada sepanjang sebagian besar tahun, jadi ini jauh lebih sering mengembalikan
+// null daripada tidak — dan renderer memperlakukan null sebagai "tidak ada market", bukan sebagai
+// kegagalan. Sengaja diselesaikan SETELAH daily store: storefront yang tidak bisa menghasilkan offer
+// harian harus tetap menggagalkan akun ini seperti sebelumnya, bukan tertutupi oleh sebuah event yang
+// kebetulan sedang berjalan.
+async function resolvedNightMarket(storefront) {
+  const market = nightMarketWindow(storefront);
+  if (!market) return null;
+  const { offers, contentUnavailable } = await resolveNightMarketOrFallback(market);
+  return { offers, contentUnavailable, endsAt: market.endsAt };
 }
 
 // PUUID of the Riot Client session that is signed in right now, or null while
