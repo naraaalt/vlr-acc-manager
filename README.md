@@ -10,38 +10,24 @@ A Windows desktop app for viewing the daily Valorant store across saved Riot Cli
 - Skin previews — upgrade levels and colour variants — in a modal, with a volume slider that persists across skins and restarts.
 - Riot ID, account level, competitive rank, RR and placement progress, per account.
 - Save and switch Riot Client sessions, or import them from TCNO Account Switcher.
-- The signed-in account is always listed first, in every sort mode; the rest sort by name, level or rank with `O`.
-- A Windows notification when the store rotates at 00:00 UTC, with an optional automatic re-sync of every account. Clicking it brings the window forward.
-- Accounts load one at a time on startup with a progress readout, rather than firing every store request at once.
-- Errors are named by cause — locked file, expired session, network failure, duplicate session — each with the action that fixes it.
-- Refresh is rate-limited to one per account per 30 seconds, to stay clear of Riot's throttling.
-- Frameless resizable window, F11 fullscreen, and a re-sync after the machine wakes from sleep.
 
-## Install
+## Installation
 
-Download `Sapphire Setup <version>.exe` from [Releases](../../releases) and run it. It creates desktop and Start Menu shortcuts; no terminal needed. The portable `Sapphire <version>.exe` runs without installing.
+Download [`Sapphire Setup <version>.exe`](../../releases) and run it. The portable `Sapphire <version>.exe` runs without installing.
 
-Windows may show a SmartScreen warning — the executable is not code-signed.
+> Windows may show a SmartScreen warning: the installer is not code-signed. After that, updates come from inside the app ([Updates](#updates)), and saved accounts in `%APPDATA%\valorant-account-manager` survive them.
 
-After the first install, updates come from inside the app: see [Updates](#updates). Saved accounts live in `%APPDATA%\valorant-account-manager` and survive upgrades.
+## Usage
 
-## Using it
-
-**Add an account.** Sign in to the account in Riot Client, then select **Add account** and give it a label.
-
-- **Save current account** saves the session that is already active.
-- **Add manually** closes Riot Client and Valorant, opens Riot's sign-in screen, and saves the account once you sign in. The current local session is backed up first.
-
-Snapshots detected from TCNO Account Switcher can be imported as well.
-
-**Work with an account.**
-
-- **Switch to this account** restores the saved session and opens Riot Client.
-- **Refresh market** updates that account's store, rank and level.
-- **View market** opens a larger store-only view.
-- **Hide skins** collapses the offer previews, keeping account details visible.
-
-**Preview a skin** with `P` on an offer to play its in-game video.
+1. **Add an account.** Sign in to the account in Riot Client, then select **Add account** (`A`) and give it a label.
+   - **Save current account** saves the session that is already active.
+   - **Add manually** closes Riot Client and Valorant, opens Riot's sign-in screen, and saves the account once you sign in. The current local session is backed up first.
+   - Snapshots detected from TCNO Account Switcher can be imported as well (`I`).
+2. **Pick an account** with `↑`/`↓` (or `O` to change the sort order); the daily store for that account fills the panel on the right.
+3. **Refresh it** with `R`, or every account with `Ctrl+R`.
+4. **Open the market view** with `M` — the store on its own, larger. `H` collapses the offer previews.
+5. **Preview a skin** with `P` on an offer to play its in-game video.
+6. **Switch the Riot session to an account** with `S`: the saved session is restored and Riot Client opens.
 
 Riot Client must be running and signed in before the app can read a session, and installed at `C:\Riot Games\Riot Client` for automatic launching and switching.
 
