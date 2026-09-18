@@ -12,6 +12,7 @@ import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortM
 import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
 import { getSetting, subscribeSettings, getLastSelection, setLastSelection } from './lib/settings.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
+import { updateBusyLabel, updateInFlight, updatePillText } from './lib/updatePill.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
 
@@ -343,9 +344,22 @@ export default function App() {
       danger: true
     });
     if (!ok) return;
+    // Both halves report themselves, and each one has to: after the dialog closes, nothing else
+    // on screen says whether the press did anything. The download reports itself through the
+    // pill (see src/lib/updatePill.js), and the install gets a toast because the pill is about
+    // to disappear with the window — a press that is followed by the app closing, with no words
+    // for it, is indistinguishable from a crash.
     const downloaded = await updates.download();
-    if (downloaded) await updates.install();
-  }, [confirm, updates]);
+    if (!downloaded) {
+      // The pill goes back to offering the version, which on its own looks like nothing was
+      // ever tried. Say that it failed.
+      showToast('UPDATE DOWNLOAD FAILED — CHECK YOUR CONNECTION AND TRY AGAIN', 'warn');
+      return;
+    }
+    showToast(`INSTALLING SAPPHIRE ${String(release.latestVersion).toUpperCase()} — IT WILL CLOSE AND REOPEN`, 'ok');
+    const installed = await updates.install();
+    if (!installed) showToast('THE INSTALLER COULD NOT START — TRY AGAIN', 'warn');
+  }, [confirm, updates, showToast]);
 
   const toggleMarket = useCallback(() => {
     if (busy) return;
@@ -522,19 +536,29 @@ export default function App() {
       <div className="header-right">
         {updates.release?.available && !updateDismissed && (
           <span className="update-notice">
+            {/* The pill is the whole progress report during an update: the settings panel is
+                shut when a press happens, and the window closes the moment the installer
+                starts. So it says DOWNLOADING n%, then INSTALLING…, and while it does the
+                press and the dismiss cross are both closed — a second press restarts the
+                download, and dismissing hides the only thing reporting it. */}
             <button
-              type="button" className={`update-pill${updates.status === 'ready' ? ' ready' : ''}`}
-              onClick={startUpdate} title={`Sapphire ${updates.release.latestVersion} is available`}
+              type="button"
+              className={`update-pill${updates.status === 'ready' ? ' ready' : ''}${updateInFlight(updates.status) ? ' busy' : ''}`}
+              onClick={startUpdate}
+              disabled={updateInFlight(updates.status)}
+              title={updateInFlight(updates.status)
+                ? `Update in progress — ${updateBusyLabel(updates.status)}`
+                : `Sapphire ${updates.release.latestVersion} is available`}
             >
               <Icon name="import" size={11} />
-              {updates.status === 'ready' ? 'RESTART TO UPDATE'
-                : updates.status === 'installing' ? 'INSTALLING…'
-                  : `UPDATE ${updates.release.latestVersion}`}
+              {updatePillText({ status: updates.status, progress: updates.progress, latestVersion: updates.release.latestVersion })}
             </button>
-            <button
-              type="button" className="update-dismiss" onClick={() => setUpdateDismissed(true)}
-              title="Dismiss until next launch" aria-label="Dismiss update notice"
-            ><Icon name="close" size={10} /></button>
+            {!updateInFlight(updates.status) && (
+              <button
+                type="button" className="update-dismiss" onClick={() => setUpdateDismissed(true)}
+                title="Dismiss until next launch" aria-label="Dismiss update notice"
+              ><Icon name="close" size={10} /></button>
+            )}
           </span>
         )}
         <button type="button" className="ghost-btn" onClick={() => setAdding(true)}><Icon name="plus" />ADD</button>

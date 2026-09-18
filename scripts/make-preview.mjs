@@ -123,6 +123,7 @@ const bridge = `
 window.__notifyCalls = [];
 window.__updateCalls = [];
 window.__playCalls = [];
+window.__updateProgressCb = null;
 // Whether a game is open right now. A hash hook rather than a constant, because two of
 // PLAY's four outcomes only exist while something is running and neither would ever render
 // from the default fixture.
@@ -153,20 +154,40 @@ window.valorant = {
     return { ok: true, data: { label: label, launched: true, switched: switched, reason: null } };
   },
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
-  getAppVersion: async () => '0.1.2',
-  onUpdateProgress: () => {},
-  downloadUpdate: async () => { window.__updateCalls.push('download'); return { ok: true, data: { path: 'X:/fake/Sapphire Setup 0.1.3.exe', bytes: 1, name: 'Sapphire Setup 0.1.3.exe' } }; },
+  getAppVersion: async () => '0.1.4',
+  // Registered, not ignored: the pill's DOWNLOADING n% is the whole progress report during an
+  // update, so a mock that swallows the callback makes the feature look inert from the preview
+  // — and "the preview shows nothing" is exactly the symptom the real thing had.
+  onUpdateProgress: (callback) => { window.__updateProgressCb = callback; },
+  downloadUpdate: async () => {
+    window.__updateCalls.push('download');
+    // #update-fail: the download refuses, which must not look like "nothing happened" — the
+    // pill goes back to offering the version and a toast says what went wrong.
+    if (location.hash.startsWith('#update-fail')) {
+      return { ok: false, error: 'The installer download failed (HTTP 503).' };
+    }
+    // #update-slow holds the download open and emits progress, so the mid-download state can be
+    // looked at. Without it the mock resolves instantly and that state never renders.
+    if (location.hash.startsWith('#update-slow')) {
+      const total = 96_000_000;
+      for (let step = 1; step <= 8; step += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        window.__updateProgressCb?.({ received: Math.round((total / 8) * step), total: total });
+      }
+    }
+    return { ok: true, data: { path: 'X:/fake/Sapphire Setup 0.1.5.exe', bytes: 1, name: 'Sapphire Setup 0.1.5.exe' } };
+  },
   installUpdate: async () => { window.__updateCalls.push('install'); return { ok: true, data: { helperPid: 1 } }; },
   checkForUpdates: async () => {
     window.__updateCalls.push('check');
     // Opt-in lewat hash: default preview TIDAK menampilkan pill, supaya screenshot keadaan
     // normal tidak tiba-tiba menampilkan penawaran update.
-    if (location.hash === '#update') {
-      return { ok: true, data: { available: true, currentVersion: '0.1.2', latestVersion: '0.1.3', reason: 'ok',
-        installer: { name: 'Sapphire Setup 0.1.3.exe', url: 'https://example.invalid/setup.exe', size: 99_000_000, digest: 'sha256:${'a'.repeat(64)}' },
+    if (location.hash.startsWith('#update')) {
+      return { ok: true, data: { available: true, currentVersion: '0.1.4', latestVersion: '0.1.5', reason: 'ok',
+        installer: { name: 'Sapphire Setup 0.1.5.exe', url: 'https://example.invalid/setup.exe', size: 96_000_000, digest: 'sha256:${'a'.repeat(64)}' },
         notes: null, publishedAt: null } };
     }
-    return { ok: true, data: { available: false, currentVersion: '0.1.2', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null } };
+    return { ok: true, data: { available: false, currentVersion: '0.1.4', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null } };
   },
   deleteAccount: async (label) => {
     const before = window.__previewAccounts.length;

@@ -679,8 +679,17 @@ input::placeholder { color: var(--faint); }
   border: 1px solid var(--brand); background: var(--brand-soft); color: var(--brand);
   font-size: 9px; font-weight: 700; letter-spacing: .12em; padding: 4px 9px;
 }
-.update-pill:hover { background: var(--brand); color: #04121F; }
+.update-pill:hover:not(:disabled) { background: var(--brand); color: #04121F; }
 .update-pill.ready { border-color: var(--cyan); color: var(--cyan); }
+/* In flight: cyan, which is this app's "working on it" colour (the same one a switching row
+   uses), and NOT dimmed. The global `button:disabled` rule drops opacity to .55 to show that a
+   control is unavailable, which is exactly wrong here — this is the one element reporting that
+   the update is running, so it has to stay the most legible thing in the header. No hover state
+   either: it cannot be pressed again until the update is done. */
+.update-pill.busy {
+  border-color: var(--cyan); color: var(--cyan); background: rgba(61, 216, 245, .12);
+  opacity: 1; cursor: progress;
+}
 /* Tombol dismiss bersebelahan, BUKAN tombol di dalam tombol: <button> bersarang itu HTML yang
    tidak valid. Karena itu pula border kirinya dimatikan — dua-duanya terbaca sebagai satu pil. */
 .update-dismiss {

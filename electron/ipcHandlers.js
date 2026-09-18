@@ -95,8 +95,11 @@ export function registerIpcHandlers() {
       electronPath: process.execPath
     });
     // Helper sudah detached dan menunggu PID ini hilang; keluar supaya installer bisa menimpa
-    // Sapphire.exe. Delay kecil supaya balasan IPC-nya sempat sampai ke renderer dulu.
-    setTimeout(() => app.quit(), 400);
+    // Sapphire.exe. Delay-nya bukan sekadar "supaya balasan IPC sempat sampai": renderer yang
+    // menampilkannya sebagai INSTALLING… plus toast, dan pada 400ms keduanya lewat sebelum
+    // terbaca — app yang menutup seketika setelah user menekan UPDATE tidak bisa dibedakan dari
+    // app yang crash. Helper sendiri menunggu sampai 60 detik, jadi jeda ini gratis.
+    setTimeout(() => app.quit(), 2500);
     return { helperPid };
   }));
 

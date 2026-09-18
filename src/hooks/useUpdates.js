@@ -70,8 +70,11 @@ export function useUpdates() {
 
   const install = useCallback(async () => {
     setStatus('installing');
+    setError(null);
     const response = await window.valorant.installUpdate();
-    if (!response.ok) { setError(response.error); setStatus('ready'); return false; }
+    // A failure here has to leave a pressable pill: 'ready' claimed the download was finished
+    // and waiting on a restart, which is not true any more and offers no way to try again.
+    if (!response.ok) { setError(response.error); setStatus('error'); return false; }
     // Kalau sukses, app-nya keluar sebentar lagi — tidak ada state yang perlu dirapikan.
     return true;
   }, []);

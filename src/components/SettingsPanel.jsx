@@ -104,7 +104,10 @@ export default function SettingsPanel({ onClose, version, updateState, onCheckUp
 
   const updateLabel = updateState?.status === 'available' ? `${updateState.release?.latestVersion ?? ''} AVAILABLE`
     : updateState?.status === 'downloading' ? `DOWNLOADING ${updateState.progress?.total ? `${Math.round((updateState.progress.received / updateState.progress.total) * 100)}%` : '…'}`
-      : updateState?.status === 'ready' ? 'READY — RESTART TO UPDATE'
+      // 'ready' means the download is verified and the installer is being started, which is a
+      // moment rather than a state the user acts on — the pill says RESTARTING… for the same
+      // reason. The old wording ("RESTART TO UPDATE") asked for a restart that never happens.
+      : updateState?.status === 'ready' ? 'STARTING INSTALLER…'
         : updateState?.status === 'installing' ? 'INSTALLING…'
           : updateState?.status === 'checking' ? 'CHECKING…'
             : updateState?.status === 'error' ? String(updateState.error ?? 'CHECK FAILED').toUpperCase().slice(0, 48)
