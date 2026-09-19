@@ -104,10 +104,10 @@ const offerOf = (id, name, image, price, bare = false, tier = null) => ({
 // jadi diskon yang menentukan — persis yang diperiksa probe.
 const NIGHT_MARKET_OFFERS = [
   { id: 'nm-e', tier: TIER.exclusive, name: 'Singularity Knife', image: 'https://media.valorant-api.com/weaponskinlevels/ea441610-42da-e46f-8d7b-1b9759c105cd/displayicon.png', price: 2274, originalPrice: 2675, discountPercent: 15, seen: false, video: null, levels: [], chromas: [] },
-  { id: 'nm-d', tier: TIER.deluxe, name: 'Comet Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/e271a430-4282-847b-3a51-5d97839ce221/displayicon.png', price: 638, originalPrice: 1275, discountPercent: 50, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-d', tier: TIER.deluxe, name: 'Comet Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/860afab6-4496-389c-1c86-4fbcf0ea24c7/displayicon.png', price: 638, originalPrice: 1275, discountPercent: 50, seen: false, video: null, levels: [], chromas: [] },
   { id: 'nm-p1', tier: TIER.premium, name: 'Reaver Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png', price: 1172, originalPrice: 1775, discountPercent: 34, seen: false, video: null, levels: [], chromas: [] },
-  { id: 'nm-s', tier: TIER.select, name: 'MK.VII Liberty Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/6dee8259-4620-920a-cef7-14944bbed130/displayicon.png', price: 613, originalPrice: 875, discountPercent: 30, seen: false, video: null, levels: [], chromas: [] },
-  { id: 'nm-u', tier: TIER.ultra, name: 'Elderflame Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/18609205-4edb-5966-cff8-0fba0230ba1e/displayicon.png', price: 1856, originalPrice: 2475, discountPercent: 25, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-s', tier: TIER.select, name: 'MK.VII Liberty Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/cb713a25-4a6c-7ab0-213e-878977dced63/displayicon.png', price: 613, originalPrice: 875, discountPercent: 30, seen: false, video: null, levels: [], chromas: [] },
+  { id: 'nm-u', tier: TIER.ultra, name: 'Elderflame Vandal', image: 'https://media.valorant-api.com/weaponskinlevels/b3d3ff38-4202-20d8-2f41-c783477e5636/displayicon.png', price: 1856, originalPrice: 2475, discountPercent: 25, seen: false, video: null, levels: [], chromas: [] },
   { id: 'nm-p2', tier: TIER.premium, name: 'Prime Spectre', image: 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', price: 1065, originalPrice: 1775, discountPercent: 40, seen: true, video: null, levels: [], chromas: [] }
 ];
 // endsAt dihitung ulang tiap kali preview dimuat, jadi hitungannya selalu punya ~13 hari di atasnya
@@ -158,7 +158,7 @@ const accounts = [
         // mendaftarkan tier untuk skin ini" ikut terlihat di layar.
         offerOf('3', 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', 1275, false, TIER.ultra),
         offerOf('4', 'Prime Spectre', 'https://media.valorant-api.com/weaponskinlevels/d1d528ae-4dcc-e693-68e2-e8a475df83a4/displayicon.png', 1775, false, TIER.deluxe),
-        offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/f7c2e1e0-4c1e-6a11-9f0d-a75b4a6b1e11/displayicon.png', 1975, true, null)
+        offerOf('5', 'Prime Axe', 'https://media.valorant-api.com/weaponskinlevels/249b0e46-4a11-f045-51bb-649151cd802a/displayicon.png', 1975, true, null)
       ],
       // Night Market hanya dipasang di akun 'main', supaya "satu akun punya, yang lain tidak" juga
       // terlihat di layar — dan supaya keadaan null (tanpa market) tetap terwakili oleh akun lain.
