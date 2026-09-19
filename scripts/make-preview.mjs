@@ -265,7 +265,13 @@ const tail = moduleTag + index.split(moduleTag)[1];
 // so the showcase modal can be screenshot-verified headlessly.
 const qaHook = `<script>
 if (location.hash.startsWith('#preview')) {
-  setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' })), 300);
+  // Kartu daily store tidak lagi memilih dirinya sendiri saat aplikasi dibuka, dan [P] sengaja diam
+  // saat tidak ada kartu yang ditunjuk. Hook ini karena itu menunjuk kartu pertama dulu — panah
+  // kanan dari kursor kosong — baru menekan [P], persis urutan yang dilakukan user.
+  setTimeout(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' })), 120);
+  }, 300);
   const variant = location.hash.split('-')[1];
   if (variant) setTimeout(() => {
     document.querySelectorAll('.sv-chroma')[Number(variant)]?.click();

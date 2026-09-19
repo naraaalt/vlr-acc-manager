@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { divisionColor, fmtDuration, rankIconUrl, relativeTime, weaponCategory } from '../lib/format.js';
 import { nightMarketCountdown, sortNightMarketOffers } from '../lib/nightMarket.js';
+import { clampOfferCursor } from '../lib/offerCursor.js';
 import { tierRgb } from '../lib/tierColor.js';
 import { getAudioPrefs, setAudioPrefs, subscribeAudioPrefs } from '../lib/audioPrefs.js';
 import { presentError } from '../lib/errorPresentation.js';
@@ -137,15 +138,26 @@ export function NightMarketEntry({ onOpen }) {
   );
 }
 
-export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidden, onPreview }) {
+// Kartu daily store TIDAK clickable. Satu-satunya elemen yang bisa diklik di dalamnya adalah tombol
+// PREVIEW, dan itu memang satu-satunya yang punya aksi. Yang dipindahkan hover adalah KURSOR — kartu
+// yang sedang ditunjuk, yang juga dipakai tombol [P] dan [←][→] — sehingga mouse dan keyboard
+// menunjuk benda yang sama dan panah tidak pernah menunjuk kartu yang berbeda dari yang di-highlight.
+//
+// Karena itu kartu juga bukan Tab-stop lagi: `role="button"` + `tabIndex` di sini dulu menjanjikan
+// sebuah aksi (Enter memilih) yang sudah tidak ada, dan janji palsu pada screen reader lebih buruk
+// daripada tidak ada peran sama sekali.
+export function DailyStore({ account, selectedOffer, onHoverOffer, previewsHidden, onPreview }) {
   const store = account.status === 'ready' ? account.store : null;
   const offers = store?.offers ?? [];
-  const activeOffer = offers.length ? Math.min(selectedOffer, offers.length - 1) : 0;
+  // Kosong berarti belum ada kartu yang ditunjuk, dan labelnya mengatakan itu apa adanya — "—"
+  // bukan "01", karena nomor yang tercetak di label adalah klaim tentang kartu yang ditunjuk.
+  const activeOffer = clampOfferCursor(selectedOffer, offers.length);
+  const cursorLabel = activeOffer === null ? '—' : String(activeOffer + 1).padStart(2, '0');
   const title = (
     <div className="panel-title">
       <Icon name="cart" size={13} />
       <span className="t">DAILY STORE</span>
-      <span className="aux">SELECTED {String(activeOffer + 1).padStart(2, '0')}/{String(offers.length).padStart(2, '0')}</span>
+      <span className="aux">SELECTED {cursorLabel}/{String(offers.length).padStart(2, '0')}</span>
     </div>
   );
 
@@ -168,7 +180,7 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
         ? <p className="store-hidden">{offers.length} STORE SKINS HIDDEN — PRESS [H] TO SHOW.</p>
         : <div className="cards">
             {offers.map((offer, index) => {
-              const selected = index === activeOffer;
+              const pointed = index === activeOffer;
               // Warna tier dipasang sebagai custom property, bukan kelas: nilainya datang dari Riot
               // saat runtime, jadi tidak bisa ada di styles.css. Kartu tanpa tier tidak mendapat
               // kelas .tiered sama sekali — dengan begitu tidak pernah ada rgba(var(--tier-rgb))
@@ -176,11 +188,9 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
               const tierRgbValue = tierRgb(offer.tier?.color);
               return (
                 <article
-                  key={offer.id} className={`card${selected ? ' sel' : ''}${tierRgbValue ? ' tiered' : ''}`}
+                  key={offer.id} className={`card${pointed ? ' cur' : ''}${tierRgbValue ? ' tiered' : ''}`}
                   style={tierRgbValue ? { '--tier': offer.tier.color, '--tier-rgb': tierRgbValue } : undefined}
-                  onClick={() => onSelectOffer(index)}
-                  onKeyDown={(event) => { if (event.key === 'Enter') onSelectOffer(index); }}
-                  role="button" tabIndex={0} aria-pressed={selected}
+                  onMouseEnter={() => onHoverOffer(index)}
                 >
                   <span className="num">{String(index + 1).padStart(2, '0')}</span>
                   <div className="prev">
@@ -193,7 +203,7 @@ export function DailyStore({ account, selectedOffer, onSelectOffer, previewsHidd
                     {(offer.video || offer.levels?.length > 1) && (
                       <button
                         type="button" className="preview-btn"
-                        onClick={(event) => { event.stopPropagation(); onPreview(offer); }}
+                        onClick={() => onPreview(offer)}
                         title="Open the skin showcase video"
                       ><Icon name="eye" size={11} />PREVIEW</button>
                     )}

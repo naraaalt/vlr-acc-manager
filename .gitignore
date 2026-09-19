@@ -26,4 +26,4 @@ Desktop.ini
 # hermes agent workspace
 .hermes/
 # qa artifacts
-preview-screenshot.png
+preview-screenshot*.png

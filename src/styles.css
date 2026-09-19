@@ -344,10 +344,14 @@ input::placeholder { color: var(--faint); }
 .cards { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px; min-height: 0; }
 .card {
   position: relative; border: 1px solid var(--border); background: var(--panel2);
-  display: flex; flex-direction: column; min-height: 0; cursor: pointer;
+  display: flex; flex-direction: column; min-height: 0;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-.card:hover { border-color: var(--border2); }
+/* Kartu tidak clickable, jadi tidak ada `cursor: pointer` di sini: kursor tangan adalah janji bahwa
+   kartunya bisa ditekan, dan janji itu yang membuat nomor bidaknya dulu berubah putih saat diklik.
+   Satu-satunya kursor tangan di dalam kartu adalah tombol PREVIEW, dan ia memang punya aksinya
+   sendiri. */
+.card.cur { border-color: var(--border2); }
 .card .num {
   position: absolute; top: -1px; left: -1px; z-index: 2;
   background: var(--panel3); border: 1px solid var(--border2);
@@ -387,8 +391,14 @@ input::placeholder { color: var(--faint); }
    mengikuti tepinya dari dalam, sehingga highlight-nya berada di dalam bidang item — bukan halo
    yang meluber ke kartu di sebelahnya.
    Sengaja HANYA inset, tanpa lapisan luar: satu sinyal hover saja, dan tidak ada cahaya yang bocor
-   keluar dari batas kartu. Tepi kotak tetap warna tier penuh sebagai garis bacanya. */
-.card.tiered:hover .prev {
+   keluar dari batas kartu. Tepi kotak tetap warna tier penuh sebagai garis bacanya.
+
+   Selector-nya `.cur`, BUKAN `:hover`. Yang di-highlight adalah KARTU YANG DITUNJUK, dan penunjuknya
+   ada dua: mouse dan panah [←][→]. Kalau aturannya digantung pada `:hover`, panah tidak akan
+   memindahkan highlight apa pun — dan kalau keduanya dipasang, mouse yang kebetulan berhenti di
+   kartu 5 akan menyalakan kartu 5 sementara panah sedang menunjuk kartu 2. Karena hover sendiri yang
+   memindahkan kursor, `.cur` sudah mencakup hover; tidak ada yang hilang dengan membuang `:hover`. */
+.card.tiered.cur .prev {
   border-color: var(--tier);
   box-shadow:
     inset 0 0 18px rgba(var(--tier-rgb), .55),
@@ -399,27 +409,25 @@ input::placeholder { color: var(--faint); }
     var(--bg);
   background-size: 14px 14px, 14px 14px, auto;
 }
-/* Gambarnya cuma naik ke opasitas penuh saat hover — TIDAK diberi drop-shadow warna tier. Itu akan
-   membuat glow-nya mengikuti siluet senjata alih-alih duduk di dalam kotaknya. */
-.card.tiered:hover .prev img { opacity: 1; }
-.card.tiered:hover .skname { color: #fff; }
+/* Gambarnya cuma naik ke opasitas penuh saat ditunjuk — TIDAK diberi drop-shadow warna tier. Itu
+   akan membuat glow-nya mengikuti siluet senjata alih-alih duduk di dalam kotaknya. */
+.card.tiered.cur .prev img { opacity: 1; }
+.card.tiered.cur .skname { color: #fff; }
 
-/* Pilihan: nomor bidak yang terisi penuh. Terbaca jelas, dan tidak bisa tertukar dengan hover karena
-   hover adalah warna dan ini bukan. */
-.card.sel { border-color: var(--border2); box-shadow: none; }
-.card.sel .num {
-  background: var(--text-bright); border-color: var(--text-bright); color: #0A0508;
-  box-shadow: 0 0 0 3px rgba(232, 239, 245, .16);
-}
-.card.sel .skname { color: #fff; }
+/* Tidak ada lagi keadaan "terpilih", dan itu memang tujuannya: kartu tidak clickable, jadi tidak ada
+   yang bisa dipilih. Yang tersisa hanya kartu yang sedang DITUNJUK, dan itu glow tier di atas.
+   Nomor bidak karena itu tidak pernah punya tampilan kedua — ia selalu warna tier (atau `--faint`
+   untuk skin tanpa tier dari Riot). Aturan `.card.sel` yang dulu mengisi nomornya jadi putih padat
+   dengan teks gelap dibuang bersama kelasnya; kelas yang tidak pernah dipasang tidak boleh
+   meninggalkan aturannya di sini. */
 
-/* PREVIEW muncul saat hover juga, bukan hanya saat terpilih: kalau kursor sudah ada di atas kartu,
-   menyembunyikan satu-satunya aksinya membuat kartu itu terasa mati. Tombolnya karena itu selalu
-   dirender (kalau skin-nya memang punya materi showcase) dan visibilitasnya diatur di sini.
+/* PREVIEW muncul saat kartunya ditunjuk, bukan hanya saat terpilih: kalau kursor sudah ada di atas
+   kartu, menyembunyikan satu-satunya aksinya membuat kartu itu terasa mati. Tombolnya karena itu
+   selalu dirender (kalau skin-nya memang punya materi showcase) dan visibilitasnya diatur di sini.
    `visibility` dan `pointer-events` ikut diatur, bukan hanya opacity: opacity 0 menyisakan tombol
    yang tidak terlihat TAPI masih bisa diklik dan masih bisa dijangkau Tab. */
 .card .preview-btn { opacity: 0; visibility: hidden; pointer-events: none; }
-.card:hover .preview-btn, .card.sel .preview-btn { opacity: 1; visibility: visible; pointer-events: auto; }
+.card.cur .preview-btn { opacity: 1; visibility: visible; pointer-events: auto; }
 
 /* ---------- market page ---------- */
 .market-page { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
@@ -662,7 +670,7 @@ input::placeholder { color: var(--faint); }
   padding: 8px 12px; color: var(--faint); font-size: 9px; letter-spacing: .16em;
 }
 
-/* ---------- preview button on selected card ---------- */
+/* ---------- preview button on the pointed card ---------- */
 .preview-btn {
   position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: 6px;

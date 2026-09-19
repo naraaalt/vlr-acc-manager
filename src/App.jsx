@@ -12,6 +12,7 @@ import { getPreviewsHidden, setPreviewsHidden as persistPreviewsHidden, getSortM
 import { orderAccounts, SORT_LABELS } from './lib/accountOrder.js';
 import { getSetting, subscribeSettings, getLastSelection, setLastSelection, getAnnouncedNightMarkets, setAnnouncedNightMarket } from './lib/settings.js';
 import { isNewNightMarket, nightMarketOpen, nightMarketSignature } from './lib/nightMarket.js';
+import { clampOfferCursor, stepOfferCursor } from './lib/offerCursor.js';
 import { isRateLimited, cooldownSeconds, markRefreshed, isRefreshAllRateLimited, markRefreshAll, refreshAllCooldownSeconds } from './lib/rateLimit.js';
 import { updateBusyLabel, updateInFlight, updatePillText } from './lib/updatePill.js';
 import { Icon, BrandMark } from './components/Icons.jsx';
@@ -84,7 +85,10 @@ export default function App() {
   // menampilkan akun yang benar kalau pilihannya berpindah di belakangnya.
   const [nightMarketLabel, setNightMarketLabel] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
-  const [selectedOffer, setSelectedOffer] = useState(0);
+  // Kursor daily store: indeks kartu yang sedang ditunjuk, atau null saat belum ada. Kartu tidak
+  // clickable lagi (hover yang memindahkannya), dan null adalah keadaan awal yang sah — kartu nomor
+  // satu yang menyala sendiri terbaca sebagai pilihan yang dibuat aplikasi, bukan oleh user.
+  const [selectedOffer, setSelectedOffer] = useState(null);
   // [H] skin-preview toggle persists across restarts via uiPrefs.
   const [previewsHidden, setPreviewsHidden] = useState(getPreviewsHidden);
   // Account sort mode (active-first is the invariant; this reorders the rest).
@@ -169,7 +173,10 @@ export default function App() {
   // bookkeeping: a signed-in client is ACTIVE even with zero accounts saved.
   const sessionActive = Boolean(session.live);
 
-  useEffect(() => { setSelectedOffer(0); }, [selectedLabel]);
+  // Ganti akun = daftar offer yang benar-benar berbeda, jadi kursor lama tidak berarti apa-apa di
+  // sini: dibiarkan, ia menunjuk offer yang tidak pernah dilihat user di akun ini. Direset ke null,
+  // bukan ke 0 — mengembalikannya ke kartu pertama cuma memindahkan masalahnya.
+  useEffect(() => { setSelectedOffer(null); }, [selectedLabel]);
 
   // Daily store resets on a fixed 00:00 UTC server schedule — the same instant
   // worldwide (17:00 PT / 20:00 ET / 07:00 WIB, per region), shifting only when
@@ -470,7 +477,7 @@ export default function App() {
         const count = selectedAccount?.store?.offers.length ?? 0;
         if (!count) return;
         const delta = event.key === 'ArrowRight' ? 1 : -1;
-        setSelectedOffer((current) => (current + delta + count) % count);
+        setSelectedOffer((current) => stepOfferCursor(current, delta, count));
         return;
       }
       case 'Enter':
@@ -503,7 +510,11 @@ export default function App() {
       }
       case 'p':
       case 'P': {
-        const offer = selectedAccount?.status === 'ready' ? selectedAccount.store?.offers?.[Math.min(selectedOffer, (selectedAccount.store?.offers?.length ?? 1) - 1)] : null;
+        // Kursor kosong berarti tidak ada kartu yang ditunjuk, jadi [P] tidak melakukan apa pun —
+        // membuka kartu pertama berarti menebak, dan user tidak pernah menunjuknya.
+        const offers = selectedAccount?.status === 'ready' ? (selectedAccount.store?.offers ?? []) : [];
+        const index = clampOfferCursor(selectedOffer, offers.length);
+        const offer = index === null ? null : offers[index];
         if (offer && (offer.video || (offer.levels?.length ?? 0) > 1)) { flash('P'); setPreviewOffer(offer); }
         return;
       }
@@ -673,7 +684,7 @@ export default function App() {
                   <DailyStore
                     account={selectedAccount}
                     selectedOffer={selectedOffer}
-                    onSelectOffer={setSelectedOffer}
+                    onHoverOffer={setSelectedOffer}
                     previewsHidden={previewsHidden}
                     onPreview={setPreviewOffer}
                   />
