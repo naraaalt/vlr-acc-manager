@@ -268,14 +268,39 @@ if (location.hash.startsWith('#preview')) {
   // Kartu daily store tidak lagi memilih dirinya sendiri saat aplikasi dibuka, dan [P] sengaja diam
   // saat tidak ada kartu yang ditunjuk. Hook ini karena itu menunjuk kartu pertama dulu — panah
   // kanan dari kursor kosong — baru menekan [P], persis urutan yang dilakukan user.
-  setTimeout(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-    setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' })), 120);
-  }, 300);
+  //
+  // Menunggu KARTUNYA, bukan jam: event keyboard sintetis yang menyala sebelum React memasang
+  // keymap-nya ditelan tanpa jejak (sebab yang sama dengan #night di bawah), dan jeda tetap 300ms
+  // adalah tebakan tentang berapa lama fetch dashboard memakan waktu — di mesin lambat tebakan itu
+  // salah, dan hasilnya bukan error melainkan screenshot tanpa modal.
+  //
+  // Yang ditunggu adalah kartu BERISI: skeleton loading juga merender .cards .card (tanpa .num),
+  // dan selama skeleton itu daftar offer-nya masih kosong — panah dan [P] dua-duanya jadi no-op dan
+  // hook-nya diam-diam selesai tanpa membuka apa pun.
+  const press = (key) => window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+  const waitForCards = (attempt = 0) => {
+    if (!document.querySelector('.cards .card .num')) {
+      if (attempt < 100) setTimeout(() => waitForCards(attempt + 1), 100);
+      return;
+    }
+    press('ArrowRight');
+    setTimeout(() => press('p'), 120);
+  };
+  waitForCards();
   const variant = location.hash.split('-')[1];
-  if (variant) setTimeout(() => {
-    document.querySelectorAll('.sv-chroma')[Number(variant)]?.click();
-  }, 1200);
+  if (variant) {
+    // Sama: menunggu modalnya benar-benar ter-mount. Chroma cuma ada di dalam modal, dan 1200ms
+    // tetap adalah tebakan yang sama rapuhnya.
+    const waitForModal = (attempt = 0) => {
+      const swatches = document.querySelectorAll('.sv-chroma');
+      if (!swatches.length) {
+        if (attempt < 100) setTimeout(() => waitForModal(attempt + 1), 100);
+        return;
+      }
+      swatches[Number(variant)]?.click();
+    };
+    waitForModal();
+  }
 }
 if (location.hash === '#skeleton') {
   // Freeze the loading state: never resolve getDashboard.
