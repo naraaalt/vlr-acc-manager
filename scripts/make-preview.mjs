@@ -9,6 +9,16 @@ import path from 'node:path';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dist = path.join(root, 'dist');
 
+// Versi di preview dibaca dari package.json, bukan ditulis sebagai literal. Dulu di sini tertulis
+// '0.1.4' dan '0.1.5' langsung, dan akibatnya screenshot di docs/ ikut membusuk tanpa ada yang
+// menyadarinya: settings.png masih mencetak 0.1.4 beberapa rilis setelah angka itu tidak benar lagi.
+// Satu rilis berikutnya akan mengulanginya, karena tidak ada yang ingat memperbarui mock.
+//
+// Versi "yang tersedia" selalu satu patch di atas versi sekarang, supaya fixture update tetap masuk
+// akal: penawaran update yang lebih tua dari app-nya bukan keadaan yang bisa terjadi.
+const APP_VERSION = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const NEXT_VERSION = APP_VERSION.replace(/(\d+)$/, (patch) => String(Number(patch) + 1));
+
 // Mockup penempatan tombol PLAY (QA-only, tidak ikut build produksi). Dipilih lewat #pv1..#pv5.
 const playVariants = readFileSync(path.join(root, 'scripts', 'play-variants.js'), 'utf8');
 
@@ -195,7 +205,7 @@ window.valorant = {
     return { ok: true, data: { label: label, launched: true, switched: switched, reason: null } };
   },
   notifyStoreReset: async (payload) => { window.__notifyCalls.push(payload ?? {}); return { ok: true, data: true }; },
-  getAppVersion: async () => '0.1.4',
+  getAppVersion: async () => '${APP_VERSION}',
   // Registered, not ignored: the pill's DOWNLOADING n% is the whole progress report during an
   // update, so a mock that swallows the callback makes the feature look inert from the preview
   // — and "the preview shows nothing" is exactly the symptom the real thing had.
@@ -216,7 +226,7 @@ window.valorant = {
         window.__updateProgressCb?.({ received: Math.round((total / 8) * step), total: total });
       }
     }
-    return { ok: true, data: { path: 'X:/fake/Sapphire Setup 0.1.5.exe', bytes: 1, name: 'Sapphire Setup 0.1.5.exe' } };
+    return { ok: true, data: { path: 'X:/fake/Sapphire Setup ${NEXT_VERSION}.exe', bytes: 1, name: 'Sapphire Setup ${NEXT_VERSION}.exe' } };
   },
   installUpdate: async () => { window.__updateCalls.push('install'); return { ok: true, data: { helperPid: 1 } }; },
   checkForUpdates: async () => {
@@ -224,11 +234,11 @@ window.valorant = {
     // Opt-in lewat hash: default preview TIDAK menampilkan pill, supaya screenshot keadaan
     // normal tidak tiba-tiba menampilkan penawaran update.
     if (location.hash.startsWith('#update')) {
-      return { ok: true, data: { available: true, currentVersion: '0.1.4', latestVersion: '0.1.5', reason: 'ok',
-        installer: { name: 'Sapphire Setup 0.1.5.exe', url: 'https://example.invalid/setup.exe', size: 96_000_000, digest: 'sha256:${'a'.repeat(64)}' },
+      return { ok: true, data: { available: true, currentVersion: '${APP_VERSION}', latestVersion: '${NEXT_VERSION}', reason: 'ok',
+        installer: { name: 'Sapphire Setup ${NEXT_VERSION}.exe', url: 'https://example.invalid/setup.exe', size: 96_000_000, digest: 'sha256:${'a'.repeat(64)}' },
         notes: null, publishedAt: null } };
     }
-    return { ok: true, data: { available: false, currentVersion: '0.1.4', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null } };
+    return { ok: true, data: { available: false, currentVersion: '${APP_VERSION}', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null } };
   },
   deleteAccount: async (label) => {
     const before = window.__previewAccounts.length;

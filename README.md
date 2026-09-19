@@ -7,6 +7,8 @@ A Windows desktop app for viewing the daily Valorant store across saved Riot Cli
 ## Features
 
 - Daily store for every saved account: skin names, rendered art, VP prices, and a countdown to the rotation.
+- Every offer is framed in its skin's tier colour, so the tier reads at a glance without a label.
+- Night Market, when Riot is running one: that account's six discounted offers, sorted by tier and then by discount, each drawn in its own tier colour and marked once opened.
 - Skin previews — upgrade levels and colour variants — in a modal, with a volume slider that persists across skins and restarts.
 - Riot ID, account level, competitive rank, RR and placement progress, per account.
 - Save and switch Riot Client sessions, or import them from TCNO Account Switcher.
@@ -23,11 +25,12 @@ Download [`Sapphire Setup <version>.exe`](../../releases) and run it. The portab
    - **Save current account** saves the session that is already active.
    - **Add manually** closes Riot Client and Valorant, opens Riot's sign-in screen, and saves the account once you sign in. The current local session is backed up first.
    - Snapshots detected from TCNO Account Switcher can be imported as well (`I`).
-2. **Pick an account** with `↑`/`↓` (or `O` to change the sort order); the daily store for that account fills the panel on the right.
+2. **Pick an account** with `↑`/`↓` (or `O` to change the sort order); the daily store for that account fills the panel on the right. Point at an offer by hovering it or with `←`/`→`. Nothing is pointed at until you do — the header reads `SELECTED —/06` — and pointing at one names it there.
 3. **Refresh it** with `R`, or every account with `Ctrl+R`.
 4. **Open the market view** with `M` — the store on its own, larger. `H` collapses the offer previews.
-5. **Preview a skin** with `P` on an offer to play its in-game video.
-6. **Switch the Riot session to an account** with `S`: the saved session is restored and Riot Client opens.
+5. **Preview a skin** with `P`, which plays the in-game video of the offer you are pointing at. The cards are not buttons: the only thing to click inside one is its **PREVIEW** button.
+6. **Open the Night Market** when Riot is running one — a `NIGHT MARKET VIEW` entry appears in the `STORE REFRESHES IN` row, and lists that account's discounted offers. `Esc` goes back.
+7. **Switch the Riot session to an account** with `S`: the saved session is restored and Riot Client opens.
 
 Riot Client must be running and signed in before the app can read a session. Its install location does not matter: Sapphire reads where this PC put it, so another drive is fine.
 
@@ -38,12 +41,12 @@ The app is keyboard-first; the same list is in the **Commands** panel in the sid
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Move between saved accounts |
-| `←` / `→` | Move between the daily store offers |
+| `←` / `→` | Point at a daily store offer |
 | `Enter` | Open the market view for the selected account |
 | `S` | Switch to the selected account |
 | `R` | Refresh the selected account |
 | `Ctrl+R` | Refresh all accounts |
-| `P` | Preview the selected skin's video |
+| `P` | Preview the video of the offer you are pointing at |
 | `H` | Show or hide skin previews |
 | `O` | Cycle the account sort order |
 | `M` | Toggle the market view |
