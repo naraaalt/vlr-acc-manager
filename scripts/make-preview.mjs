@@ -269,37 +269,56 @@ if (location.hash.startsWith('#preview')) {
   // saat tidak ada kartu yang ditunjuk. Hook ini karena itu menunjuk kartu pertama dulu — panah
   // kanan dari kursor kosong — baru menekan [P], persis urutan yang dilakukan user.
   //
-  // Menunggu KARTUNYA, bukan jam: event keyboard sintetis yang menyala sebelum React memasang
-  // keymap-nya ditelan tanpa jejak (sebab yang sama dengan #night di bawah), dan jeda tetap 300ms
-  // adalah tebakan tentang berapa lama fetch dashboard memakan waktu — di mesin lambat tebakan itu
-  // salah, dan hasilnya bukan error melainkan screenshot tanpa modal.
+  // Dua hal yang tidak datang bersamaan, dan keduanya pernah bikin hook ini diam-diam gagal:
   //
-  // Yang ditunggu adalah kartu BERISI: skeleton loading juga merender .cards .card (tanpa .num),
-  // dan selama skeleton itu daftar offer-nya masih kosong — panah dan [P] dua-duanya jadi no-op dan
-  // hook-nya diam-diam selesai tanpa membuka apa pun.
+  // 1. Skeleton loading juga merender .cards .card (tanpa .num). Menunggu .cards .card berarti
+  //    menunggu placeholder, dan selama skeleton itu daftar offer-nya masih kosong — panah dan [P]
+  //    dua-duanya no-op, tanpa error, cuma screenshot dashboard.
+  // 2. Kartu nyata bisa tampil satu frame SEBELUM ref keymap menunjuk closure render terbaru
+  //    (ref-nya di-update di effect, bukan saat render). Keydown yang mendarat di frame itu ditelan
+  //    tanpa jejak. Terukur di mesin ini: ~15ms setelah kartu muncul, dan tidak ada hubungannya
+  //    dengan fokus jendela — di halaman yang sudah settle, tekan pertama selalu diterima.
+  //
+  // Karena itu panahnya DIULANG sampai kursornya benar-benar bergerak, dan [P] diulang sampai
+  // modalnya benar-benar ada. Menekan sekali lalu berharap cuma memindahkan tebakan 300ms ke tempat
+  // lain. [P] idempoten (ia menyetel offer, tidak pernah menutup), jadi mengulangnya aman.
   const press = (key) => window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+  const modalOpen = () => {
+    const modal = document.querySelector('.skin-modal');
+    return Boolean(modal) && modal.getBoundingClientRect().width > 0;
+  };
+  const openModal = (attempt = 0) => {
+    if (modalOpen() || attempt >= 60) return;
+    press('p');
+    setTimeout(() => openModal(attempt + 1), 100);
+  };
+  const pointAtCard = (attempt = 0) => {
+    if (document.querySelector('.card.cur')) { openModal(); return; }
+    if (attempt >= 60) return;
+    press('ArrowRight');
+    setTimeout(() => pointAtCard(attempt + 1), 100);
+  };
   const waitForCards = (attempt = 0) => {
     if (!document.querySelector('.cards .card .num')) {
       if (attempt < 100) setTimeout(() => waitForCards(attempt + 1), 100);
       return;
     }
-    press('ArrowRight');
-    setTimeout(() => press('p'), 120);
+    pointAtCard();
   };
   waitForCards();
   const variant = location.hash.split('-')[1];
   if (variant) {
-    // Sama: menunggu modalnya benar-benar ter-mount. Chroma cuma ada di dalam modal, dan 1200ms
-    // tetap adalah tebakan yang sama rapuhnya.
-    const waitForModal = (attempt = 0) => {
+    // Chroma cuma ada di dalam modal, jadi yang ditunggu swatch-nya — bukan jam. 1200ms tetap
+    // adalah tebakan yang sama rapuhnya, dan #preview-slow menahan playback 5 detik.
+    const waitForSwatches = (attempt = 0) => {
       const swatches = document.querySelectorAll('.sv-chroma');
       if (!swatches.length) {
-        if (attempt < 100) setTimeout(() => waitForModal(attempt + 1), 100);
+        if (attempt < 100) setTimeout(() => waitForSwatches(attempt + 1), 100);
         return;
       }
       swatches[Number(variant)]?.click();
     };
-    waitForModal();
+    waitForSwatches();
   }
 }
 if (location.hash === '#skeleton') {
