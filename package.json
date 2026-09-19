@@ -50,7 +50,8 @@
       "dist/**/*",
       "electron/**/*",
       "!electron/**/*.test.js",
-      "package.json"
+      "package.json",
+      "build/icon.ico"
     ],
     "icon": "build/icon.ico",
     "win": {
