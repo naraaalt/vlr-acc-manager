@@ -12,6 +12,11 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# Scratch files written while working. This exists because one of them was a plaintext copy of a
+# GitHub credential: a throwaway file that is never meant to be committed should not depend on
+# nobody running `git add -A` in the second before it is deleted.
+.tmp*
+
 
 /accounts/
 /switch-backups/
