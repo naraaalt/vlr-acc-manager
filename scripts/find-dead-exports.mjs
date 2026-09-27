@@ -1,11 +1,9 @@
 // Dead-export audit: finds exported names that no other file references.
 //
 // Conservative by design (a missed dead export is fine; a wrong "dead" verdict
-// leads to deleting live code):
-//   - a name counts as used if it appears as a whole word anywhere outside the
-//     file that declares it, including in test files and strings;
-//   - default exports are skipped (usually the component itself);
-//   - re-exports (`export { x }`) are skipped.
+// deletes live code): a name counts as used if it appears as a whole word
+// anywhere outside its declaring file, tests and strings included; default
+// exports and re-exports (`export { x }`) are skipped.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +34,6 @@ for (const [file, text] of sources) {
   // `export function foo`, which would otherwise be reported as a declaration.
   const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
   const declared = [];
-  // export function foo / export async function foo / export const foo / export let foo
   for (const m of code.matchAll(/export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/g)) {
     declared.push(m[1]);
   }

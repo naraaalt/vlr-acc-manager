@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { tierRgb } from './tierColor.js';
 
-// Warna tier datang dari Riot sebagai hex, tapi dipakai untuk membangun rgba() — border, glow, dan
-// wash semuanya butuh komponennya terpisah supaya satu warna per tier cukup untuk semuanya, tanpa
-// menyimpan lima konstanta tambahan yang bisa lupa diperbarui saat Riot menambah tier baru.
+// The tier colour comes from Riot as hex, but is used to build rgba(): the border, glow and wash need
+// its components separately, so one colour per tier is enough for all of them — without five extra
+// constants that could be forgotten when Riot adds a new tier.
 describe('tierRgb', () => {
   it('turns a tier hex into the "r, g, b" rgba() needs', () => {
     expect(tierRgb('#D1548D')).toBe('209, 84, 141'); // Premium
@@ -12,19 +12,18 @@ describe('tierRgb', () => {
 
   it('accepts the colour without the leading hash, and in lower case', () => {
     expect(tierRgb('d1548d')).toBe('209, 84, 141');
-    expect(tierRgb('  #009587  ')).toBe('0, 149, 135'); // Deluxe — dan ia gelap, tapi tetap sah
+    expect(tierRgb('  #009587  ')).toBe('0, 149, 135'); // Deluxe — and it is dark, but still valid
   });
 
   it('returns null instead of inventing a colour', () => {
-    // Null adalah keadaan yang nyata: 40 dari 1405 skin Riot tidak punya tier, dan layanan tiernya
-    // bisa mati. Kartunya harus tetap dirender, hanya tanpa warna.
+    // Null is a real state: 40 of Riot's 1405 skins have no tier, and the tier service can go down.
+    // The card must still render, just without a colour.
     expect(tierRgb(null)).toBeNull();
     expect(tierRgb(undefined)).toBeNull();
     expect(tierRgb('')).toBeNull();
     expect(tierRgb('rebeccapurple')).toBeNull();
     expect(tierRgb('#12345')).toBeNull();
-    // Delapan digit = bentuk MENTAH dari Riot (RRGGBBAA). Kalau ia sampai ke sini, itu bug di
-    // pemanggilnya, dan mengembalikan null lebih baik daripada diam-diam memakai alpha 33.
+    // Eight digits = Riot's RAW form (RRGGBBAA); reaching here means a bug in the caller.
     expect(tierRgb('#D1548D33')).toBeNull();
   });
 });

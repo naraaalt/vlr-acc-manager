@@ -1,8 +1,6 @@
-// Per-account rate limiting for Riot storefront refreshes. Riot dislikes
-// burst traffic; the dashboard already fetches every account on load, so
-// manual refreshes need a cooldown. Module-level store (no persistence —
-// a restart resets cooldowns, which is fine because the boot fetch is the
-// request we would have blocked anyway).
+// Per-account rate limiting for Riot storefront refreshes: Riot dislikes burst traffic, and the
+// dashboard already fetches every account on load, so manual refreshes need a cooldown. Module-level
+// store, no persistence — a restart resets cooldowns; the boot fetch is the request we would block anyway.
 
 const COOLDOWN_MS = 30_000;
 const lastRefresh = new Map(); // label → Date.now()

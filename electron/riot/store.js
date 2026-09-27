@@ -25,12 +25,9 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-// The Riot client version is identical for every account, and Riot rejects a
-// request made with a stale one. Fetch it once per session instead of once per
-// account — and once per parallel request within an account, which is why five
-// accounts used to make ten identical calls to the public version service.
-// A failure clears the memo rather than being remembered, so one blip does not
-// make every later account fail without even trying.
+// The Riot client version is identical for every account and Riot rejects a stale one: fetched once per
+// session, not once per account or per parallel request (five accounts used to make ten identical calls).
+// A failure clears the memo rather than being remembered, so one blip does not break every later account.
 let clientVersionPromise;
 function getClientVersion() {
   if (!clientVersionPromise) {
@@ -63,8 +60,8 @@ async function getAuthenticatedHeaders({ accessToken, entitlementsToken }) {
 export async function fetchStorefront({ accessToken, entitlementsToken, puuid, shard }) {
   const headers = await getAuthenticatedHeaders({ accessToken, entitlementsToken });
 
-  // Riot migrated this route to a POST-only v3 endpoint. Keep the v2 GET
-  // fallback for installations which still expose the older route.
+  // Riot migrated this route to a POST-only v3 endpoint; the v2 GET fallback is for installations which
+  // still expose the older route.
   const v3 = await fetchWithTimeout(`https://pd.${shard}.a.pvp.net/store/v3/storefront/${puuid}`, {
     method: 'POST',
     headers,
@@ -103,8 +100,7 @@ function extractCompetitiveRank(payload) {
   return { rank: COMPETITIVE_TIERS[tier] ?? 'Unranked', rr: tier > 2 ? rr : null, placementsRemaining: 0 };
 }
 
-// These two endpoints are independent of the storefront. A missing profile
-// response should never prevent a user from seeing their daily store.
+// These two endpoints are independent of the storefront: a missing profile response must never prevent the daily store from rendering.
 export async function fetchAccountProfile({ accessToken, entitlementsToken, puuid, shard }) {
   const headers = await getAuthenticatedHeaders({ accessToken, entitlementsToken });
   const baseUrl = `https://pd.${shard}.a.pvp.net`;
@@ -120,10 +116,9 @@ export async function fetchAccountProfile({ accessToken, entitlementsToken, puui
   return { level, ...(rank ?? { rank: null, rr: null, placementsRemaining: null }) };
 }
 
-// Riot selalu memberi harga satu item, tapi mata uangnya berupa map berkunci id mata uang dan satu
-// offer bisa membawa lebih dari satu. Mengambil nilai finite terbesar benar untuk store VP maupun
-// night market. null untuk map kosong itu penting: Math.max() dari tidak ada apa-apa adalah
-// -Infinity, dan itu akan dirender sebagai harga.
+// Riot always prices an item, but the currency is a map keyed by currency id and a single offer
+// can carry more than one, so the largest finite value is taken — correct for the VP store and the
+// night market. null for an empty map matters: Math.max() of empty is -Infinity, and that renders as a price.
 function maxCost(cost) {
   const values = Object.values(cost ?? {}).map(Number).filter(Number.isFinite);
   return values.length ? Math.max(...values) : null;
@@ -140,15 +135,13 @@ export function getDailyOffers(storefront) {
   });
 }
 
-// Night Market. Riot membukanya per act dan selebihnya field BonusStore cukup tidak ada, jadi tidak
-// ada yang perlu diprediksi dan tidak ada jadwal yang perlu disimpan — yang dilaporkan adalah apa
-// yang dikatakan storefront. Dua hal di dokumentasi publik salah dan keduanya penting di sini:
-// BonusStoreOffers itu array, dan BonusStoreRemainingDurationInSeconds tidak terdaftar sama sekali.
-// Keduanya diperlakukan opsional: jendela yang tampil tanpa hitungan lebih baik daripada yang throw.
+// Night Market. Riot opens it per act and otherwise simply omits the BonusStore field, so what is
+// reported is what the storefront says. Two things in the public documentation are wrong and matter:
+// BonusStoreOffers is an array, and BonusStoreRemainingDurationInSeconds is not listed at all —
+// both are optional, because a window without a countdown beats one that throws.
 //
-// Offer-nya dikunci pada Rewards[0].ItemID — uuid skin LEVEL — karena itulah namespace yang sudah
-// dipakai SkinsPanelLayout.SingleItemOffers, dan karenanya namespace tempat indeks konten dibangun.
-// Mengunci pada BonusOfferID akan menghasilkan tanpa nama dan tanpa gambar.
+// Offers are keyed on Rewards[0].ItemID (the skin LEVEL uuid), the same namespace as
+// SkinsPanelLayout.SingleItemOffers and where the content index is built; BonusOfferID means no name.
 export function getNightMarket(storefront) {
   const raw = storefront?.BonusStore?.BonusStoreOffers;
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -169,13 +162,76 @@ export function getNightMarket(storefront) {
   return { offers, endsInSeconds: Number.isFinite(remaining) ? remaining : null };
 }
 
-// Jendelanya, dengan akhir yang sudah jadi instant absolut. `now` adalah parameter supaya aturannya
-// bisa diuji tanpa membekukan jam — alasan yang sama dengan nextStoreReset(now) di renderer.
+// Its window, with the end already turned into an absolute instant. `now` is a parameter so the rule can be
+// tested without freezing the clock — the same reason as nextStoreReset(now) in the renderer.
 export function nightMarketWindow(storefront, now = Date.now()) {
   const parsed = getNightMarket(storefront);
   if (!parsed) return null;
   return {
     offers: parsed.offers,
     endsAt: parsed.endsInSeconds === null ? null : now + parsed.endsInSeconds * 1000
+  };
+}
+
+// Number(...) of a missing field is NaN, and NaN is not null: it survives the renderer's `?? 0` and is
+// printed as a price. Empty string and null both count as "absent" — Number(null) is 0, not a price Riot sent.
+function finiteOr(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+// A fraction becomes a whole percent, one that arrives whole is kept: `<= 1` is the boundary, since a
+// fraction cannot exceed it and both endpoints were measured — FeaturedBundle sends 0.34, the Night Market 34.
+function percentOrNull(value) {
+  const number = finiteOr(value, null);
+  if (number === null) return null;
+  return Math.round(number <= 1 ? number * 100 : number);
+}
+
+// Featured bundle: the cosmetic bundle Riot is selling right now, inside the same storefront as the daily
+// store, so it costs no extra request. Its shape differs from the other two paths here: every item carries
+// its own price, discount and promo flag, so no price is reconstructed from the bundle price.
+//
+// `Bundles` has the same shape as `Bundle` and appears in some payloads where `Bundle` does not, hence
+// Bundle first, then Bundles[0]. An entry without an ItemID is dropped — that id resolves its name, image
+// and tier, and a missing row beats a row that lies about what it is.
+//
+// `now` is a parameter because the duration is measured AT THIS REQUEST: converted to an absolute instant
+// once, here, rather than going stale the moment it is read.
+export function getFeaturedBundle(storefront, now = Date.now()) {
+  const featured = storefront?.FeaturedBundle;
+  const primary = featured?.Bundle?.Items;
+  const secondary = featured?.Bundles?.[0]?.Items;
+  const bundle = Array.isArray(primary) && primary.length
+    ? featured.Bundle
+    : (Array.isArray(secondary) && secondary.length ? featured.Bundles[0] : null);
+  if (!bundle) return null;
+
+  const items = bundle.Items.map((entry) => {
+    const item = entry?.Item;
+    const itemId = item?.ItemID;
+    if (typeof itemId !== 'string' || !itemId) return null;
+    return {
+      itemTypeId: typeof item?.ItemTypeID === 'string' ? item.ItemTypeID : null,
+      itemId,
+      // NOT multiplied into the price: BasePrice and DiscountedPrice are the line's own prices, not unit prices.
+      quantity: finiteOr(item?.Quantity, 1),
+      basePrice: finiteOr(entry?.BasePrice, null),
+      discountedPrice: finiteOr(entry?.DiscountedPrice, null),
+      // Measured against a live Champions 2026 bundle: THIS endpoint sends the discount as a FRACTION
+      // (0.34, 0.3, 0.29) while the Night Market sends whole percents (34, 30). Normalising keeps the field
+      // meaning one thing across both paths — stored raw it would read "-0.34%" and disagree with the market's.
+      discountPercent: percentOrNull(entry?.DiscountPercent),
+      isPromoItem: Boolean(entry?.IsPromoItem)
+    };
+  }).filter(Boolean);
+
+  const endsInSeconds = finiteOr(featured?.BundleRemainingDurationInSeconds, null);
+  return {
+    id: typeof bundle.DataAssetID === 'string' ? bundle.DataAssetID : '',
+    endsAt: endsInSeconds === null ? null : now + endsInSeconds * 1000,
+    endsInSeconds,
+    items
   };
 }

@@ -1,39 +1,34 @@
-// Membuang sampah yang ditinggalkan proses update.
+// Discards the garbage left behind by the update process: the NSIS installer moves the old Sapphire.exe to
+// `%TEMP%\nsXXXX.tmp\old-install\` then abandons that directory (225 MB per install — measured
+// 1.3 GB after six updates), and a downloaded installer (100 MB per version) is never
+// deleted. The sweep pattern already exists in accountStore.js (`sweepStaleTempFiles`).
 //
-// Kenapa modul ini ada: satu update Sapphire meninggalkan DUA jejak yang tidak pernah diambil
-// siapa pun. Installer NSIS memindahkan Sapphire.exe yang lama ke `%TEMP%\nsXXXX.tmp\old-install\`
-// supaya bisa menimpa exe yang sedang berjalan, lalu direktori itu ditinggal — 225 MB per install,
-// terukur 1,3 GB setelah enam update. Dan installer yang sudah diunduh (100 MB per versi) tidak
-// pernah dihapus setelah dipakai. Pola sweep-nya sudah ada di repo ini (`sweepStaleTempFiles` di
-// accountStore.js); modul ini memakai gagasan yang sama untuk dua lokasi yang lain.
+// WHAT IS RISKY IS NOT DELETING, BUT DELETING TOO MUCH: so every decision lives in a
+// pure function that can be tested, and its runner is best-effort — a file that fails to delete is retried on the
+// next launch, while the app must stay open.
 //
-// BAGIAN YANG BERISIKO BUKAN MENGHAPUS, TAPI MENGHAPUS TERLALU BANYAK. Karena itu setiap keputusan
-// ada di fungsi murni yang bisa diuji, dan runner-nya sengaja best-effort: file yang gagal dihapus
-// akan dicoba lagi launch berikutnya, sementara app-nya harus tetap terbuka.
-//
-// Modul ini SENGAJA tidak import 'electron': semua path masuk sebagai parameter, jadi tesnya jalan
-// di Node biasa dan runner-nya bisa dibuktikan terhadap filesystem sungguhan.
+// DELIBERATELY does not import 'electron': all paths come in as parameters, so its tests run on plain Node.
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-// NSIS baru selesai menulis ke direktorinya beberapa detik sebelum kita melihatnya. Batas umur ini
-// yang memisahkan "install yang baru saja jalan" dari "sisa install yang sudah selesai".
+// NSIS only finishes writing to its directory a few seconds before we look at it. This age limit is
+// what separates "an install that just ran" from "the leftovers of an install that has finished".
 export const INSTALL_DIR_MIN_AGE_MS = 10 * 60 * 1000;
 
-// Helper menjalankan installer, menunggu prosesnya keluar, LALU membuka app — jadi saat app start,
-// installer itu berumur beberapa detik saja. Batas yang longgar memastikan sweep ini tidak mungkin
-// menghapus file yang masih dibutuhkan bagian lain dari update yang baru saja selesai.
+// The helper runs the installer, waits for the process to exit, THEN opens the app — so when the app starts,
+// that installer is only a few seconds old. A loose limit makes sure this sweep can never
+// delete a file another part of the just-finished update still needs.
 export const INSTALLER_MIN_AGE_MS = 60 * 60 * 1000;
 
-// Berapa backup sebelum-switch yang disimpan. Backup itu jaring pengaman untuk satu operasi yang
-// gagal, bukan arsip: yang berguna adalah yang paling baru, dan setelah beberapa switch berikutnya
-// tidak ada lagi yang bisa memakai yang lama.
+// How many pre-switch backups are kept. A backup is a safety net for a single failed
+// operation, not an archive: the useful one is the newest, and after a few more switches
+// nothing can use the old ones anymore.
 export const BACKUPS_KEPT = 5;
 
-// Direktori ns*.tmp milik siapa pun yang membuatnya, jadi "ns" bukan bukti kepemilikan — dan mesin
-// ini bisa punya installer aplikasi lain yang sedang jalan. Satu-satunya bukti yang sah adalah
-// Sapphire.exe yang kita sendiri dipindahkan ke dalamnya.
+// The ns*.tmp directory belongs to whoever created it, so "ns" is not proof of ownership — and this machine
+// can have another app's installer running. The only valid proof is
+// the Sapphire.exe that we ourselves moved into it.
 export function staleInstallDirs(entries, { now = Date.now(), minAgeMs = INSTALL_DIR_MIN_AGE_MS } = {}) {
   return (entries ?? [])
     .filter((entry) => entry?.hasOldInstall)
@@ -47,8 +42,8 @@ export function staleInstallers(entries, { now = Date.now(), minAgeMs = INSTALLE
     .map((entry) => entry.name);
 }
 
-// Mengembalikan yang HARUS DIBUANG (terlama dulu), bukan yang disimpan — supaya pemanggilnya tidak
-// perlu mengulang logika urutannya, dan urutan directory tidak pernah dipercaya sebagai urutan umur.
+// Returns the ones that MUST BE DISCARDED (oldest first), not the ones kept — so the caller does not
+// have to repeat the ordering logic, and directory order is never trusted as age order.
 export function backupsToPrune(entries, keep = BACKUPS_KEPT) {
   const sorted = (entries ?? [])
     .filter(Boolean)
@@ -64,8 +59,8 @@ async function statSafe(target) {
   try { return await fs.stat(target); } catch { return null; }
 }
 
-// Ukuran dikumpulkan SEBELUM menghapus, karena setelahnya tidak ada lagi yang bisa diukur — dan
-// angka inilah yang membuat sweep-nya bisa dilaporkan sebagai "sekian MB balik" alih-alih diklaim.
+// Sizes are collected BEFORE deleting, because afterwards there is nothing left to measure — and
+// this number is what lets the sweep be reported as "so many MB back" instead of merely claimed.
 async function measure(target) {
   const info = await statSafe(target);
   if (!info) return 0;
@@ -75,8 +70,8 @@ async function measure(target) {
   return total;
 }
 
-// Dijalankan saat app start. Selalu resolve — kegagalan housekeeping tidak boleh menjadi alasan
-// Sapphire tidak terbuka.
+// Runs on app start. Always resolves — a housekeeping failure must not be a reason
+// for Sapphire not opening.
 export async function sweepScratch({ tempRoot, updateDir, now = Date.now() } = {}) {
   const result = { removedDirs: [], removedInstallers: [], bytes: 0 };
   if (!tempRoot) return result;
@@ -84,9 +79,9 @@ export async function sweepScratch({ tempRoot, updateDir, now = Date.now() } = {
   for (const dirent of await listDirectory(tempRoot)) {
     if (!dirent.isDirectory() || !/^ns.*\.tmp$/i.test(dirent.name)) continue;
     const full = path.join(tempRoot, dirent.name);
-    // Umur diambil dari FILE PENANDA, bukan dari direktori induknya. Direktori `ns*.tmp` dibuat
-    // lebih dulu dan mtime-nya bisa tersentuh apa saja yang menulis di dalamnya — sementara
-    // Sapphire.exe yang dipindahkan NSIS ke situ punya waktu yang tepat: saat installer mulai.
+    // The age is taken from the MARKER FILE, not from its parent directory. The `ns*.tmp` directory is created
+    // earlier and its mtime can be touched by anything writing inside it — while
+    // the Sapphire.exe NSIS moved in there has exactly the right time: when the installer started.
     const marker = await statSafe(path.join(full, 'old-install', 'Sapphire.exe'));
     const entries = [{
       name: dirent.name,
@@ -100,8 +95,8 @@ export async function sweepScratch({ tempRoot, updateDir, now = Date.now() } = {
     }
   }
 
-  // Hanya .exe: helper (`apply-update.cjs`) dan log-nya tidak pernah disentuh di sini, karena
-  // keduanya masih berguna setelah install selesai.
+  // .exe only: the helper (`apply-update.cjs`) and its logs are never touched here, because
+  // both are still useful after the install finishes.
   if (updateDir) {
     const files = [];
     for (const dirent of await listDirectory(updateDir)) {

@@ -100,29 +100,26 @@ export function AccountOverview({ account, busy, onSwitch, onRefresh, onRefreshA
   );
 }
 
-// `entry` adalah slot yang dipakai Night Market. Ia INLINE — tepat setelah countdown di baris yang
-// sama — bukan barisnya sendiri, karena baris penuh kedua untuk event langka akan menghabiskan 44px
-// di setiap peluncuran sepanjang ~50 minggu setahun saat tidak ada apa pun untuk ditaruh di situ.
-//
-// Prop `offersCount` yang lama sudah dibuang: App.jsx menghitungnya dan mengoperkannya, tapi
-// komponen ini tidak pernah membacanya. Prop yang tidak dipakai lebih buruk daripada tidak ada prop
-// — ia terbaca sebagai fitur yang ada.
+// `entry` is INLINE in the countdown row, not its own row: a second full row for a rare event
+// would eat 44px on every launch all year while empty. Its slot is a span of its own because
+// there are TWO doors, and two elements each demanding `margin-left: auto` will not line up
+// as one right-aligned group. The old `offersCount` prop is gone — this component never
+// read it, and an unused prop reads as a feature that exists.
 export function StoreRefreshStrip({ countdown, entry = null }) {
   return (
     <section className="panel refresh-strip" aria-label="Store refresh countdown">
       <Icon name="clock" size={12} />
       <span className="rs-lbl">STORE REFRESHES IN</span>
       <span className="rs-count">{countdown}</span>
-      {entry}
+      <span className="rs-entries">{entry}</span>
     </section>
   );
 }
 
-// Pintu masuk Night Market, dirender KE DALAM baris refresh yang sudah ada. Ia menyebut namanya dan
-// menawarkan VIEW — sengaja tanpa jumlah offer dan tanpa hitungan waktu: hitungannya ada di halaman,
-// tempat angka yang dijelaskannya berada, dan sebuah pintu tidak perlu jadwalnya dicetak di pintu.
-// App.jsx hanya merendernya kalau akun terpilih memang punya market, jadi ia tidak memakan apa pun
-// sepanjang minggu-minggu saat tidak ada.
+// The Night Market door, rendered INTO the existing refresh row — deliberately without an offer
+// count and without a timer: those numbers live on the page, the place that explains them. App.jsx
+// only renders it when the selected account actually has a market, so it costs nothing during the
+// weeks when there is none.
 export function NightMarketEntry({ onOpen }) {
   return (
     <span
@@ -138,19 +135,14 @@ export function NightMarketEntry({ onOpen }) {
   );
 }
 
-// Kartu daily store TIDAK clickable. Satu-satunya elemen yang bisa diklik di dalamnya adalah tombol
-// PREVIEW, dan itu memang satu-satunya yang punya aksi. Yang dipindahkan hover adalah KURSOR — kartu
-// yang sedang ditunjuk, yang juga dipakai tombol [P] dan [←][→] — sehingga mouse dan keyboard
-// menunjuk benda yang sama dan panah tidak pernah menunjuk kartu yang berbeda dari yang di-highlight.
-//
-// Karena itu kartu juga bukan Tab-stop lagi: `role="button"` + `tabIndex` di sini dulu menjanjikan
-// sebuah aksi (Enter memilih) yang sudah tidak ada, dan janji palsu pada screen reader lebih buruk
-// daripada tidak ada peran sama sekali.
+// The daily store card is NOT clickable — the only action inside it is the PREVIEW button. Hover
+// moves the SAME cursor used by the [P] and [←][→] keys, so mouse and keyboard point at the same
+// card. The card is also not a Tab stop: `role="button"` + `tabIndex` used to promise an Enter
+// action that no longer exists, and a false promise to a screen reader is worse than no role.
 export function DailyStore({ account, selectedOffer, onHoverOffer, previewsHidden, onPreview }) {
   const store = account.status === 'ready' ? account.store : null;
   const offers = store?.offers ?? [];
-  // Kosong berarti belum ada kartu yang ditunjuk, dan labelnya mengatakan itu apa adanya — "—"
-  // bukan "01", karena nomor yang tercetak di label adalah klaim tentang kartu yang ditunjuk.
+  // An empty cursor prints "—", not "01": the number in the label is a claim about the card pointed at.
   const activeOffer = clampOfferCursor(selectedOffer, offers.length);
   const cursorLabel = activeOffer === null ? '—' : String(activeOffer + 1).padStart(2, '0');
   const title = (
@@ -181,10 +173,9 @@ export function DailyStore({ account, selectedOffer, onHoverOffer, previewsHidde
         : <div className="cards">
             {offers.map((offer, index) => {
               const pointed = index === activeOffer;
-              // Warna tier dipasang sebagai custom property, bukan kelas: nilainya datang dari Riot
-              // saat runtime, jadi tidak bisa ada di styles.css. Kartu tanpa tier tidak mendapat
-              // kelas .tiered sama sekali — dengan begitu tidak pernah ada rgba(var(--tier-rgb))
-              // yang variabelnya kosong, yang akan membatalkan seluruh deklarasinya.
+              // Tier color becomes a custom property, not a class: the value comes from Riot at runtime,
+              // so it cannot live in styles.css. Without a tier, the card gets no .tiered class at
+              // all — rgba(var(--tier-rgb)) with an empty variable cancels the whole declaration.
               const tierRgbValue = tierRgb(offer.tier?.color);
               return (
                 <article
@@ -260,24 +251,17 @@ export function MarketView({ account, countdown, onBack }) {
   );
 }
 
-// Halaman Night Market: enam kartu, dan warnanya adalah TIER skin itu — tidak ada label "TIER:
-// PREMIUM" di mana pun, karena kata adalah pembawa warna yang lebih buruk daripada warna itu sendiri.
-// Tiernya datang sudah jadi dari main process (rank, warna), jadi tidak ada yang diturunkan ulang
-// di sini.
+// Night Market card color is the skin TIER — no "TIER: PREMIUM" label, because the word is a worse
+// carrier of color than the color itself; the tier arrives ready-made from the main process (rank,
+// color), so nothing is re-derived here.
 //
-// Diurutkan tier dulu, diskon kedua. Riot mengirim urutannya sendiri dan daily store mempertahankan
-// urutan itu; Night Market dengan sengaja tidak, karena yang dicari user di layar ini adalah offer
-// terbaiknya, dan tier adalah potongan pertama yang jujur untuk itu — diskon 40% untuk skin Select
-// nilainya di bawah 20% untuk skin Ultra.
-//
-// Header dan footer sengaja pendek: hitungan waktunya ada di sini (bukan di pintu masuk), dan label
-// seperti "SESSION ACTIVE", "SORTED BY SKIN TIER" serta "PRICES IN VP" dibuang atas permintaan —
-// ketiganya menjelaskan hal yang sudah terlihat dari halamannya sendiri.
+// Sorted by tier first, discount second: Riot sends its own order and the daily store keeps it,
+// but here what the user is looking for is the best offer — a 40% discount on a Select skin is
+// worth less than 20% on an Ultra skin.
 export function NightMarketView({ account, now, onBack, onPreview }) {
   const market = account.status === 'ready' ? account.store?.nightMarket : null;
-  // Diurutkan DI SINI, bukan di App.jsx, dan hasilnya array baru: payload akun tetap berisi urutan
-  // asli dari Riot (state akun tetap salinan yang setia), sementara halaman ini yang memutuskan cara
-  // menyajikannya. Urutan itu keputusan tampilan, jadi tempatnya di komponen tampilan.
+  // Sorted HERE, not in App.jsx, and the result is a new array: the account payload keeps Riot's
+  // original order, while display order is a display component's decision.
   const offers = sortNightMarketOffers(market?.offers);
   const remaining = nightMarketCountdown(market?.endsAt, now);
 
@@ -305,7 +289,7 @@ export function NightMarketView({ account, now, onBack, onPreview }) {
               className={`nm-card${tierRgbValue ? ' tiered' : ''}`}
               style={tierStyle}
             >
-              {/* Garis tepi: penanda tier yang terbaca sekilas di grid enam kartu. */}
+              {/* Edge line: a tier marker readable at a glance in the six-card grid. */}
               <span className="nm-edge" style={{ background: offer.tier?.color ?? 'var(--border2)' }} />
               {offer.seen && <span className="nm-seen">OPENED</span>}
               <div className="nm-prev">
@@ -316,8 +300,8 @@ export function NightMarketView({ account, now, onBack, onPreview }) {
               <div className="nm-meta">
                 <span className="nm-name" title={offer.name}>{offer.name}</span>
                 <div className="nm-bottom">
-                  {/* Persentase memakai warna tier saat ada; tanpa tier ia jatuh ke gold, satu-satunya
-                      warna yang tersisa yang berarti "angka". */}
+                  {/* Percentage uses the tier color when there is one; without a tier it falls back to
+                      gold, the only color that means "number". */}
                   <span className="nm-pct" style={offer.tier?.color ? { color: offer.tier.color } : undefined}>
                     {offer.discountPercent == null ? '—' : `-${offer.discountPercent}%`}
                   </span>
@@ -333,7 +317,143 @@ export function NightMarketView({ account, now, onBack, onPreview }) {
           );
         })}
       </div>
-      <p className="market-foot">DISCOUNTS AS SENT BY RIOT · [ESC] BACK</p>
+    </section>
+  );
+}
+
+// The Featured Bundle door, sibling of the Night Market door in the same row. Its color is brand
+// blue, NOT gold — gold in this app means "a number worth reading" and is already taken by Night
+// Market. Only the bundle name and its discount are printed; a missing discount (Riot sends two
+// identical totals) is not printed at all, rather than printed as -0%.
+export function FeaturedBundleEntry({ name, discountPercent, onOpen }) {
+  return (
+    <span
+      className="rs-bundle" role="button" tabIndex={0}
+      title="Open the featured bundle"
+      onClick={onOpen}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
+    >
+      <Icon name="box" size={12} />
+      <span className="rb-lbl">{name}</span>
+      {discountPercent != null && <span className="rb-off">-{discountPercent}%</span>}
+      <span className="nm-go">VIEW</span>
+    </span>
+  );
+}
+
+const BUNDLE_KINDS = { buddy: 'BUDDY', spray: 'SPRAY', card: 'PLAYER CARD', other: 'ITEM' };
+
+// Skins use weaponCategory, which returns MELEE for dagger/knife names — so a bundle's melee needs
+// no marker of its own; it already reads as melee from its name.
+function bundleKindLabel(item) {
+  return item.kind === 'skin' ? weaponCategory(item.name) : BUNDLE_KINDS[item.kind] ?? 'ITEM';
+}
+
+// Featured Bundle page: same shape as Night Market, the only difference is how the price is read.
+// A bundle has ONE price and one discount computed from the prices of its rows, while every item
+// inside it is already included in that price — which is why an item flagged as promo prints INCLUDED
+// with its original price struck through, not 0 VP: a 0 next to an item reads as "this item is
+// free", and that is not what Riot says. Its order is Riot's order and is not sorted like Night
+// Market, because a bundle is one set Riot already arranged — weapons first, accessories after.
+export function FeaturedBundleView({ account, now, onBack, onPreview }) {
+  const bundle = account.status === 'ready' ? account.store?.bundle : null;
+  // The same helper as Night Market: it only needs a window with an absolute end, not offers.
+  const remaining = nightMarketCountdown(bundle?.endsAt, now);
+  const items = bundle?.items ?? [];
+  const skins = items.filter((item) => item.kind === 'skin').length;
+  // displayIcon2 is the wide key art; verticalPromoImage is the tall poster. displayIcon is deliberately
+  // NOT used as a fallback: a square logo stretched to a box this wide reads as a bug.
+  const hero = bundle?.art?.wide ?? bundle?.art?.tall ?? null;
+
+  return (
+    <section className="market-page" aria-label="Featured bundle">
+      <div className="market-top">
+        <button type="button" className="ghost-btn" onClick={onBack}><Icon name="back" />BACK TO ACCOUNTS</button>
+        <span className="market-meta">{remaining === null ? 'NO END DATE' : `ENDS IN ${fmtDuration(remaining)}`}</span>
+      </div>
+      <div className="market-head">
+        <BrandMark size={18} />
+        <h2>{account.label.toUpperCase()} — FEATURED BUNDLE</h2>
+        <span className="nm-head-live">
+          {bundle?.name ?? '—'}
+          {bundle?.discountPercent != null ? ` · -${bundle.discountPercent}%` : ''}
+          {bundle ? ` · ${bundle.price.toLocaleString('en-US')} VP` : ''}
+        </span>
+      </div>
+      {bundle?.contentUnavailable && (
+        <p className="snap-note">SKIN NAMES AND PREVIEWS UNAVAILABLE — RIOT&apos;S OFFERS AND PRICES BELOW.</p>
+      )}
+      {bundle && <>
+        <div className="bundle-hero">
+          <div className="hero-art">
+            {hero
+              ? <img src={hero} alt="" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+              : <span className="nm-noimg">NO ART</span>}
+          </div>
+          <div className="hero-side">
+            <div>
+              <div className="bundle-name">{bundle.name}</div>
+              <div className="bundle-tags">
+                <span className="bundle-count">{items.length} ITEMS · {skins} WEAPON SKINS</span>
+              </div>
+            </div>
+            <div className="bundle-price">
+              {bundle.discountPercent != null && <span className="b-pct">-{bundle.discountPercent}%</span>}
+              <span className="b-now">{bundle.price.toLocaleString('en-US')} VP</span>
+              {bundle.discountPercent != null && <span className="b-was">{bundle.baseTotal.toLocaleString('en-US')} VP</span>}
+            </div>
+            <div className="b-note">
+              {remaining === null ? 'NO END DATE' : `ENDS IN ${fmtDuration(remaining)}`}
+              {bundle.discountPercent != null ? ` · ${bundle.baseTotal.toLocaleString('en-US')} VP BOUGHT SEPARATELY` : ''}
+            </div>
+          </div>
+        </div>
+        <div className="b-grid">
+          {items.map((item) => {
+            const tierRgbValue = tierRgb(item.tier?.color);
+            // Same as the other two screens: without a tier, the card gets no .tiered class at all, so
+            // rgba(var(--tier-rgb)) is never empty — an empty variable cancels the whole declaration.
+            const tierStyle = tierRgbValue ? { '--tier': item.tier.color, '--tier-rgb': tierRgbValue } : undefined;
+            const previewable = Boolean(item.video) || (item.levels?.length ?? 0) > 1;
+            return (
+              <article key={item.id} className={`b-card${tierRgbValue ? ' tiered' : ''}`} style={tierStyle}>
+                {/* Edge line: a quick tier marker in the grid; a card without a tier still gets its line, just neutral. */}
+                <span className="b-edge" />
+                <div className="b-thumb">
+                  {item.image
+                    ? <img src={item.image} alt={item.name} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                    : <span className="b-none">NO IMAGE</span>}
+                </div>
+                <div className="b-meta">
+                  <span className="b-name" title={item.name}>{item.name}</span>
+                  <div className="b-row">
+                    <span className="b-type">{bundleKindLabel(item)}</span>
+                    {item.included ? (
+                      <>
+                        {item.basePrice != null && <span className="b-base">{item.basePrice.toLocaleString('en-US')}</span>}
+                        <span className="b-inc">INCLUDED</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="b-price">{item.price?.toLocaleString('en-US') ?? '—'} VP</span>
+                        {item.basePrice != null && item.basePrice !== item.price
+                          && <span className="b-base">{item.basePrice.toLocaleString('en-US')}</span>}
+                      </>
+                    )}
+                  </div>
+                  {/* Same as the daily store: a button that opens an empty stage is worse than no button. */}
+                  {previewable
+                    ? <button
+                        type="button" className="ghost-btn preview-btn"
+                        onClick={() => onPreview(item)} title="Open the showcase"
+                      ><Icon name="eye" size={11} />PREVIEW</button>
+                    : <span className="b-none">NO SHOWCASE VIDEO</span>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </>}
     </section>
   );
 }
@@ -350,18 +470,16 @@ function levelLabel(level, index) {
   return `LVL ${index + 1}`;
 }
 
-// Showcase modal: one <video> whose src is bound declaratively (via key) to
-// the selected level — the fix for the stale/blank video bug — plus replay,
-// upgrade-level and chroma-variant switching. Audio: muted by default (store
-// previews are ambient), toggle + volume slider in the stage overlay.
+// Showcase modal: one <video> whose src is bound declaratively (via key) to the selected level —
+// the fix for the stale/blank video bug. Audio is muted by default (store previews are ambient).
 export function SkinPreviewModal({ offer, onClose }) {
   const levels = (offer?.levels ?? []).filter((level) => level.video || level.icon);
   const chromas = offer?.chromas ?? [];
   const [levelIndex, setLevelIndex] = useState(0);
   const [chromaIndex, setChromaIndex] = useState(0);
   const [videoKey, setVideoKey] = useState(0);
-  // Audio prefs live in a module-level store persisted to localStorage: the
-  // chosen volume carries across skins, modal cycles, and app restarts.
+  // Audio prefs live in a module-level store persisted to localStorage, so the volume carries across
+  // skins, modal cycles, and app restarts.
   const [audio, setAudio] = useState(getAudioPrefs());
   useEffect(() => subscribeAudioPrefs(setAudio), []);
   const { soundOn, volume } = audio;
@@ -379,18 +497,13 @@ export function SkinPreviewModal({ offer, onClose }) {
   };
   useEffect(() => { applyAudio(videoRef.current, soundOn, volume); }, [soundOn, volume]);
 
-  // Some CDN responses stream slowly or stall entirely; canplay may never fire
-  // in a reasonable time even though enough data has arrived to show frames.
-  // Escape hatches:
-  //   - onPlaying: the video actually started (strongest signal)
-  //   - onLoadedData + stall timeout: first frame decoded; give the network a
-  //     grace window, then reveal the video even if canplay never fires —
-  //     a stalled frame beats an infinite loader
+  // Some CDN responses stall entirely: canplay may never fire even though enough data has arrived to
+  // show frames. onPlaying is the strongest signal; onLoadedData starts a stall timeout that reveals
+  // the video anyway — a stalled frame beats an infinite loader.
   const [videoLoading, setVideoLoading] = useState(Boolean(offer?.video));
   const stallTimerRef = useRef(null);
-  // Stable identities: the effect below lists these as dependencies, and an
-  // unstable function would re-run it on every render, restarting the timer
-  // instead of letting it fire.
+  // Stable identities: the effect below lists these as dependencies, and an unstable function would
+  // re-run it every render, restarting the timer instead of letting it fire.
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) { clearTimeout(stallTimerRef.current); stallTimerRef.current = null; }
   }, []);
@@ -403,20 +516,17 @@ export function SkinPreviewModal({ offer, onClose }) {
   const activeLevel = levels[levelIndex] ?? null;
   const activeChroma = chromas[chromaIndex] ?? null;
   const standardLevel = levels.find((level) => !level.item) ?? levels[0] ?? null;
-  // Showcase resolution order for the selected level + variant:
-  //   1. variant-specific video (865/2921 chromas have one)
-  //   2. picked variant's full-quality render — a chosen variant must always
-  //      change the stage, so it wins over the default-color level video
-  //   3. level video
-  //   4. level icon / base image
+  // Showcase resolution order for the selected level + variant: variant-specific video (only 865 of
+  // 2921 chromas have one) → picked variant's full-quality render — a chosen variant must always
+  // change the stage, so it wins over the default-color level video → level video → level icon.
   const variantVideo = activeChroma?.video ?? null;
   const wantsVariantStill = !variantVideo && chromaIndex > 0 && activeChroma?.render;
   const activeVideo = wantsVariantStill ? null : (variantVideo ?? activeLevel?.video ?? offer?.video ?? null);
   const activeRender = wantsVariantStill ? activeChroma.render : null;
   const stillImage = activeRender ?? standardLevel?.icon ?? offer?.image ?? null;
 
-  // Reset the loading state machine whenever the stage content changes —
-  // mirrors the <video> remount below (same key inputs).
+  // Reset the loading state machine whenever the stage content changes — mirrors the <video> remount
+  // below (same key inputs).
   useEffect(() => {
     setVideoLoading(Boolean(activeVideo));
     if (activeVideo) startStallTimer();

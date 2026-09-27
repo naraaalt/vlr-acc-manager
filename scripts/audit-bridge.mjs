@@ -1,12 +1,10 @@
 // Diffs what the renderer calls on the preload bridge against what
-// contextBridge.exposeInMainWorld actually exposes.
+// contextBridge.exposeInMainWorld exposes.
 //
-// Why this exists: a renderer call to a bridge method the preload never
-// exposed throws `x is not a function` at RUNTIME, while build, lint and unit
-// tests all stay green. The dev mock (src/devMock.js) implements methods the
-// real preload lacks, so the mock preview looks perfectly healthy and the gap
-// only appears in the packaged app. That is exactly how `deleteAccount` broke
-// the delete button with nothing catching it.
+// Why: calling a bridge method the preload never exposed throws `x is not a
+// function` at RUNTIME only — build, lint and tests stay green, and the dev mock
+// (src/devMock.js) implements methods the real preload lacks, so the gap appears
+// only in the packaged app (that is how `deleteAccount` broke the delete button).
 //
 // Usage: node scripts/audit-bridge.mjs [repoRoot]
 // Exit 1 when the renderer calls a method that is not exposed (crash class).
@@ -52,17 +50,14 @@ function exposedMethods(source) {
   return names;
 }
 
-// The renderer reaches the bridge directly (`window.valorant.x`) or through a
-// local alias (`const api = window.valorant`), so aliases are resolved to a
-// fixpoint: one alias can come from another (`const api = bridge()`, where
-// `bridge()` returns the bridge).
+// Aliases (`const api = window.valorant`, or one alias derived from another via
+// the `bridge()` helper) are resolved to a fixpoint.
 //
-// The initializer MUST reference the bare bridge — `window.valorant`, not
-// `window.valorant.method(...)`. Without that distinction `const response =
-// await window.valorant.renameAccount(x)` looks like an alias and every
-// `response.ok` / `response.data` becomes a phantom "missing method".
-// Declarations are matched one line at a time for the same reason: a
-// multi-line initializer is not guessed at.
+// The initializer MUST reference the bare bridge, not `window.valorant.method(...)`:
+// otherwise `const response = await window.valorant.renameAccount(x)` looks like an
+// alias and `response.ok` / `response.data` become phantom "missing method" reports.
+// Declarations are matched one line at a time for the same reason — multi-line
+// initializers are not guessed at.
 function collectAliases(text) {
   const aliases = new Set();
   const aliasLines = new Set();
@@ -76,8 +71,6 @@ function collectAliases(text) {
       if (!declared) return;
       const [, name, initializer] = declared;
       if (aliases.has(name)) return;
-      // Either the initializer holds the bare bridge, or it calls an alias
-      // (the `bridge()` helper that returns it).
       const fromBridge = bareBridge.test(initializer);
       const fromAlias = [...aliases].some((alias) => new RegExp(`\\b${alias}\\s*\\(`).test(initializer));
       if (fromBridge || fromAlias) {

@@ -1,21 +1,11 @@
 // Where is RiotClientServices.exe? Pure path plumbing for answering that.
 //
-// A Riot Client install is not required to live on the system drive, and assuming
-// C:\Riot Games\Riot Client means a machine that put it on D: or E: can never be driven by
-// this app — while the failure it produces ("ENOENT ... access 'C:\Riot Games\...'") reads
-// like a file lock, so the one thing that would explain it is the thing it never says.
-//
-// Two records on the machine name the real location, and both are read here:
-//
-//   - RiotClientInstalls.json, which Riot rewrites on every install and update, mapping each
-//     installed product to the client that owns it (plus rc_default / rc_live for the client
-//     itself). This is the same file the patchline comes from.
-//   - the `riotclient://` protocol handler in the registry, which Windows itself uses to open
-//     the client, so it points at the executable wherever the user put it.
-//
-// The conventional location is kept as a last resort only. Everything here is text work —
-// no disk access at all — so the decision is unit-tested rather than discovered on a user's
-// machine; the caller probes the candidates in order and keeps the first that exists.
+// A Riot Client install need not live on the system drive, and assuming C:\Riot Games\Riot Client
+// makes such a machine undriveable while the ENOENT it produces reads like a file lock. Two records
+// name the real location, both read here: RiotClientInstalls.json (rewritten on every install and
+// update; also the source of the patchline) and the `riotclient://` protocol handler in the
+// registry, which points at the executable wherever the user put it. The conventional location is a
+// last resort; everything here is text work, unit-tested, and the caller probes in order.
 import path from 'node:path';
 
 const CLIENT_FILENAME = 'RiotClientServices.exe';
@@ -37,18 +27,15 @@ function unique(list) {
   return out;
 }
 
-// Filtered to the executable we are actually going to spawn, and deduplicated keeping the
-// first spelling. Exported because the caller merges candidates from two independent records
-// that routinely name the same file, and the error message lists them.
+// Filtered to the executable we spawn, deduplicated keeping the first spelling. Exported because
+// the caller merges candidates from two records that routinely name the same file.
 export function uniqueClients(values) {
   return unique((Array.isArray(values) ? values : []).filter(isClientExecutable));
 }
 
-// Candidates from RiotClientInstalls.json, most authoritative first: the two entries that
-// name the client itself, then the client each installed product is mapped to. Values that
-// are not RiotClientServices.exe are dropped — `associated_client` maps a product to
-// whichever client owns it, and a value pointing at some other executable is not the thing
-// to spawn.
+// Candidates from RiotClientInstalls.json, most authoritative first: the two entries naming the
+// client itself, then the client each installed product is mapped to. Non-RiotClientServices.exe
+// values are dropped — `associated_client` can point at some other executable.
 export function clientCandidates(installs) {
   if (!installs || typeof installs !== 'object') return [];
   return uniqueClients([
@@ -67,10 +54,9 @@ export function registryCommand(output) {
   return match ? match[1] : null;
 }
 
-// The executable out of that command line: a quoted path followed by arguments. Quoting is
-// the convention rather than a guarantee, so an unquoted one falls back to everything up to
-// the executable's own name. Anything that is not the client is refused rather than returned
-// — a handler pointing somewhere unexpected must not become the thing this app runs.
+// The executable out of that command line. Quoting is convention, not a guarantee, so an unquoted
+// one falls back to everything up to the executable's own name. Anything that is not the client is
+// refused — a handler pointing elsewhere must not become what this app runs.
 export function protocolExecutable(command) {
   const text = String(command ?? '').trim();
   if (!text) return null;
@@ -80,8 +66,8 @@ export function protocolExecutable(command) {
   return bare ? bare[1].trim() : null;
 }
 
-// Last resort: the conventional location on the system drive. Still where most installs
-// land, and only reached when neither record above resolved to a file that exists.
+// Last resort: the conventional location on the system drive, reached only when neither record above
+// resolved to a file that exists.
 export function conventionalClientPath(systemDrive) {
   const drive = String(systemDrive ?? '').trim() || 'C:';
   return path.join(drive, 'Riot Games', 'Riot Client', CLIENT_FILENAME);

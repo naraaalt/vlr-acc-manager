@@ -1,13 +1,13 @@
-// QA-ONLY (mockup): bandingkan penempatan + ukuran tombol PLAY. File ini TIDAK ikut ke build
-// produksi — make-preview.mjs menempelkannya ke dist/preview.html supaya bisa difoto, supaya
-// keputusan diambil dari gambar app asli, bukan dari gambar karangan di luar app.
+// QA-ONLY (mockup): compare PLAY button placement + size. This file does NOT go into the production
+// build — make-preview.mjs appends it to dist/preview.html so it can be photographed, so decisions
+// come from pictures of the real app, not from mock-ups drawn outside it.
 //
-// Dipilih lewat location.hash: #pv1 .. #pv10
+// Selected via location.hash: #pv1 .. #pv10
 //
-// Sengaja TIDAK menyentuh src/App.jsx: kalau tombolnya ditanam di App.jsx, tiap varian butuh
-// mengubah komponen asli dan 'varians' jadi bercampur dengan app. Di sini app-nya apa adanya,
-// tombolnya cuma ditempel. Plain script (bukan ESM) karena preview.html menyatukan semuanya
-// jadi satu <script> inline.
+// Deliberately does NOT touch src/App.jsx: if the button were planted in App.jsx, every variant
+// would need changes to the real component and the 'variants' would get mixed in with the app. Here
+// the app is left as it is, the button is merely appended. Plain script (not ESM) because
+// preview.html merges everything into one inline <script>.
 (function () {
   var PLAY = '\u25B6';
 
@@ -21,17 +21,17 @@
 .pv-play:hover { background: rgba(var(--brand-rgb), .22); }
 .pv-play b { font-size: 11px; letter-spacing: 0; }
 
-/* V1 - header kanan, satu kluster dengan ADD */
+/* V1 - right header, one cluster with ADD */
 .pv1 .header-right .pv-play { margin-right: 2px; }
 
-/* V2 - aksi per-baris akun, mendahului SWITCH/RENAME/DEL */
+/* V2 - per-account-row action, ahead of SWITCH/RENAME/DEL */
 .pv2 .acct-actions .pv-play { padding: 3px 8px; }
 
-/* V3 - hero di header kartu akun terpilih */
+/* V3 - hero in the header of the selected account card */
 .pv3 .ov-head .pv-play { margin-left: auto; }
 .pv3 .ov-status { margin-left: 0; }
 
-/* V4 - dock selebar konten, di bawah */
+/* V4 - dock as wide as the content, at the bottom */
 .pv4 .content { padding-bottom: 52px; }
 .pv-dock {
   position: fixed; left: 337px; right: 1px; bottom: 35px; height: 40px;
@@ -42,24 +42,24 @@
 .pv-dock .pv-ctx { color: var(--faint); font-size: 9.5px; letter-spacing: .16em; }
 .pv-dock .pv-play { padding: 6px 26px; }
 
-/* V5 - mengambang, melekat ke konten terpilih */
+/* V5 - floating, stuck to the selected content */
 .pv-float { position: fixed; right: 26px; bottom: 50px; padding: 9px 20px; font-size: 11px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, .5); }
 .pv-float .pv-ctx { color: var(--brand); opacity: .75; font-size: 9px; letter-spacing: .14em; }
 
-/* Timer yang pindah ke header Daily Store (V6+). */
+/* The timer moved to the Daily Store header (V6+). */
 .pv-timer { display: inline-flex; align-items: center; gap: 6px; }
 .pv-timer .icon { opacity: .7; color: var(--dim); }
 .pv-timer-lbl { color: var(--faint); font-size: 8.5px; font-weight: 700; letter-spacing: .18em; }
 .pv-timer-count { color: var(--danger); font-size: 13px; font-weight: 800; letter-spacing: .04em;
   text-shadow: 0 0 10px rgba(var(--danger-rgb), .3); }
 
-/* V6 - PLAY menggantikan strip timer, tombol selebar strip */
+/* V6 - PLAY replaces the timer strip, button as wide as the strip */
 .pv6 .refresh-strip { padding: 7px 10px; }
 .pv-play-strip { flex: 1; justify-content: center; padding: 7px 20px; font-size: 10.5px; }
 
-/* V8-V10 - konsep V7 (timer di kanan) tapi tombolnya sekecil tombol Play Steam,
-   dan "SELECTED 01/05" dibuang karena di sebelah timer jadi ganjil. */
+/* V8-V10 - the V7 concept (timer on the right) but the button is as small as Steam's Play button,
+   and "SELECTED 01/05" is dropped because next to the timer it looks odd. */
 .pv8 .refresh-strip, .pv9 .refresh-strip { padding: 7px 14px; }
 .pv-center { justify-content: center; }
 .pv-between { justify-content: space-between; }
@@ -69,37 +69,37 @@
   color: var(--dim); font-size: 9.5px; font-weight: 700; letter-spacing: .18em;
   display: inline-flex; align-items: center; gap: 8px;
 }
-/* V11-V13 - tombol kecil di KIRI; sisi kanan diisi salah satu dari tiga hal. */
+/* V11-V13 - small button on the LEFT; the right side is filled by one of three things. */
 .pv11 .refresh-strip, .pv12 .refresh-strip, .pv13 .refresh-strip { padding: 7px 14px; }
 .pv11 .refresh-strip .pv-timer-count, .pv12 .refresh-strip .pv-timer-count { font-size: 15px; }
 
-/* V14-V15 - tombol PLAY naik ke hero, menggantikan chip ONLINE di samping username.
-   .ov-level sudah margin-left:auto, jadi level tetap menempel di kanan dan tombolnya
-   duduk persis di sebelah nama. */
+/* V14-V15 - the PLAY button moves up to the hero, replacing the ONLINE chip next to the username.
+   .ov-level is already margin-left:auto, so the level stays pinned right and the button
+   sits right next to the name. */
 .pv-hero { padding: 4px 13px; font-size: 10px; gap: 8px; }
 .pv-hero b { font-size: 10px; }
 .pv-hero .dot { width: 5px; height: 5px; flex: 0 0 auto; }
 
-/* V16-V17 - PLAY mengambil slot RR di baris akun. RR tidak hilang dari app: main page
-   sudah menampilkannya tiga kali (ov-rr, meter RR, dan "x / 100 RR THIS SEASON"). */
+/* V16-V17 - PLAY takes over the RR slot in the account row. RR does not disappear from the app:
+   the main page already shows it three times (ov-rr, the RR meter, and "x / 100 RR THIS SEASON"). */
 .pv16 .acct-l2 .pv-play, .pv16i .acct-l2 .pv-play, .pv17 .acct-l2 .pv-play { margin-left: auto; padding: 2px 10px; }
 .pv16 .acct-l2 .pv-play b, .pv16i .acct-l2 .pv-play b, .pv17 .acct-l2 .pv-play b { font-size: 9px; }
 .pv16 .acct-l2 .pv-play, .pv16i .acct-l2 .pv-play, .pv17 .acct-l2 .pv-play { font-size: 8.5px; gap: 5px; }
-/* V17 - tombolnya melebar mengisi sisa baris kedua, jadi tidak ada celah kosong. */
+/* V17 - the button widens to fill the rest of the second row, so there is no empty gap. */
 .pv17 .acct-l2 .pv-play { flex: 1; justify-content: center; }
 
-/* Ukuran angka timer disamakan dengan label "STORE REFRESHES IN" (22px -> 9.5px).
-   Efeknya: glow-nya dibuang (glow itu efek untuk teks besar; di ukuran label jadi noda),
-   dan strip otomatis jadi lebih pendek karena elemen tertingginya tinggal ikon. */
+/* The timer number size is matched to the "STORE REFRESHES IN" label (22px -> 9.5px).
+   Effect: the glow is dropped (glow is an effect for large text; at label size it turns into a smudge),
+   and the strip automatically gets shorter because its tallest element is only the icon. */
 .pv16 .refresh-strip .rs-count,
 .pv17 .refresh-strip .rs-count,
 .pv16i .refresh-strip .rs-count {
   font-size: 9.5px; letter-spacing: .1em; text-shadow: none;
 }
-/* V16i - sekalian ikon jamnya dikecilkan supaya seluruh baris terbaca satu ukuran. */
+/* V16i - the clock icon is shrunk too so the whole row reads at one size. */
 .pv16i .refresh-strip .icon { width: 12px; height: 12px; }
 
-/* V10 membuang strip, jadi timer harus mendorong dirinya sendiri ke kanan. */
+/* V10 drops the strip, so the timer has to push itself to the right. */
 .pv10 .store .panel-title .pv-timer { margin-left: auto; }
 .pv10 .store .panel-title .pv-sm { margin-left: 14px; }
 `;
@@ -112,8 +112,8 @@
 
   var SMALL = '<a class="pv-play pv-sm" title="Launch Valorant"><b>' + PLAY + '</b> PLAY</a>';
 
-  // Konsep V7 yang sudah disetujui: timer pindah ke header Daily Store, "SELECTED 01/05"
-  // dibuang (di sebelah timer jadi ganjil), strip dikosongkan supaya bisa diisi ulang.
+  // The approved V7 concept: the timer moves to the Daily Store header, "SELECTED 01/05" is
+  // dropped (next to the timer it looks odd), the strip is emptied so it can be refilled.
   function v7Base() {
     var strip = document.querySelector('.refresh-strip');
     var title = document.querySelector('.store .panel-title');
@@ -129,8 +129,8 @@
     return strip;
   }
 
-  // Baris strip versi baru: tombol PLAY kecil di KIRI, sisi kanan diserahkan pemanggilnya.
-  // "SELECTED 01/05" dibuang karena di sebelah timer jadi ganjil.
+  // The new strip row: a small PLAY button on the LEFT, the right side is handed to the caller.
+  // "SELECTED 01/05" is dropped because next to the timer it looks odd.
   function leftBase() {
     var strip = document.querySelector('.refresh-strip');
     var title = document.querySelector('.store .panel-title');
@@ -155,17 +155,17 @@
       '"></span>' + (name ? name.textContent : '') + '</span>');
   }
 
-  // Ganti slot RR di tiap baris akun dengan tombol PLAY. Akun ERROR tidak diberi tombol
-  // (keputusan C); slotnya dibiarkan apa adanya.
+  // Replace the RR slot in each account row with the PLAY button. ERROR accounts get no button
+  // (decision C); their slot is left as it is.
   function rowPlay() {
     var rows = [...document.querySelectorAll('.acct')];
     if (!rows.length) return false;
     var count = 0;
     rows.forEach(function (row) {
-      // PLAY sekarang benar-benar hidup di baris akun, jadi slot RR yang dulu ditempati
-      // kandidat sudah tidak dirender lagi. Kandidat ini disimpan sebagai pembanding (dan
-      // screenshot-nya), jadi tombolnya ditempel ke ujung baris kedua — bukan menggantikan
-      // elemen yang sudah tidak ada, yang akan membuat kandidat ini diam-diam kosong.
+      // PLAY now really lives in the account row, so the RR slot this candidate used to occupy
+      // is no longer rendered. This candidate is kept as a comparison (and for its screenshot),
+      // so the button is appended to the end of the second row — rather than replacing an element
+      // that no longer exists, which would leave this candidate silently empty.
       var l2 = row.querySelector('.acct-l2');
       if (!l2 || l2.querySelector('.pv-play')) return;
       l2.appendChild(el('<a class="pv-play" title="Launch Valorant with this account"><b>' +
@@ -176,19 +176,19 @@
   }
 
   var variants = {
-    // V16 - PLAY menggantikan RR di baris akun, tombol ringkas di kanan.
+    // V16 - PLAY replaces RR in the account row, a compact button on the right.
     pv16: function () { return rowPlay(); },
-    // V16i - seperti V16, tapi ikon jam di strip ikut dikecilkan.
+    // V16i - like V16, but the clock icon in the strip is shrunk too.
     pv16i: function () { return rowPlay(); },
-    // V17 - sama, tapi tombolnya melebar mengisi sisa baris kedua.
+    // V17 - same, but the button widens to fill the rest of the second row.
     pv17: function () { return rowPlay(); },
-    // V14 - PLAY menggantikan chip status, dot-nya IKUT masuk ke dalam tombol
-    // supaya status sesi (online/saved) tidak hilang dari hero.
+    // V14 - PLAY replaces the status chip, its dot goes INTO the button as well
+    // so the session status (online/saved) does not disappear from the hero.
     pv14: function () {
       var head = document.querySelector('.panel.overview .ov-head');
       var status = head && head.querySelector('.ov-status');
       if (!status) return false;
-      // Keputusan C: akun ERROR tidak punya tombol PLAY, dan chip error-nya harus tetap utuh.
+      // Decision C: ERROR accounts have no PLAY button, and their error chip must stay intact.
       if (status.classList.contains('is-err')) return true;
       var dot = status.querySelector('.dot');
       var btn = el('<a class="pv-play pv-hero" title="Launch Valorant">' +
@@ -196,9 +196,9 @@
       head.replaceChild(btn, status);
       return true;
     },
-    // V14e - PEMBANDING kasus ERROR: pilih akun yang error DULU, baru tempel tombolnya.
-    // Urutannya penting — kalau tombol ditempel dulu, node .ov-status milik React terlepas
-    // permanen dan layout error tidak akan pernah terlihat (jadi tesnya menyesatkan).
+    // V14e - the ERROR case COMPARISON: select the errored account FIRST, then append the button.
+    // The order matters — if the button is appended first, React's .ov-status node is detached
+    // for good and the error layout can never be seen (so the test would be misleading).
     pv14e: function () {
       var row = [...document.querySelectorAll('.acct')].find((n) => n.querySelector('.dot.err'));
       if (!row) return false;
@@ -206,14 +206,14 @@
       var head = document.querySelector('.panel.overview .ov-head');
       var status = head && head.querySelector('.ov-status');
       if (!status) return false;
-      if (status.classList.contains('is-err')) return true; // chip error dibiarkan utuh
+      if (status.classList.contains('is-err')) return true; // error chip left intact
       var dot = status.querySelector('.dot');
       head.replaceChild(el('<a class="pv-play pv-hero" title="Launch Valorant">' +
         (dot ? dot.outerHTML : '') + '<b>' + PLAY + '</b> PLAY</a>'), status);
       return true;
     },
-    // V15 - sama, tapi TANPA dot. Status sesi masih terbaca di baris SESSION
-    // ("Signed in" / "Saved session") di dalam sel INFO.
+    // V15 - same, but WITHOUT the dot. The session status is still readable on the SESSION row
+    // ("Signed in" / "Saved session") inside the INFO cell.
     pv15: function () {
       var head = document.querySelector('.panel.overview .ov-head');
       var status = head && head.querySelector('.ov-status');
@@ -223,14 +223,14 @@
         PLAY + '</b> PLAY</a>'), status);
       return true;
     },
-    // V11 - tombol di kiri, timer di kanan bar yang sama. Bar tetap jadi milik store.
+    // V11 - button on the left, timer on the right of the same bar. The bar still belongs to the store.
     pv11: function () {
       var b = leftBase();
       if (!b) return false;
       b.strip.appendChild(b.badge);
       return true;
     },
-    // V12 - tombol di kiri, nama akun di kanan. Timer tetap di panel header.
+    // V12 - button on the left, account name on the right. The timer stays in the panel header.
     pv12: function () {
       var strip = document.querySelector('.refresh-strip');
       var title = document.querySelector('.store .panel-title');
@@ -248,8 +248,8 @@
       strip.appendChild(accountChip());
       return true;
     },
-    // V13 - tombol di kiri, kanan dibiarkan kosong (pembanding: ini yang tadi terasa ganjil).
-    // Timernya TIDAK boleh hilang — ia pindah ke panel header supaya store tetap punya hitungan.
+    // V13 - button on the left, the right left empty (comparison: this is the one that felt odd).
+    // The timer must NOT disappear — it moves to the panel header so the store keeps a countdown.
     pv13: function () {
       var b = leftBase();
       if (!b) return false;
@@ -291,7 +291,7 @@
         '</b> PLAY<span class="pv-ctx"> \u00b7 VALORANT</span></a>'));
       return true;
     },
-    // V6 - tombol selebar strip, timer di kiri header Daily Store.
+    // V6 - button as wide as the strip, timer on the left of the Daily Store header.
     pv6: function () {
       var strip = document.querySelector('.refresh-strip');
       var title = document.querySelector('.store .panel-title');
@@ -308,7 +308,7 @@
         PLAY + '</b> PLAY VALORANT</a>'));
       return true;
     },
-    // V7 - tombol selebar strip juga, tapi timer tidak disembunyikan di kiri.
+    // V7 - strip-wide button too, but the timer is not tucked away on the left.
     pv7: function () {
       var strip = document.querySelector('.refresh-strip');
       var title = document.querySelector('.store .panel-title');
@@ -325,7 +325,7 @@
         PLAY + '</b> PLAY VALORANT</a>'));
       return true;
     },
-    // V8 - tombol kecil di TENGAH: ruang kosongnya jadi seimbang kiri-kanan.
+    // V8 - small button in the CENTRE: the empty space is balanced left and right.
     pv8: function () {
       var strip = v7Base();
       if (!strip) return false;
@@ -333,7 +333,7 @@
       strip.appendChild(el(SMALL));
       return true;
     },
-    // V9 - tombol kecil di KANAN, kiri diisi identitas akun yang akan di-launch.
+    // V9 - small button on the RIGHT, the left is filled with the identity of the account to launch.
     pv9: function () {
       var strip = v7Base();
       if (!strip) return false;
@@ -346,8 +346,8 @@
       strip.appendChild(el(SMALL));
       return true;
     },
-    // V10 - strip DIBUANG: tombol kecilnya numpang di baris DAILY STORE, jadi tidak ada
-    // bar yang perlu diisi. Paling hemat tinggi (45px penuh kembali ke kartu store).
+    // V10 - the strip is REMOVED: the small button rides along on the DAILY STORE row, so there is
+    // no bar left to fill. Cheapest in height (a full 45px back to the store card).
     pv10: function () {
       var strip = document.querySelector('.refresh-strip');
       var title = document.querySelector('.store .panel-title');
@@ -378,7 +378,7 @@
   var attempt = function () {
     if (done) return;
     try { done = build(); } catch { done = false; }
-    // Store/overview baru ada setelah data mock selesai dimuat, jadi coba lagi sampai berhasil.
+    // Store/overview only exist once the mock data has finished loading, so retry until it works.
     if (!done) setTimeout(attempt, 120);
   };
   setTimeout(attempt, 60);

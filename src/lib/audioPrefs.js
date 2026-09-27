@@ -1,9 +1,8 @@
-// Adapter over the single settings store (src/lib/settings.js). The showcase reads a
-// {soundOn, volume} pair as one object; the store holds them as two independent settings.
+// Adapter over the single settings store (src/lib/settings.js): the showcase reads a
+// {soundOn, volume} pair as one object, while the store holds two independent settings.
 //
-// Note: subscribeAudioPrefs now fires whenever ANY setting changes, because it subscribes
-// to the store rather than to the audio pair. The listener is a setState, so an unrelated
-// change costs one extra render and nothing else.
+// subscribeAudioPrefs fires on ANY setting change, because it subscribes to the store rather than
+// the audio pair. The listener is a setState, so an unrelated change costs one extra render.
 
 import { getSetting, setSetting, subscribeSettings } from './settings.js';
 

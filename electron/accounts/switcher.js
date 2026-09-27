@@ -46,10 +46,9 @@ async function backupLiveCredentials(prefix = 'before-switch') {
   await pruneBackups();
 }
 
-// Backup ditulis sebelum SETIAP switch dan dulu tidak pernah dibuang: 27 file / 245 MB dalam tiga
-// hari, tumbuh tanpa batas. Best-effort dengan sengaja — gagal membersihkan backup tidak boleh
-// menggagalkan switch yang sedang berjalan, karena backup itu ada justru untuk melindungi operasi
-// ini, bukan sebaliknya.
+// A backup is written before EVERY switch and used to never be discarded: 27 files / 245 MB in three
+// days. Deliberately best-effort — failing to clean up backups must not fail the switch,
+// because that backup exists precisely to protect this operation, not the other way round.
 async function pruneBackups() {
   try {
     const directory = backupDirectory();
@@ -59,7 +58,7 @@ async function pruneBackups() {
       if (info) entries.push({ name, mtimeMs: info.mtimeMs });
     }
     for (const name of backupsToPrune(entries)) await fs.rm(path.join(directory, name), { force: true }).catch(() => {});
-  } catch { /* housekeeping tidak pernah fatal */ }
+  } catch { /* housekeeping is never fatal */ }
 }
 async function clearLiveSession() {
   await writeBundle({ version: 1, files: [] });
@@ -82,8 +81,17 @@ export async function openRiotSignIn() {
   }
 }
 
-// Shared body: the caller owns the re-entrancy flag so PLAY can switch without
-// tripping the guard its own entry point sets.
+// Only performSwitch's post-launch refresh sets this, so a failure before the credentials are
+// touched (loadAccount, backupLiveCredentials, writeBundle) stays a plain failure, never a move.
+const hasMoved = (error) => error?.switchedAccountMoved === true;
+
+// Shared body: the caller owns the re-entrancy flag so PLAY can switch without tripping the
+// guard its own entry point sets.
+//
+// This function deliberately REJECTS when the post-launch refresh fails: PLAY's guarantee is that
+// a switch waits for the new session to be readable, and swallowing the failure would let PLAY
+// launch against a client possibly sitting at Riot's sign-in screen. switchToAccount converts that
+// failure into a reported move; PLAY keeps the throw.
 async function performSwitch(label) {
   const account = await loadAccount(label);
   await backupLiveCredentials();
@@ -91,32 +99,46 @@ async function performSwitch(label) {
   await writeBundle(account.credentials);
   await fs.writeFile(path.join(riotRoot, 'VamAccountId.instance'), account.id, 'utf8');
   await launchRiotClient();
-  const refreshed = await refreshSwitchedAccount(account.label);
-  return { label: account.label, store: refreshed.store };
+  // Past this point the session HAS moved: credentials written, client relaunched. The marker is
+  // what lets switchToAccount tell this failure from one before the client was touched.
+  try {
+    const refreshed = await refreshSwitchedAccount(account.label);
+    return { label: account.label, store: refreshed.store };
+  } catch (error) {
+    error.switchedAccountMoved = true;
+    throw error;
+  }
 }
 
 export async function switchToAccount(label) {
   if (switchInProgress) throw new Error('Another account switch is still in progress. Wait for it to finish before switching again.');
   switchInProgress = true;
   try {
-    return await performSwitch(label);
+    // The success shape carries `moved` too: the renderer gates the page retarget on it, so a
+    // plain `{label, store}` would stop the page following the most common case — a switch that
+    // works. `refreshError` is on both paths so the renderer never has to tell absent from null.
+    const result = await performSwitch(label);
+    return { ...result, moved: true, refreshError: null };
+  } catch (error) {
+    // Everything before the refresh IS the switch: credentials written, client relaunched. The
+    // refresh can still legitimately fail (a slow sign-in runs past waitForCurrentAccount's 60s
+    // window; a just-rotated session can be rejected), and reporting that as a failed switch left
+    // the renderer on the PREVIOUS account's page while the session had moved. `moved` is what it
+    // retargets on; `refreshError` warns on top; a failure BEFORE the relaunch still rejects.
+    if (!hasMoved(error)) throw error;
+    return { label, store: null, moved: true, refreshError: error.message || 'The account moved, but its store could not be read yet.' };
   } finally {
     switchInProgress = false;
   }
 }
 
-// PLAY: get this account into the game, in one press.
-//
-// The press does whatever that takes. If the account is already the signed-in one it just
-// asks Riot Client to start the game; otherwise it switches first, and the switch waits for
-// the new session to be readable before returning, so the launch is asked for as an account
-// the client is actually signed in as.
-//
-// This replaced a launch-only rule that refused every other row. The refusal was built on a
-// true observation — a client that is not signed in accepts a launch and drops it — but the
-// answer to it is to switch, not to refuse: a manager exists to hold the accounts you are
-// not currently in, so a control that only works on the account already open is a control
-// that is almost always off.
+// PLAY: get this account into the game, in one press. If it is already signed in it just asks
+// Riot Client to start the game; otherwise it switches first, and the switch waits for the new
+// session to be readable before returning, so the launch is asked for as an account the client
+// is actually signed in as. This replaced a launch-only rule that refused every other row: the
+// answer to "a client that is not signed in accepts a launch and drops it" is to switch, not to
+// refuse — a manager exists to hold the accounts you are not currently in, so a control that
+// only works on the account already open is almost always off.
 export async function playAccount(label) {
   if (switchInProgress) throw new Error('Another account operation is still in progress. Wait for it to finish before launching.');
   switchInProgress = true;
@@ -131,15 +153,14 @@ export async function playAccount(label) {
       return { label: account.label, launched: false, switched: false, reason: 'already-running' };
     }
     if (decision === 'close-game-first') {
-      // Reported, not acted on: the switch would close the game that is open under the
-      // account signed in now, and that is the user's call to make, not a mis-click's.
+      // Reported, not acted on: the switch would close the game open under the account signed in
+      // now, and that is the user's call to make, not a mis-click's.
       return { label: account.label, launched: false, switched: false, reason: 'close-game-first' };
     }
     const switched = decision === 'switch-then-launch';
     if (switched) await performSwitch(account.label);
-    // Reports success only once the game process is actually up: the client acknowledging a
-    // request is not the same as a game starting, and conflating the two is what made an
-    // earlier build report a launch that never happened.
+    // Reports success only once the game process is up: the client acknowledging a request is not
+    // a game starting, and conflating the two made an earlier build report a launch that never happened.
     await launchValorantWhenReady();
     return { label: account.label, launched: true, switched, reason: null };
   } finally {

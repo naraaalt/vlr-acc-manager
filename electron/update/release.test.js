@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { compareVersions, pickInstaller, readRelease } from './release.js';
 
-// Versi dibandingkan sebagai ANGKA per bagian. Perbandingan string punya bug klasik:
-// '0.1.10' < '0.1.9' secara leksikografis, artinya app bakal berhenti nawarin update
-// selamanya begitu versi ke-10 rilis — dan gagalnya SENYAP.
+// Versions are compared as NUMBERS per part. String comparison has a classic bug:
+// '0.1.10' < '0.1.9' lexicographically, meaning the app will stop offering updates
+// forever once the tenth version ships — and it fails SILENTLY.
 describe('compareVersions', () => {
   it('treats the tenth patch as newer than the ninth', () => {
     expect(compareVersions('0.1.10', '0.1.9')).toBe(1);
@@ -32,9 +32,9 @@ describe('pickInstaller', () => {
   it('picks the NSIS installer, not the portable build', () => {
     expect(pickInstaller(assets).browser_download_url).toBe('https://x/setup');
   });
-  // GitHub menormalkan spasi di nama asset hasil upload REST jadi TITIK. Fixture yang cuma
-  // memakai nama berspasi bikin bug ini lolos dari unit test dan baru ketahuan dari release
-  // SUNGGUHAN: updater tidak menemukan installer-nya dan berhenti menawarkan update.
+  // GitHub normalises spaces in REST-uploaded asset names to DOTS. A fixture that only
+  // uses spaced names lets this bug slip through unit tests and only surfaces from a
+  // REAL release: the updater misses its installer and stops offering updates.
   it('accepts the dot-normalised name GitHub actually stores', () => {
     expect(pickInstaller([{ name: 'Sapphire.Setup.0.1.3.exe', browser_download_url: 'https://x/setup' }]).browser_download_url).toBe('https://x/setup');
   });
@@ -66,8 +66,8 @@ describe('readRelease', () => {
     expect(result.reason).toBe('ok');
   });
 
-  // 404 dari /releases/latest = "belum ada release", dan repo ini MEMANG belum punya.
-  // Kalau ini diperlakukan sebagai error, user baru bakal lihat pesan gagal terus.
+  // A 404 from /releases/latest = "no release yet", and this repo INDEED has none.
+  // If this were treated as an error, new users would keep seeing a failure message.
   it('treats a missing release as up to date, not as a failure', () => {
     const result = readRelease(null, '0.1.2');
     expect(result.available).toBe(false);

@@ -50,9 +50,8 @@ const WEAPON_WORDS = {
   MELEE: ['KNIFE', 'BLADE', 'AXE', 'SWORD', 'KATANA', 'NEEDLE', 'TALON', 'HAMMER', 'FISTS', 'FAN', 'SCYTHE', 'KUNAI', 'DAGGER', 'SPEAR', 'BAT', 'CLAW', 'GLOVES']
 };
 export function weaponCategory(skinName) {
-  // filter(Boolean) drops the empty token that String.split always leaves
-  // behind ('' splits to [''], 'name ' to [..., '']), so the 'WEAPON' fallback
-  // below is actually reachable and a trailing space cannot yield an empty label.
+  // filter(Boolean) drops the empty token String.split always leaves behind ('' splits to ['']), so
+  // the 'WEAPON' fallback below is reachable and a trailing space cannot yield an empty label.
   const words = String(skinName || '').toUpperCase().split(/\s+/).filter(Boolean);
   for (const word of words) {
     for (const [category, list] of Object.entries(WEAPON_WORDS)) {
@@ -71,10 +70,9 @@ export function fmtCountdown(totalSeconds) {
   return `${hh}:${mm}:${ss}`;
 }
 
-// Countdown yang sama, tapi jujur soal skalanya. fmtCountdown mencetak jam, dan itu benar untuk
-// daily store (selalu di bawah 24 jam) serta salah untuk Night Market (~2 minggu): 13 hari jadi
-// '312:00:00', angka yang tidak ada yang membacanya sebagai tiga belas hari. Di atas satu hari ia
-// beralih ke D/H/M — satuan yang juga dipakai layar in-game.
+// The same countdown, but honest about its scale: fmtCountdown prints hours, correct for the daily
+// store (<24 hours) and wrong for the Night Market (~2 weeks, 13 days becomes '312:00:00'); above one
+// day it switches to D/H/M, the units the in-game screen uses too.
 export function fmtDuration(totalSeconds) {
   if (!Number.isFinite(totalSeconds)) return '--:--:--';
   const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -96,11 +94,9 @@ export function relativeTime(input) {
   return `${Math.floor(diff / 86_400_000)} d ago`;
 }
 
-// The daily store rotates on a fixed server schedule: 00:00 UTC, the same
-// instant worldwide (17:00 PT / 20:00 ET / 07:00 WIB), shifting by an hour
-// only where a local region observes DST. Counting to the next UTC midnight
-// stays exact even when the last store snapshot is stale, whereas a sampled
-// `expiresIn` delta drifts.
+// The daily store rotates on a fixed server schedule: 00:00 UTC worldwide, shifting by an hour only
+// where a local region observes DST. Counting to the next UTC midnight stays exact even when the last
+// snapshot is stale, whereas a sampled `expiresIn` delta drifts.
 export function nextStoreReset(now = Date.now()) {
   const sampled = new Date(now);
   return Date.UTC(sampled.getUTCFullYear(), sampled.getUTCMonth(), sampled.getUTCDate() + 1);
@@ -111,11 +107,9 @@ export function storeCountdownSeconds(now = Date.now()) {
   return Math.max(0, (nextStoreReset(now) - now) / 1000);
 }
 
-// The rotation instant that `now` has just crossed since `previous`, or null
-// when no boundary lies between them. Monotonic by construction: once the
-// boundary has passed, the following tick computes its own next boundary, so
-// a single reset fires exactly once — and a machine asleep across several days
-// still reports a single rotation rather than one per elapsed day.
+// The rotation instant that `now` has just crossed since `previous`, or null when no boundary lies
+// between them. Monotonic by construction: the following tick computes its own next boundary, so a
+// single reset fires exactly once — a machine asleep for days reports one rotation, not one per day.
 export function crossedStoreReset(previous, now) {
   if (!Number.isFinite(previous) || !Number.isFinite(now) || now <= previous) return null;
   const boundary = nextStoreReset(previous);

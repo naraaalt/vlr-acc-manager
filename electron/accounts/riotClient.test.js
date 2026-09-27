@@ -4,19 +4,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { clientExecutableCandidates, firstExisting } from './riotClient.js';
 
-// The discovery chain end to end, through the SHIPPED module — not a re-implementation of
-// it. `installsPath()` reads `process.env.ProgramData`, so pointing that at a scratch
-// directory puts a fabricated machine in front of the real code: its own install map, and a
-// client executable that exists.
+// The discovery chain end to end, through the SHIPPED module — not a re-implementation of it.
+// `installsPath()` reads `process.env.ProgramData`, so pointing that at a scratch directory puts a
+// fabricated machine in front of the real code: its own install map, and a client executable that
+// exists.
 //
-// What this proves: the path in the map is what the app will run. The old code could only
-// produce C:\Riot Games\Riot Client\RiotClientServices.exe — this test fails against it,
-// because the first candidate would be that guess instead of the mapped path.
-//
-// What this does NOT prove: that the drive letter can differ. The scratch directory sits on
-// the same drive as the system here, so the resolver simply never has to care. That half was
-// proven separately, by running the same function against a real client directory created on
-// E:\ along with a fabricated install map naming it.
+// What this proves: the path in the map is what the app will run — the old code could only produce
+// C:\Riot Games\Riot Client\RiotClientServices.exe, so this test fails against it. What this does
+// NOT prove: that the drive letter can differ, since the scratch directory sits on the same drive
+// as the system here; that half was proven separately, against a real client directory on E:\.
 let scratch;
 let fakeProgramData;
 let realProgramData;
@@ -94,8 +90,8 @@ describe('clientExecutableCandidates', () => {
   });
 
   it('survives a missing or unreadable install map', async () => {
-    // No RiotClientInstalls.json at all — the app must still produce its fallbacks rather
-    // than throw out of a cache read.
+    // No RiotClientInstalls.json at all — the app must still produce its fallbacks rather than
+    // throw out of a cache read.
     process.env.ProgramData = fakeProgramData;
     const candidates = await clientExecutableCandidates();
     expect(candidates.length).toBeGreaterThan(0);

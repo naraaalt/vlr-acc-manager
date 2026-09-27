@@ -27,8 +27,7 @@ function parseAccountName(userInfoResponse) {
   }
 }
 
-// Node's built-in fetch does not accept https.Agent. This small request helper
-// deliberately disables certificate verification only for localhost.
+// Node's built-in fetch does not accept https.Agent; this helper disables certificate verification for localhost only.
 function localJson(url, headers) {
   return new Promise((resolve, reject) => {
     https.get(url, { headers, agent: localAgent }, (response) => {

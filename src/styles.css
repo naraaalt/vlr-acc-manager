@@ -85,7 +85,6 @@ input::placeholder { color: var(--faint); }
 .vlr-mark { display: block; flex: 0 0 auto; }
 .brand-vlr { color: var(--brand); font-weight: 800; font-size: 14px; letter-spacing: .22em; }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.session-pill { display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: .16em; color: var(--dim); font-weight: 700; }
 
 /* ---------- custom window controls ---------- */
 .win-controls { display: flex; align-items: stretch; align-self: stretch; margin-left: 12px; }
@@ -180,17 +179,12 @@ input::placeholder { color: var(--faint); }
 .acct-rankic { width: 14px; height: 14px; flex: 0 0 14px; object-fit: contain; }
 .acct-rankic-empty { border: 1px solid var(--faint); width: 10px; height: 10px; }
 .acct-rank { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; }
-/* The row's launch control, sitting in the slot the RR readout used to occupy. Sized like a
-   launcher's Play button and pushed right, never stretched across the row — a control that fills
-   its bar reads as a banner. */
-/* PLAY is the one GREEN control in the app, and deliberately so. Green is reserved here for
-   "this is fine / this works": the signed-in dot, the OK toast edge, the market's live badge.
-   A launcher is the same kind of statement — the dot says the session is good, this says the
-   session is ready to start, so the two read as one idea on the row. The other accents are
-   already spoken for and would collide: cyan is the row's BUSY state (.acct.busy), gold is
-   numbers (LV, VP), and red is errors and deletes. Brand blue stays the identity colour
-   (selection bars, card selection, primary buttons); leaving PLAY out of it is what makes the
-   control read as an action rather than as more chrome. */
+/* The row's launch control, in the slot the RR readout used to occupy. Sized like a launcher's Play
+   button and pushed right, never stretched across the row — a control that fills its bar is a banner. */
+/* PLAY is the one GREEN control in the app: green is reserved for "this is fine / this works" — the
+   signed-in dot, the OK toast edge, the market's live badge — and a launcher makes the same
+   statement. The other accents are spoken for: cyan is the row's BUSY state, gold is numbers, red is
+   errors and deletes, brand blue is identity (selection, primary buttons). */
 .acct-play {
   margin-left: auto; border: 1px solid var(--green); background: var(--green-soft);
   color: var(--green); font-family: inherit; font-size: 11.5px; font-weight: 700;
@@ -198,9 +192,9 @@ input::placeholder { color: var(--faint); }
   display: inline-flex; align-items: center; gap: 7px;
 }
 .acct-play:hover:not(:disabled) { background: rgba(var(--green-rgb), .22); }
-/* Muted, not faded: a row the press cannot act on stays legible as a control, it just loses the
-   green. Dropping only the opacity left the brand colours in place and read as a button that was
-   merely dimmed, which is the opposite of "not usable here". */
+/* Muted, not faded: an unusable row stays legible as a control, it just loses the green. Dropping
+   only the opacity left the brand colours in place and read as merely dimmed — the opposite of "not
+   usable here". */
 .acct-play:disabled { border-color: var(--border2); background: var(--panel2); color: var(--faint); cursor: default; }
 .acct-actions { display: none; gap: 6px; padding: 2px 0 0 32px; }
 .acct-actions button {
@@ -347,10 +341,10 @@ input::placeholder { color: var(--faint); }
   display: flex; flex-direction: column; min-height: 0;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-/* Kartu tidak clickable, jadi tidak ada `cursor: pointer` di sini: kursor tangan adalah janji bahwa
-   kartunya bisa ditekan, dan janji itu yang membuat nomor bidaknya dulu berubah putih saat diklik.
-   Satu-satunya kursor tangan di dalam kartu adalah tombol PREVIEW, dan ia memang punya aksinya
-   sendiri. */
+/* The card is not clickable, so there is no `cursor: pointer` here: a hand cursor is a promise that
+   the card can be pressed, and that promise is what used to turn its bid number white on click.
+   The only hand cursor inside the card is the PREVIEW button, and it does have an action of its
+   own. */
 .card.cur { border-color: var(--border2); }
 .card .num {
   position: absolute; top: -1px; left: -1px; z-index: 2;
@@ -374,30 +368,21 @@ input::placeholder { color: var(--faint); }
 .skrow { display: flex; align-items: baseline; gap: 8px; }
 .wcat { font-size: 9px; color: var(--dim); font-weight: 600; letter-spacing: .18em; }
 .vp { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .03em; }
-/* Tier: warnanya membingkai KOTAK GAMBAR skin, bukan seluruh kartu.
-   Di situ warnanya menempel pada bendanya — "skin ini tier Premium" — sementara border kartu tetap
-   netral dan karenanya tidak ikut bersaing dengan penanda pilihan. Efek sampingnya juga benar:
-   gambar tiap skin sudah punya warna dominannya sendiri, dan bingkai di sekelilingnya membaca sebagai
-   milik gambar itu, bukan sebagai hiasan kartu.
-   Warna dipasang inline per kartu (--tier/--tier-rgb) karena datang dari Riot saat runtime; kartu
-   yang memang tidak punya tier tidak mendapat kelas .tiered sama sekali, sehingga tidak pernah ada
-   rgba(var(--tier-rgb)) dengan variabel kosong — yang akan membatalkan seluruh deklarasinya. */
+/* Tier: the colour frames the skin's IMAGE BOX, not the whole card — there it sticks to the
+   object itself, while the card border stays neutral and does not compete with the selection
+   marker. The colour is set inline per card (--tier/--tier-rgb) because it comes from Riot at
+   runtime; a card without a tier gets no .tiered class at all, so there is never an
+   rgba(var(--tier-rgb)) with an empty variable — which would cancel its whole declaration. */
 .card.tiered .prev { border: 1px solid rgba(var(--tier-rgb), .45); }
 .card.tiered .num { border-color: rgba(var(--tier-rgb), .5); color: rgba(var(--tier-rgb), .95); }
 .card.tiered .wcat { color: rgba(var(--tier-rgb), .8); }
 
-/* HOVER = highlight-nya, dan warnanya warna tier: yang sedang ditunjuk kursor adalah SKIN-nya.
-   Glow-nya DI DALAM kotak (inset), bukan memancar ke luar: cahayanya memenuhi interior box dan
-   mengikuti tepinya dari dalam, sehingga highlight-nya berada di dalam bidang item — bukan halo
-   yang meluber ke kartu di sebelahnya.
-   Sengaja HANYA inset, tanpa lapisan luar: satu sinyal hover saja, dan tidak ada cahaya yang bocor
-   keluar dari batas kartu. Tepi kotak tetap warna tier penuh sebagai garis bacanya.
-
-   Selector-nya `.cur`, BUKAN `:hover`. Yang di-highlight adalah KARTU YANG DITUNJUK, dan penunjuknya
-   ada dua: mouse dan panah [←][→]. Kalau aturannya digantung pada `:hover`, panah tidak akan
-   memindahkan highlight apa pun — dan kalau keduanya dipasang, mouse yang kebetulan berhenti di
-   kartu 5 akan menyalakan kartu 5 sementara panah sedang menunjuk kartu 2. Karena hover sendiri yang
-   memindahkan kursor, `.cur` sudah mencakup hover; tidak ada yang hilang dengan membuang `:hover`. */
+/* HOVER is its highlight, and its colour is the tier colour: what the cursor points at is the SKIN.
+   The glow is INSIDE the box (inset) only — one hover signal, no light leaking onto the card next
+   to it. The selector is `.cur`, NOT `:hover`: what is highlighted is the POINTED-AT CARD, and there
+   are two pointers (mouse and arrow keys [←][→]). Hung on `:hover`, the arrows would move no
+   highlight at all; setting both would make a mouse resting on card 5 light it up while the arrows
+   point at card 2. Hover itself moves the cursor, so `.cur` already covers it. */
 .card.tiered.cur .prev {
   border-color: var(--tier);
   box-shadow:
@@ -409,23 +394,20 @@ input::placeholder { color: var(--faint); }
     var(--bg);
   background-size: 14px 14px, 14px 14px, auto;
 }
-/* Gambarnya cuma naik ke opasitas penuh saat ditunjuk — TIDAK diberi drop-shadow warna tier. Itu
-   akan membuat glow-nya mengikuti siluet senjata alih-alih duduk di dalam kotaknya. */
+/* The image only rises to full opacity when pointed at — it is NOT given a tier-coloured drop
+   shadow. That would make the glow follow the weapon's silhouette instead of sitting in its box. */
 .card.tiered.cur .prev img { opacity: 1; }
 .card.tiered.cur .skname { color: #fff; }
 
-/* Tidak ada lagi keadaan "terpilih", dan itu memang tujuannya: kartu tidak clickable, jadi tidak ada
-   yang bisa dipilih. Yang tersisa hanya kartu yang sedang DITUNJUK, dan itu glow tier di atas.
-   Nomor bidak karena itu tidak pernah punya tampilan kedua — ia selalu warna tier (atau `--faint`
-   untuk skin tanpa tier dari Riot). Aturan `.card.sel` yang dulu mengisi nomornya jadi putih padat
-   dengan teks gelap dibuang bersama kelasnya; kelas yang tidak pernah dipasang tidak boleh
-   meninggalkan aturannya di sini. */
+/* There is no "selected" state any more: the card is not clickable, so nothing can be selected.
+   What is left is only the POINTED-AT card (tier glow above), and its bid number therefore never
+   has a second appearance. The old `.card.sel` rule was dropped together with its class — a class
+   that is never applied must not leave its rule behind here. */
 
-/* PREVIEW muncul saat kartunya ditunjuk, bukan hanya saat terpilih: kalau kursor sudah ada di atas
-   kartu, menyembunyikan satu-satunya aksinya membuat kartu itu terasa mati. Tombolnya karena itu
-   selalu dirender (kalau skin-nya memang punya materi showcase) dan visibilitasnya diatur di sini.
-   `visibility` dan `pointer-events` ikut diatur, bukan hanya opacity: opacity 0 menyisakan tombol
-   yang tidak terlihat TAPI masih bisa diklik dan masih bisa dijangkau Tab. */
+/* PREVIEW is always rendered (if the skin has showcase material) and its visibility is set here: a
+   cursor already over the card must not watch its only action disappear. `visibility` and
+   `pointer-events` are set too, not just opacity — opacity 0 leaves a button that is invisible BUT
+   still clickable and still reachable by Tab. */
 .card .preview-btn { opacity: 0; visibility: hidden; pointer-events: none; }
 .card.cur .preview-btn { opacity: 1; visibility: visible; pointer-events: auto; }
 
@@ -455,12 +437,11 @@ input::placeholder { color: var(--faint); }
 
 /* ---------- night market ---------- */
 
-/* Pintunya, di dalam baris refresh yang sudah ada. `margin-left:auto` mendorongnya ke ujung kanan
-   baris; pemisah tipis di kirinya memisahkan dua hitungan yang tidak berhubungan — milik daily
-   store yang sudah ada di baris ini, dan milik market yang hanya ada di halaman di balik kontrol
-   ini. Emas, tanpa token baru: di aplikasi ini emas berarti "angka yang layak dibaca". */
+/* The doorway, inside the existing refresh strip — what puts it flush right is its SLOT
+   (.rs-entries), not itself. Gold, with no new token: here gold means "a number worth
+   reading". */
 .rs-nm {
-  margin-left: auto; display: flex; align-items: center; gap: 9px; padding: 4px 9px;
+  display: flex; align-items: center; gap: 9px; padding: 4px 9px;
   border: 1px solid rgba(232, 196, 104, .35); background: rgba(232, 196, 104, .07);
   cursor: pointer; user-select: none;
 }
@@ -476,19 +457,18 @@ input::placeholder { color: var(--faint); }
   color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .14em;
 }
 
-/* Kartu night market: 3 kolom supaya enam offer jadi dua baris penuh. Grid, bukan tabel — halaman
-   ini soal bendanya, bukan soal daftar, dan di situlah warnanya bisa memenuhi kartu.
-   Warna tier dipasang INLINE per kartu (datang dari Riot saat runtime), jadi tidak ada aturan di
-   sini yang boleh menyetel border-color atau box-shadow pada .nm-prev — aturan di file ini akan
-   kalah dari inline style milik kartu yang punya tier, atau lebih buruk lagi menang untuk kartu
-   yang tidak punya. */
+/* Night market card: 3 columns so six offers make two full rows. A grid, not a table — this page is
+   about the objects, not about a list.
+   The tier colour is set INLINE per card (it comes from Riot at runtime), so no rule here may set
+   border-color or box-shadow on .nm-prev: a rule in this file would lose to the inline style of a
+   card that has a tier, or worse win for a card that does not. */
 .nm-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .nm-card {
   position: relative; display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--border); background: var(--panel);
 }
-/* Garis tepi tier: penanda yang terbaca sekilas di grid enam kartu, sebelum mata sempat membaca
-   warnanya. */
+/* Tier edge line: a marker readable at a glance in the six-card grid, before the eye has time to
+   read the colour. */
 .nm-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .nm-seen {
   position: absolute; top: 9px; right: 10px; z-index: 2;
@@ -506,8 +486,8 @@ input::placeholder { color: var(--faint); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .nm-bottom { display: flex; align-items: baseline; gap: 8px; }
-/* Sama dengan daily store: warna tier membingkai KOTAK gambarnya, dan saat hover glow-nya masuk ke
-   DALAM kotak. Ini bahasa visual yang sama supaya kedua layar tidak terasa seperti dua aplikasi. */
+/* Same as the daily store: the tier colour frames its IMAGE BOX, and on hover the glow goes INSIDE
+   the box. This is the same visual language so the two screens do not feel like two apps. */
 .nm-card.tiered .nm-prev { border: 1px solid rgba(var(--tier-rgb), .45); }
 .nm-card.tiered:hover .nm-prev {
   border-color: var(--tier);
@@ -518,14 +498,94 @@ input::placeholder { color: var(--faint); }
 .nm-was { color: var(--faint); font-size: 10px; text-decoration: line-through; }
 .nm-pv { align-self: flex-start; }
 
+/* ---------- featured bundle ---------- */
+/* The doorway slot in the refresh strip, and it owns the alignment: with TWO doorways (bundle and
+   Night Market), two elements each demanding `margin-left: auto` would push each other instead of
+   lining up as one group. `margin-left: auto` on .rs-nm was therefore dropped. */
+.rs-entries { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* Bundle doorway: the same geometry as .rs-nm, its colour brand blue instead of gold. Gold in this
+   app means "a number worth reading" and Night Market already has it; two doorways of the same
+   colour on the same row would read as one control. */
+.rs-bundle {
+  display: flex; align-items: center; gap: 9px; padding: 4px 9px;
+  border: 1px solid rgba(var(--brand-rgb), .45); background: var(--brand-soft);
+  cursor: pointer; user-select: none;
+}
+.rs-bundle:hover { background: rgba(var(--brand-rgb), .24); border-color: var(--brand); }
+.rs-bundle:focus-visible { outline: 1px solid var(--brand); outline-offset: 1px; }
+.rs-bundle .icon { color: var(--brand); opacity: .95; }
+.rb-lbl { color: var(--brand); font-size: 9.5px; font-weight: 800; letter-spacing: .16em; }
+.rb-off { color: var(--brand); font-size: 9.5px; font-weight: 800; letter-spacing: .1em; }
+.rs-bundle:hover .nm-go { color: var(--brand); }
+
+/* Hero: wide key art on the left, price block on the right. Its height is pinned so the row does not
+   jump when the image finishes loading — bundle art comes from a third-party CDN, and without a
+   fixed height this page would shift once on every load. */
+.bundle-hero { display: grid; grid-template-columns: minmax(0, 1fr) 340px; border: 1px solid var(--border); background: var(--panel); }
+.hero-art {
+  position: relative; height: 236px; border-right: 1px solid var(--border); background: var(--panel2);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.hero-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-side { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bundle-name { font-size: 22px; font-weight: 800; color: var(--text-bright); letter-spacing: .1em; }
+.bundle-tags { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.bundle-count { color: var(--faint); font-size: 9.5px; letter-spacing: .16em; }
+.bundle-price { display: flex; align-items: baseline; gap: 10px; }
+.b-pct { color: var(--gold); font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.b-now { color: var(--text-bright); font-size: 16px; font-weight: 800; letter-spacing: .04em; }
+.b-was { color: var(--faint); font-size: 12px; text-decoration: line-through; }
+.b-note { color: var(--faint); font-size: 9px; letter-spacing: .12em; }
+
+/* Grid item: four columns, Riot's order preserved. Thumbnail height is fixed like the Night
+   Market card, because these two pages are read with the same eye. */
+.b-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.b-card { position: relative; display: flex; flex-direction: column; border: 1px solid var(--border); background: var(--panel); overflow: hidden; }
+/* Edge line: a tier marker readable at a glance in the grid. A card without a tier still gets its
+   line, only in a neutral colour — so the width is the same on every card and the grid stays smooth. */
+.b-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--border2); }
+.b-card.tiered .b-edge { background: var(--tier); }
+.b-thumb {
+  height: 96px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel2); border-bottom: 1px solid var(--border);
+}
+.b-thumb img { max-height: 78px; max-width: 88%; object-fit: contain; }
+.b-card.tiered .b-thumb { border-bottom: 1px solid rgba(var(--tier-rgb), .45); }
+.b-meta { padding: 9px 11px 10px; display: flex; flex-direction: column; gap: 7px; }
+.b-name {
+  color: var(--text-bright); font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.b-row { display: flex; align-items: baseline; gap: 8px; }
+.b-type { color: var(--faint); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.b-card.tiered .b-type { color: rgba(var(--tier-rgb), .85); }
+.b-price { color: var(--text-bright); font-size: 11.5px; font-weight: 800; margin-left: auto; }
+/* INCLUDED, not "0 VP": promo items do NOT add to the bundle price, and a zero next to an item
+   reads as "this item is free" — not what Riot says. */
+.b-inc { color: var(--green); font-size: 11.5px; font-weight: 800; margin-left: auto; letter-spacing: .08em; }
+.b-base { color: var(--faint); font-size: 9.5px; text-decoration: line-through; }
+/* The PREVIEW button inside this card is not an overlay like in the daily store: the card has no
+   cursor, so the button is always visible and the button itself is the only interactive element
+   inside it. */
+.b-card .preview-btn { position: static; transform: none; align-self: flex-start; }
+.b-none { color: var(--faint); font-size: 9px; letter-spacing: .16em; }
+
 /* ---------- footer ---------- */
 .app-footer {
   flex: 0 0 34px; border-top: 1px solid var(--border2);
   display: flex; align-items: center; gap: 16px; padding: 0 14px;
   background: var(--panel);
 }
-.foot-title { color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .22em; }
-.foot-meta { margin-left: auto; color: var(--faint); font-size: 9px; letter-spacing: .14em; }
+/* Version and session state share one status line. The colour is `--dim`, not `--faint`: `--faint`
+   was right for secondary text accompanying a title beside it, and is too dim for the
+   only text on this line. */
+.foot-version { color: var(--dim); font-size: 9.5px; letter-spacing: .14em; }
+
+/* Riot session state, moved here from the action cluster in the header. The `margin-left: auto` the
+   version used to hold is now held by the pill, so it still sticks to the right edge of the window
+   exactly as it did in the header — only its row changed, not its place. */
+.session-pill { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: .16em; color: var(--dim); font-weight: 700; }
 
 /* ---------- overlays / modal / toast ---------- */
 .overlay {
@@ -794,17 +854,16 @@ input::placeholder { color: var(--faint); }
 }
 .update-pill:hover:not(:disabled) { background: var(--brand); color: #04121F; }
 .update-pill.ready { border-color: var(--cyan); color: var(--cyan); }
-/* In flight: cyan, which is this app's "working on it" colour (the same one a switching row
-   uses), and NOT dimmed. The global `button:disabled` rule drops opacity to .55 to show that a
-   control is unavailable, which is exactly wrong here — this is the one element reporting that
-   the update is running, so it has to stay the most legible thing in the header. No hover state
-   either: it cannot be pressed again until the update is done. */
+/* In flight: cyan — this app's "working on it" colour, the same one a switching row uses — and NOT
+   dimmed. The global `button:disabled` opacity .55 says "unavailable", which is exactly wrong for the
+   one element reporting that the update is running. No hover state either: it cannot be pressed again
+   until the update is done. */
 .update-pill.busy {
   border-color: var(--cyan); color: var(--cyan); background: rgba(61, 216, 245, .12);
   opacity: 1; cursor: progress;
 }
-/* Tombol dismiss bersebelahan, BUKAN tombol di dalam tombol: <button> bersarang itu HTML yang
-   tidak valid. Karena itu pula border kirinya dimatikan — dua-duanya terbaca sebagai satu pil. */
+/* The dismiss button sits beside, NOT inside the button: a nested <button> is invalid HTML. That is
+   also why its left border is off — both read as one pill. */
 .update-dismiss {
   border: 1px solid var(--brand); border-left: none; background: var(--brand-soft);
   color: var(--brand); padding: 0 6px; display: flex; align-items: center;
@@ -814,8 +873,8 @@ input::placeholder { color: var(--faint); }
   display: flex; align-items: center; gap: 10px;
   padding: 9px 12px; border-top: 1px solid var(--border2);
 }
-/* Baris SYSTEM adalah perhentian panah terakhir di panel, jadi ia memakai penanda yang sama
-   dengan baris setting yang sedang disorot. */
+/* The SYSTEM row is the last arrow stop in the panel, so it uses the same marker as the focused
+   setting row. */
 .set-system.sel { background: var(--panel3); box-shadow: inset 3px 0 0 var(--brand); }
 .set-system-label { color: var(--faint); font-size: 9px; font-weight: 700; letter-spacing: .18em; }
 .set-version { color: var(--dim); font-size: 9.5px; letter-spacing: .1em; }

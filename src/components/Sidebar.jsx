@@ -54,11 +54,9 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
           ? <img className="acct-rankic" src={iconUrl} alt="" width="14" height="14" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
           : <span className="acct-rankic acct-rankic-empty" />}
         <span className="acct-rank" style={rank ? { color } : undefined}>{rank ?? 'UNRANKED'}</span>
-        {/* PLAY takes this row's RR slot. RR is the one value here the details panel already
-            carries three times over (value, meter and season progress), so the slot is the
-            cheapest place for a launcher. It stays visible on every row and is MUTED only
-            when the entry itself is unusable — see playGate for what a press does and why
-            the earlier rule that disabled it on every non-signed-in row was wrong. */}
+        {/* PLAY takes this row's RR slot because RR is the one value the details panel already
+            carries three times over. It stays visible on every row and is MUTED only when the
+            entry itself is unusable — see playGate for why the earlier rule was wrong. */}
         <button
           type="button" className="acct-play"
           disabled={!canPlay(account) || anySwitching}
@@ -66,9 +64,8 @@ function AccountRow({ account, selected, onSelect, onOpenMarket, onSwitch, onPla
           title={playTitle(account)}
         >
           <Icon name="play" size={13} />
-          {/* The press switches first when this account does not own the session, and that
-              takes far longer than a launch. Saying which of the two is happening is the
-              difference between a slow button and a broken one. */}
+          {/* The press switches first when this account does not own the session, which takes far
+              longer than a launch — saying which is happening is the difference between slow and broken. */}
           {playing ? (account.active ? 'PLAYING…' : 'SWITCHING…') : 'PLAY'}
         </button>
       </div>
@@ -91,13 +88,14 @@ function SyncNote({ accounts }) {
   );
 }
 
-// Commands mirror the non-duplicated keymap: switching happens per-row via the
-// account card buttons, so there is no Switch entry. Import only exists when
-// TCNO is installed.
+// Commands mirror the non-duplicated keymap: switching happens per-row via the account card
+// buttons, so there is no Switch entry.
 const COMMANDS = [
   { key: 'R', icon: 'refresh', label: 'Refresh Account', busyGated: true },
   { key: 'CTRL+R', icon: 'refreshall', label: 'Refresh All', busyGated: true },
   { key: 'O', icon: 'sort', label: 'Sort Accounts' },
+  // Not busyGated: reading the bundle changes no account, just like the Night Market door.
+  { key: 'B', icon: 'box', label: 'Featured Bundle' },
   { key: 'X', icon: 'trash', label: 'Delete Account', busyGated: true }
 ];
 
@@ -137,7 +135,7 @@ export default function Sidebar({
   accounts, visible, totalCount, selectedIndex, onSelect, onOpenMarket,
   filter, onFilter, sortMode, onCycleSort,
   tcnoAvailable, busy, commandFlash, switchingLabel, playingLabel,
-  onSwitch, onPlay, onRefresh, onRefreshAll, onDelete, onRename, onImport, onAdd
+  onSwitch, onPlay, onRefresh, onRefreshAll, onDelete, onRename, onImport, onAdd, onOpenBundle
 }) {
   const readyCount = accounts.filter((account) => account.status === 'ready').length;
   // Command rows act on the selected account; row buttons act on their own row.
@@ -146,6 +144,7 @@ export default function Sidebar({
     else if (key === 'CTRL+R') onRefreshAll();
     else if (key === 'X') onDelete();
     else if (key === 'I') onImport();
+    else if (key === 'B') onOpenBundle();
     else if (key === 'O') onCycleSort();
   };
   return (

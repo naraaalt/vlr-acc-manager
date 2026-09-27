@@ -32,7 +32,7 @@ describe('defaults', () => {
     expect(SETTINGS).toHaveLength(10);
     expect(new Set(SETTINGS.map((setting) => setting.id)).size).toBe(10);
     // The panel shows only what has no other surface; the rest are owned by a keybind or an
-    // in-context control. Defaults are covered by the loop test above.
+    // in-context control.
     expect(SETTINGS.filter((setting) => setting.panel !== false)).toHaveLength(6);
   });
 });
@@ -84,10 +84,8 @@ describe('writing', () => {
   });
 });
 
-// The registry is the persistence SCHEMA, not just the panel's row list, so a setting that
-// leaves the panel MUST stay in it. If one of these is ever deleted from SETTINGS instead of
-// marked panel:false, setSetting throws 'Unknown setting' and the control that owns it stops
-// working with nothing on screen to say why.
+// The registry is the persistence SCHEMA, not just the panel's row list: deleting one of these from
+// SETTINGS instead of marking it panel:false makes setSetting throw and stops its owner, silently.
 describe('settings kept out of the panel', () => {
   it('stays writable, so the keybind or overlay that owns it cannot break silently', async () => {
     const { getSetting, setSetting, SETTINGS } = await loadSettings();
@@ -124,9 +122,8 @@ describe('migration from the old per-feature keys', () => {
     expect(getSetting('sortMode')).toBe('active');
   });
 
-  // Regression: migration must not leave the old keys in place. read() falls back to
-  // legacySeed() whenever 'vlr.settings' is absent, so a reset that removes the new key
-  // would re-adopt the OLD values on the next launch and appear to have done nothing.
+  // Regression: read() falls back to legacySeed() whenever 'vlr.settings' is absent, so legacy keys
+  // left in place would let a reset that removes the new key re-adopt the OLD values on next launch.
   it('clears the legacy keys, so resetting cannot resurrect them', async () => {
     globalThis.localStorage.setItem('vlr.ui.previewsHidden', '1');
     const first = await loadSettings();
@@ -159,14 +156,13 @@ describe('reset and subscribe', () => {
     expect(seen).toEqual([true, false]);
   });
 
-  // This is the contract uiPrefs.js already had, and which its existing tests pin: with
-  // storage unavailable a write must not throw, and must not pretend it stuck.
+  // This is the contract uiPrefs.js already had: with storage unavailable a write must not throw,
+  // and must not pretend it stuck.
   it('does not throw when storage is unavailable, and does not pretend the write stuck', async () => {
     const { getSetting, setSetting } = await loadSettings();
     globalThis.localStorage = undefined;
     expect(() => setSetting('notifyOnRotation', false)).not.toThrow();
     expect(getSetting('notifyOnRotation')).toBe(true);
-    // The return value is the value in effect, not the one that was attempted.
     expect(setSetting('notifyOnRotation', false)).toBe(true);
   });
 });
@@ -185,8 +181,8 @@ describe('the remembered last account', () => {
     expect(getSetting('notifyOnRotation')).toBe(false);
   });
 
-  // Regression: this blob also holds state that is not a setting. Writing a setting used
-  // to replace the whole blob and forget which account to reopen, with no error anywhere.
+  // Regression: this blob also holds state that is not a setting. Writing a setting used to replace the
+  // whole blob and forget which account to reopen, with no error anywhere.
   it('keeps the remembered account when an unrelated setting is written afterwards', async () => {
     const { getLastSelection, setLastSelection, setSetting } = await loadSettings();
     setLastSelection('sec');
@@ -194,9 +190,8 @@ describe('the remembered last account', () => {
     expect(getLastSelection()).toBe('sec');
   });
 });
-// Bukan setting yang dilihat user: Night Market mana yang sudah diumumkan, per label akun. Ia
-// menumpang blob yang sama supaya tetap ada tepat satu kunci penyimpanan, dan berbeda dari setting
-// ia tidak pernah disanitasi — nilainya sidik jari yang tidak transparan, bukan pilihan user.
+// Not a user-facing setting: which Night Market has been announced, per account label. It rides in
+// the same blob so there is still one storage key, and it is never sanitised (the value is a fingerprint).
 describe('the announced night market memory', () => {
   it('is empty before anything is written', async () => {
     const { getAnnouncedNightMarkets } = await loadSettings();
@@ -217,9 +212,8 @@ describe('the announced night market memory', () => {
     expect(getAnnouncedNightMarkets()).toEqual({ main: 'e|f' });
   });
 
-  // Regression guard for the whole reason this lives in the settings blob: writing a setting used to
-  // replace the blob wholesale, which would have silently forgotten every announced market and made
-  // the app announce the same window again on the next launch.
+  // Regression guard for why this lives in the settings blob: writing a setting used to replace the blob
+  // wholesale, silently forgetting every announced market and re-announcing the same window next launch.
   it('survives an unrelated settings write, and does not disturb settings', async () => {
     const { getAnnouncedNightMarkets, setAnnouncedNightMarket, getSetting, setSetting } = await loadSettings();
     setAnnouncedNightMarket('main', 'a|b');
@@ -238,8 +232,8 @@ describe('the announced night market memory', () => {
   });
 });
 
-// Night Market tidak punya jadwal, jadi notice-nya tidak bisa digantung pada jam seperti rotasi
-// daily store. Setting-nya ada supaya user tetap punya satu saklar untuk mematikannya.
+// The Night Market has no schedule like the daily store rotation, so its notice cannot hang off a
+// clock; the setting exists so the user still has one switch to turn it off.
 describe('the night market notice setting', () => {
   it('is on by default and rendered in the panel', async () => {
     const { SETTINGS, getSetting } = await loadSettings();

@@ -4,9 +4,9 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 const RIOT_CLIENT_ROOT = path.join(process.env.LOCALAPPDATA ?? '', 'Riot Games', 'Riot Client');
-// Riot's current Windows client keeps session state across the full Data and
-// Config directories (file names vary between client releases). The lockfile
-// is deliberately excluded because its port/password is always live-only.
+// Riot's current Windows client keeps session state across the full Data and Config directories
+// (file names vary between client releases). The lockfile is deliberately excluded because its
+// port/password is always live-only.
 const SOURCES = [['Data', true], ['Config', true]];
 
 function storageDirectory() { return path.join(app.getPath('userData'), 'accounts'); }
@@ -20,18 +20,15 @@ function normaliseLabel(label) {
   if (!value || value.length > 64) throw new Error('Account labels must be between 1 and 64 characters.');
   return value;
 }
-// toLowerCase() deliberately, NOT toLocaleLowerCase(): this id becomes the
-// account's filename and is embedded in the index, so it may depend only on
-// the label text. Locale-aware casing resolves 'MAIN' to a different id on a
-// Turkish-configured machine ('I' lowercases to a dotless 'ı'), and the saved
-// account would then read as missing on that machine.
+// toLowerCase() deliberately, NOT toLocaleLowerCase(): this id becomes the account's filename and
+// index entry, so it may depend only on the label text — locale-aware casing resolves 'MAIN'
+// differently on a Turkish machine ('I' -> dotless 'ı') and the account would read as missing there.
 function accountId(label) { return createHash('sha256').update(label.toLowerCase()).digest('hex').slice(0, 24); }
 async function ensureStorage() { await fs.mkdir(storageDirectory(), { recursive: true }); await sweepStaleTempFiles(); }
 
-// Windows refuses a rename for a moment while an antivirus scan or the search
-// indexer holds a handle to the file, and a whole write is exactly one rename.
-// Retrying briefly turns that transient refusal into a successful save instead
-// of an EPERM the user has to resolve by hand.
+// Windows refuses a rename for a moment while an antivirus scan or the search indexer holds a
+// handle to the file, and a whole write is exactly one rename. Retrying briefly turns that
+// transient refusal into a successful save instead of an EPERM the user must resolve by hand.
 const RENAME_RETRY_DELAYS_MS = [50, 200, 600];
 const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY']);
 function sleep(milliseconds) { return new Promise((resolve) => { setTimeout(resolve, milliseconds); }); }
@@ -48,10 +45,9 @@ async function renameWithRetry(from, to) {
   }
 }
 
-// A write killed between its temp file and the rename leaves that temp file
-// behind for good — earlier failures had left 13 MB of them in the accounts
-// directory. Sweep once per run, and only files old enough that no write still
-// in flight could own them.
+// A write killed between its temp file and the rename leaves that temp file behind for good —
+// earlier failures had left 13 MB of them in the accounts directory. Sweep once per run, and only
+// files old enough that no write still in flight could own them.
 const STALE_TEMP_MS = 5 * 60 * 1000;
 let sweptStaleTemps = false;
 async function sweepStaleTempFiles() {
@@ -83,9 +79,8 @@ async function writeEncrypted(file, value) {
   try {
     await renameWithRetry(temporary, file);
   } catch (error) {
-    // Never leave the temp file behind: it holds an encrypted copy of the
-    // account and nothing would ever collect it. The original code and message
-    // are kept so the failure still classifies as a file-system error.
+    // Never leave the temp file behind: it holds an encrypted copy of the account and nothing
+    // would collect it. The original code and message are kept so it still classifies as fs-error.
     await fs.rm(temporary, { force: true }).catch(() => {});
     throw new Error(`Unable to write "${path.basename(file)}": ${error.message}`, { cause: error });
   }
@@ -181,10 +176,9 @@ export async function deleteAccount(label) {
   await writeIndex(index.filter((account) => account.id !== id));
 }
 
-// Renaming migrates the account id (sha256 of the label) everywhere it is
-// referenced: the encrypted blob filename, the index entry, and — when the
-// renamed account is the live one — the VamAccountId marker the switcher
-// wrote into the Riot Client root.
+// Renaming migrates the account id (sha256 of the label) everywhere it is referenced: the
+// encrypted blob filename, the index entry, and — when the renamed account is the live one —
+// the VamAccountId marker the switcher wrote into the Riot Client root.
 export async function renameAccount(oldLabel, newLabel) {
   const from = normaliseLabel(oldLabel);
   const to = normaliseLabel(newLabel);

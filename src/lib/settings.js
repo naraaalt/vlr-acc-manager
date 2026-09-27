@@ -1,29 +1,17 @@
 // Single source of truth for every persisted user preference.
 //
-// A REGISTRY, not a pile of getters: SettingsPanel renders itself from SETTINGS, so
-// adding a preference later is one entry here and zero UI code.
+// A REGISTRY, not a pile of getters: SettingsPanel renders itself from SETTINGS, so a new preference
+// is one entry here and zero UI code.
 //
-// THE REGISTRY IS THE SCHEMA, NOT THE PANEL'S ROW LIST. Two consequences worth knowing
-// before editing it:
-//   - Removing an entry does not just hide a row. setSetting() looks the id up here and
-//     throws 'Unknown setting' when it is gone, and read()/DEFAULTS are built from this
-//     list, so a value whose entry disappears stops persisting — [H] would toggle nothing,
-//     silently. Settings that live in the panel are the exception, because nothing else
-//     reads them.
-//   - An entry with `panel: false` stays fully persisted and sanitised, and simply is not
-//     rendered. That is for preferences that already have a home elsewhere (a keybind, an
-//     in-context control): the panel holds only what has NO other surface, so nothing is
-//     offered twice.
+// THE REGISTRY IS THE SCHEMA, NOT THE PANEL'S ROW LIST: removing an entry does not just hide a row —
+// setSetting() throws 'Unknown setting' for an id that is gone, and read()/DEFAULTS are built from
+// this list, so the value stops persisting, silently. A `panel: false` entry stays persisted and
+// sanitised, just not rendered; it has a home elsewhere (a keybind, an in-context control).
 //
-// One storage key ('vlr.settings'). Preferences that used to live in their own keys are
-// migrated once, on first load, so nobody loses a choice they already made. uiPrefs.js
-// and audioPrefs.js are thin adapters over this store — they must NOT keep writing their
-// own keys, or two writers will drift apart.
-//
-// STORAGE IS THE ONLY SOURCE OF TRUTH — there is deliberately no in-memory cache.
-// A cache drifts the moment anything writes the blob out of band, and it leaks state
-// between tests that share one module instance. Reads parse a small JSON object, and the
-// call sites are initialisers, effects and event handlers, not render loops.
+// One storage key ('vlr.settings'); older per-feature keys migrate once on first load, and uiPrefs.js
+// and audioPrefs.js must NOT keep writing their own keys. STORAGE IS THE ONLY SOURCE OF TRUTH — no
+// cache, which would drift when anything writes the blob out of band and leak state between tests
+// sharing one module instance.
 
 import { SORT_MODES, SORT_LABELS } from './accountOrder.js';
 
@@ -46,8 +34,7 @@ export const SETTINGS = [
     kind: 'choice',
     default: 'active',
     options: SORT_MODES.map((mode) => ({ value: mode, label: SORT_LABELS[mode] })),
-    // Panel-excluded: the [O] key and the sidebar sort button already own it, and two UI
-    // controls for one value is one too many.
+    // Panel-excluded: the [O] key and the sidebar sort button already own it; two controls for one value.
     panel: false
   },
   {
@@ -66,8 +53,7 @@ export const SETTINGS = [
     kind: 'range',
     default: 70, min: 0, max: 100, step: 5,
     format: (value) => `${value}%`,
-    // Panel-excluded: the showcase overlay has its own volume slider, and that is the better
-    // place to set it — while you are listening to it.
+    // Panel-excluded: the showcase overlay's own slider is the better place — you set it while listening.
     panel: false
   },
   {
@@ -89,8 +75,7 @@ export const SETTINGS = [
     label: 'NIGHT MARKET NOTICE',
     hint: 'One Windows notification when a Night Market opens for a saved account.',
     kind: 'toggle',
-    // Default ON, sama seperti STORE ROTATION NOTICE: jendela Night Market hanya terbuka ~2 minggu
-    // sekali per act, jadi justru inilah hal yang paling tidak boleh terlewat.
+    // Default ON like STORE ROTATION NOTICE: this window only opens ~once every 2 weeks per act.
     default: true
   },
   {
@@ -112,7 +97,7 @@ export const SETTINGS = [
     label: 'CHECK UPDATES ON LAUNCH',
     hint: 'One small request to GitHub when the app starts. CHECK NOW in the panel footer works either way.',
     kind: 'toggle',
-    // Default ON: fitur ini ada justru supaya tidak perlu ada yang ingat ngecek sendiri.
+    // Default ON: this feature exists precisely so nobody has to remember to check by hand.
     default: true
   }
 ];
@@ -126,20 +111,17 @@ function readStorage() {
 
 function persist(value) {
   try {
-    // Merge over the raw blob rather than replacing it, so store state that is NOT a
-    // setting survives every write. The remembered last account lives in this same blob,
-    // and a wholesale replace would silently forget it the moment any setting changed.
+    // Merge over the raw blob rather than replacing it: the remembered last account lives in this same
+    // blob, and a wholesale replace would silently forget it the moment any setting changed.
     localStorage.setItem(KEY, JSON.stringify({ ...(readStorage() ?? {}), ...value }));
     return true;
   } catch {
-    // Storage unavailable (blocked, private mode). The write does not stick, and the
-    // callers see the defaults — which is the contract uiPrefs.js already had.
+    // Storage unavailable (blocked, private mode): the write does not stick, so callers see the defaults.
     return false;
   }
 }
 
-// Read the legacy per-feature keys, once, because 'vlr.settings' was absent. After that
-// the new key is the only source, so a legacy key can never override a later choice.
+// Read the legacy keys once, because 'vlr.settings' was absent; after that the new key is the only source.
 function legacySeed() {
   const seeded = {};
   try {
@@ -153,26 +135,22 @@ function legacySeed() {
       if (typeof parsed.soundOn === 'boolean') seeded.showcaseSound = parsed.soundOn;
       if (Number.isFinite(Number(parsed.volume))) seeded.showcaseVolume = Number(parsed.volume);
     }
-    // Migration is a MOVE, not a copy. Leaving these behind would resurrect them the first
-    // time resetSettings() removes the new key, so a reset would silently undo itself on
-    // the next launch. The cost of moving: a rollback to the previous build starts from
-    // the defaults.
+    // Migration is a MOVE, not a copy: leftovers would resurrect on the first resetSettings(), which
+    // removes the new key — a reset would silently undo itself (and a rollback starts from the defaults).
     localStorage.removeItem('vlr.ui.previewsHidden');
     localStorage.removeItem('vlr.ui.sortMode');
     localStorage.removeItem('vlr.showcase.audio');
   } catch { /* storage unavailable: defaults are fine */ }
 
-  // Persist what was migrated, immediately. The legacy keys are gone and this module has
-  // no cache, so if the seeded values were only returned they would be consumed by the
-  // import-time read and the very next read would fall back to the defaults.
+  // Persist what was migrated immediately: the legacy keys are gone and there is no cache, so returning
+  // the seeded values alone would leave the next read falling back to the defaults.
   const migrated = sanitise(seeded);
   if (Object.keys(migrated).length) persist({ ...DEFAULTS, ...migrated });
   return seeded;
 }
 
-// Unknown ids are dropped and every value is coerced to its declared shape, so a
-// hand-edited or stale blob can never put a string where a boolean belongs, and a later
-// version's setting is dropped rather than trusted.
+// Unknown ids are dropped and every value is coerced to its declared shape, so a hand-edited or stale
+// blob can never put a string where a boolean belongs, and a later version's setting is dropped.
 function sanitise(input) {
   const output = {};
   if (!input || typeof input !== 'object') return output;
@@ -205,8 +183,7 @@ function announce() {
 export function getSetting(id) { return read()[id]; }
 export function getSettings() { return { ...read() }; }
 
-// Returns the value now IN EFFECT, which is the default when the write could not be
-// persisted — not the value that was attempted.
+// Returns the value now IN EFFECT, not the one attempted: the default when the write could not persist.
 export function setSetting(id, value) {
   const setting = SETTINGS.find((entry) => entry.id === id);
   if (!setting) throw new Error(`Unknown setting: ${id}`);
@@ -230,8 +207,7 @@ export function subscribeSettings(listener) {
   return () => listeners.delete(listener);
 }
 
-// Not a user-facing setting: remembered so 'reopen last account' has a label to reopen.
-// Kept in the same blob so there is still exactly one storage key.
+// Not a user-facing setting: the label 'reopen last account' needs. In the same blob, so still one key.
 export function getLastSelection() {
   const stored = readStorage();
   return typeof stored?.lastSelectedLabel === 'string' ? stored.lastSelectedLabel : null;
@@ -241,14 +217,9 @@ export function setLastSelection(label) {
   persist({ lastSelectedLabel: label });
 }
 
-// Bukan setting yang dilihat user: Night Market mana yang sudah diumumkan, per label akun. Ia
-// menumpang blob yang sama supaya tetap ada tepat satu kunci penyimpanan. Berbeda dari setting, ia
-// tidak pernah disanitasi — nilainya sidik jari yang tidak transparan, bukan pilihan user, dan
-// sanitise() akan membuang kunci yang tidak dikenalnya.
-//
-// Ditulis SEBELUM notice dikirim. persist() menulis lewat localStorage secara sinkron, jadi render
-// ulang yang menjalankan efek pengumuman sekali lagi sudah melihat sidik jarinya dan tetap diam —
-// tanpa itu, satu jendela bisa diumumkan berkali-kali dalam satu sesi.
+// Not a user-facing setting: which Night Market has been announced, per account label. It rides in
+// the same blob so there is still one storage key, and it is never sanitised (the value is a fingerprint).
+// Written BEFORE the notice is sent: persist() is synchronous, so a re-render already sees the fingerprint.
 export function getAnnouncedNightMarkets() {
   const stored = readStorage();
   return stored?.nightMarkets && typeof stored.nightMarkets === 'object' ? stored.nightMarkets : {};

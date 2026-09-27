@@ -1,12 +1,10 @@
-// Dev-only mock of the electron/preload.cjs bridge.
-// main.jsx installs it only when import.meta.env.DEV and window.valorant is
-// absent, so this module is tree-shaken out of production builds.
+// Dev-only mock of the electron/preload.cjs bridge, installed by main.jsx only when
+// import.meta.env.DEV and window.valorant is absent — tree-shaken out of production builds.
 
 const DASHBOARD_DELAY_MS = 0; // raise to e.g. 1500 to inspect the loading skeleton
 
-// Tier: nilai asli dari valorant-api /v1/contenttiers. Kartu tanpa tier (null) adalah keadaan yang
-// nyata — 40 dari 1405 skin Riot tidak punya contentTierUuid — jadi satu offer sengaja dibiarkan
-// tanpa tier: kartunya harus tetap dirender, hanya tanpa warna.
+// Tier: real values from valorant-api /v1/contenttiers. A null tier is a real state (40 of 1405 Riot
+// skins without contentTierUuid), so one offer is deliberately left without a tier to exercise that path.
 const TIERS = {
   ultra: { rank: 4, label: 'Ultra Edition', color: '#FAD663' },
   exclusive: { rank: 3, label: 'Exclusive Edition', color: '#F5955B' },
@@ -33,6 +31,49 @@ const RANKS = [
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Featured bundle, the exact same shape as the main process. Elderflame-shaped: four skins (one
+// WITHOUT showcase so the "no video" path is visible), one melee, three accessories priced 0.
+// Totals are computed from the items, not literal — a literal total stays right even if the page miscounts.
+//
+// Videos use REAL Riot CDN URLs, not relative filenames like 'vandal.mp4': relative
+// files do not exist, so the PREVIEW button opens a player that fails. Two items with video are enough to
+// check the modal path.
+const VANDAL_VIDEO = 'https://valorant.dyn.riotcdn.net/x/videos/release-13.05/7cf0f6c2-af1e-47db-9d85-f1a130267cc7_default_universal.mp4';
+const DAGGER_VIDEO = 'https://valorant.dyn.riotcdn.net/x/videos/release-13.05/97510dc2-457c-4b55-8737-14646b3e05e9_default_universal.mp4';
+const BUNDLE_ITEMS = [
+  { id: 'bundle-vandal', kind: 'skin', name: 'Elderflame Vandal', image: null, video: VANDAL_VIDEO, levels: [{ name: 'Elderflame Vandal', item: null, video: VANDAL_VIDEO, icon: null }, { name: 'Elderflame Vandal Level 2', item: 'EEquippableSkinLevelItem::VFX', video: VANDAL_VIDEO, icon: null }], chromas: [], tier: TIERS.ultra, price: 2475, basePrice: 2475, discountPercent: 0, included: false, quantity: 1 },
+  { id: 'bundle-operator', kind: 'skin', name: 'Elderflame Operator', image: null, video: null, levels: [], chromas: [], tier: TIERS.ultra, price: 2475, basePrice: 2475, discountPercent: 0, included: false, quantity: 1 },
+  { id: 'bundle-judge', kind: 'skin', name: 'Elderflame Judge', image: null, video: null, levels: [], chromas: [], tier: TIERS.ultra, price: 2475, basePrice: 2475, discountPercent: 0, included: false, quantity: 1 },
+  // No levels and no video: the card must print NO SHOWCASE VIDEO and NOT have a PREVIEW
+  // button — a real state (827 of 1405 Riot skins), and the only path not visible
+  // from an accessory card.
+  { id: 'bundle-frenzy', kind: 'skin', name: 'Elderflame Frenzy', image: null, video: null, levels: [], chromas: [], tier: TIERS.ultra, price: 2475, basePrice: 2475, discountPercent: 0, included: false, quantity: 1 },
+  // The melee's edition is DIFFERENT from the bundle's: an item's color always comes from that item's own tier.
+  { id: 'bundle-dagger', kind: 'skin', name: 'Elderflame Dagger', image: null, video: DAGGER_VIDEO, levels: [{ name: 'Elderflame Dagger', item: null, video: DAGGER_VIDEO, icon: null }, { name: 'Elderflame Dagger Level 2', item: 'EEquippableSkinLevelItem::VFX', video: DAGGER_VIDEO, icon: null }], chromas: [], tier: TIERS.exclusive, price: 0, basePrice: 4950, discountPercent: 0, included: true, quantity: 1 },
+  { id: 'bundle-buddy', kind: 'buddy', name: 'Elderflame Buddy', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 475, discountPercent: 0, included: true, quantity: 1 },
+  { id: 'bundle-spray', kind: 'spray', name: 'Elderflame Spray', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 325, discountPercent: 0, included: true, quantity: 1 },
+  { id: 'bundle-card', kind: 'card', name: 'Elderflame Card', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 375, discountPercent: 0, included: true, quantity: 1 }
+];
+
+function bundleFixture() {
+  const items = BUNDLE_ITEMS.map((item) => ({ ...item }));
+  const baseTotal = items.reduce((sum, item) => sum + (item.basePrice ?? 0), 0);
+  const price = items.reduce((sum, item) => sum + (item.price ?? item.basePrice ?? 0), 0);
+  return {
+    id: 'mock-bundle-elderflame',
+    name: 'Elderflame',
+    art: { wide: null, tall: null, logo: null },
+    items,
+    baseTotal,
+    price,
+    discountPercent: baseTotal > 0 && price < baseTotal ? Math.round((1 - price / baseTotal) * 100) : null,
+    // A few days ahead, recomputed every time a store is created — the page never starts out "already ended".
+    endsAt: Date.now() + (4 * 24 * 3600_000) + (6 * 3600_000),
+    endsInSeconds: 4 * 24 * 3600 + 6 * 3600,
+    contentUnavailable: false
+  };
+}
+
 let accounts = [];
 let counter = 0;
 
@@ -41,8 +82,8 @@ function freshStore(accountName) {
     accountName,
     offers: OFFERS.map((offer) => ({ ...offer })),
     expiresIn: 52_337,
-    // Night Market, bentuk yang sama dengan yang datang dari main process. `seen` disebar supaya
-    // tanda OPENED dan urutan di dalam tier kelihatan di dev.
+    // Night Market, the same shape as the main process. `seen` is spread so the OPENED marker and
+    // the order within a tier are visible in dev.
     nightMarket: {
       endsAt: Date.now() + (12 * 24 * 3600_000) + (22 * 3600_000),
       contentUnavailable: false,
@@ -54,6 +95,7 @@ function freshStore(accountName) {
         seen: index > 1
       }))
     },
+    bundle: bundleFixture(),
     profile: null
   };
 }
@@ -72,6 +114,7 @@ function makeReadyAccount(spec) {
       accountName: spec.accountName,
       offers: OFFERS.map((offer) => ({ ...offer })),
       expiresIn: 52_337,
+      bundle: bundleFixture(),
       profile: {
         level: spec.level,
         rank: spec.rank,
@@ -123,8 +166,7 @@ export function installDevMock() {
     // Recorded so the headless harness can assert the rotation notice fired, or that it did
     // NOT: a call that returns true is indistinguishable from one never made.
     notifyStoreReset: async (payload) => { (window.__notifyCalls ??= []).push(payload ?? null); return respond(true); },
-    // Update: dev tidak pernah menyentuh GitHub. `npm run dev` pakai jawaban tetap supaya UI-nya
-    // bisa diperiksa tanpa network, dan supaya tidak ada request pihak ketiga dari dev.
+    // Update: dev never touches GitHub — fixed answers so the UI can be checked without network.
     getAppVersion: async () => '0.1.2-dev',
     checkForUpdates: async () => respond({ available: false, currentVersion: '0.1.2-dev', latestVersion: null, reason: 'no-releases', installer: null, notes: null, publishedAt: null }),
     downloadUpdate: async () => fail('Dev mock: download disabled.'),
@@ -161,12 +203,17 @@ export function installDevMock() {
     switchAccount: async (label) => {
       if (!findAccount(label)) return fail(`No saved account “${label}”.`);
       accounts = accounts.map((account) => ({ ...account, active: account.label === label }));
-      return respond();
+      // Mirrors the real backend's shape: `moved` on both paths, `refreshError` carrying the
+      // store-read failure — a switch whose store could not be read has still moved the session.
+      return respond({ label, store: null, moved: true, refreshError: null });
     },
-    // PLAY, mirroring the real backend: launch only for the account that owns the session,
-    // report not-signed-in otherwise. Recorded the same way as notifyStoreReset, because a
-    // launch is not observable from the renderer — a stub that silently succeeds is
-    // indistinguishable from one never invoked. The mock never starts a game.
+    // PLAY, mirroring the real backend: launch only for the account that owns the session, report
+    // not-signed-in otherwise. Recorded like notifyStoreReset — a launch is not observable from the
+    // renderer, so a stub that silently succeeds is indistinguishable from one never invoked. The
+    // mock never starts a game.
+    //
+    // The switch really moves the session: the renderer re-reads the dashboard after a PLAY that
+    // switched, so a mock reporting only `switched` would hand it the previous account as active.
     playAccount: async (label) => {
       const target = findAccount(label);
       if (!target) return fail(`No saved account “${label}”.`);
@@ -175,6 +222,7 @@ export function installDevMock() {
       (window.__playCalls ??= []).push({ label, active: Boolean(target.active), switched, running });
       if (target.active && running) return respond({ label, launched: false, switched: false, reason: 'already-running' });
       if (running) return respond({ label, launched: false, switched: false, reason: 'close-game-first' });
+      if (switched) accounts = accounts.map((account) => ({ ...account, active: account.label === label }));
       return respond({ label, launched: true, switched, reason: null });
     },
     detectTcno: async () => respond({

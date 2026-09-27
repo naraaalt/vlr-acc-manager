@@ -5,9 +5,9 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { classifyError } from '../lib/errorKind.js';
 
-// accountStore imports electron's app/safeStorage, so the module is exercised
-// against a real throwaway directory with both of them stubbed. state is
-// hoisted because vi.mock's factory runs before the file body.
+// accountStore imports electron's app/safeStorage, so the module is exercised against a real
+// throwaway directory with both of them stubbed. state is hoisted because vi.mock's factory runs
+// before the file body.
 const state = vi.hoisted(() => ({ userData: '' }));
 
 vi.mock('electron', () => ({
@@ -24,8 +24,8 @@ const CREDENTIALS = { version: 1, files: [{ path: 'Data/foo', contents: 'AAAA' }
 let dir;
 let store;
 
-// The stale-temp sweep runs once per process, so every test needs a fresh
-// module graph rather than a shared one.
+// The stale-temp sweep runs once per process, so every test needs a fresh module graph rather
+// than a shared one.
 async function loadStore() {
   vi.resetModules();
   return import('./accountStore.js');
@@ -40,7 +40,6 @@ function renameRefusal(code = 'EPERM') {
   return error;
 }
 
-// Seeds a temp file whose mtime is `ageMs` old.
 function seedTempFile(name, ageMs) {
   mkdirSync(accountsDir(), { recursive: true });
   const file = path.join(accountsDir(), name);
@@ -75,8 +74,8 @@ describe('writeEncrypted rename handling', () => {
 
     await store.saveAccount('main', CREDENTIALS, { accountName: 'main#1' });
 
-    // saveAccount writes the account blob and then the index, so it performs
-    // two renames; the refused one was retried and the save still completed.
+    // saveAccount writes the account blob and then the index, so it performs two renames; the
+    // refused one was retried and the save still completed.
     expect(refusals).toBe(1);
     expect(attempts).toBe(3);
     expect(tempFiles()).toEqual([]);

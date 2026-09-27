@@ -7,7 +7,7 @@ import { checkForUpdates, digestExpectation, digestMatches, downloadInstaller, f
 
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 
-// Body-nya harus ReadableStream asli: service-nya memakai Readable.fromWeb untuk streaming.
+// The body must be a real ReadableStream: the service uses Readable.fromWeb for streaming.
 const streamBody = (text) => new ReadableStream({
   start(controller) { controller.enqueue(new TextEncoder().encode(text)); controller.close(); }
 });
@@ -34,8 +34,8 @@ describe('digest handling', () => {
   it('understands the shape GitHub publishes', () => {
     expect(digestExpectation(`sha256:${'a'.repeat(64)}`)).toBe('a'.repeat(64));
   });
-  // Format yang tidak dikenal diperlakukan sebagai "tidak ada digest", BUKAN sebagai cocok.
-  // Kalau tidak, format aneh bisa lolos sebagai terverifikasi.
+  // An unknown format is treated as "no digest", NOT as a match.
+  // Otherwise a weird format could pass as verified.
   it('refuses to treat an unknown format as a verified digest', () => {
     expect(digestExpectation('md5:abc')).toBeNull();
     expect(digestExpectation('sha256:xyz')).toBeNull();
@@ -107,8 +107,8 @@ describe('downloadInstaller', () => {
     await expect(stat(installerPath(root, info))).rejects.toThrow();
   });
 
-  // App ini memegang sesi Riot. Menjalankan installer 95 MB tanpa checksum lebih buruk daripada
-  // tidak update sama sekali, jadi ketiadaan digest = ditolak.
+  // This app holds a Riot session. Running a 95 MB installer without a checksum is worse than
+  // not updating at all, so a missing digest = refused.
   it('refuses when the release published no checksum at all', async () => {
     await expect(downloadInstaller(installerInfo(null), { root, fetchImpl: vi.fn(async () => binaryResponse('hello')) }))
       .rejects.toThrow(/checksum/i);
@@ -120,7 +120,7 @@ describe('downloadInstaller', () => {
     })).rejects.toThrow(/500/);
   });
 
-  // Nama file datang dari payload GitHub, jadi ia tidak boleh bisa keluar dari folder temp.
+  // The file name comes from the GitHub payload, so it must not be able to escape the temp folder.
   it('ignores directory parts in the asset name', () => {
     expect(installerPath('C:/Temp', { installer: { name: '../../evil.exe' } })).toBe(path.join('C:/Temp', 'sapphire-update', 'evil.exe'));
   });

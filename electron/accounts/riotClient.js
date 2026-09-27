@@ -12,10 +12,9 @@ const exec = promisify(execFile);
 // Riot Client serves its own API over 127.0.0.1 with a self-signed certificate.
 const localAgent = new https.Agent({ rejectUnauthorized: false });
 
-// RiotClientInstalls.json is a plain map of installed products to the client that owns
-// them. It is the only place on the machine that says which patchline Valorant was
-// installed under, so it is read rather than assumed — a PBE install has its own entry.
-// It is also one of the two records that name the client's own location.
+// RiotClientInstalls.json maps installed products to the client that owns them. It is the only
+// place that says which patchline Valorant was installed under (a PBE install has its own entry),
+// and one of the two records naming the client's own location.
 function installsPath() {
   const programData = process.env.ProgramData ?? path.join(process.env.SystemDrive ?? 'C:', 'ProgramData');
   return path.join(programData, 'Riot Games', 'RiotClientInstalls.json');
@@ -30,10 +29,9 @@ async function resolvePatchline() {
   return valorantPatchline(await readInstalls());
 }
 
-// Windows' own record of where the client lives: the handler for the `riotclient://`
-// protocol. Read on top of the install map because that map can be missing or stale — on a
-// machine that has not run an update since the client was moved, this is the only place
-// that still knows, and it is the one Windows itself uses to open the client.
+// Windows' own record of where the client lives: the handler for the `riotclient://` protocol.
+// Read on top of the install map because that map can be missing or stale — on a machine that
+// has not run an update since the client was moved, this is the only place that still knows.
 async function registeredClientPath() {
   try {
     const { stdout } = await exec('reg', ['query', 'HKEY_CLASSES_ROOT\\riotclient\\shell\\open\\command', '/ve']);
@@ -60,10 +58,9 @@ export async function firstExisting(candidates) {
   return null;
 }
 
-// Riot Client is not required to live on the system drive, so its location is discovered
-// rather than assumed, and the failure below says what was looked at. The old code composed
-// C:\Riot Games\Riot Client\RiotClientServices.exe, which made every machine that installed
-// the client elsewhere permanently unusable while reporting the miss as a missing file.
+// Riot Client is not required to live on the system drive, so its location is discovered rather
+// than assumed. The old code composed C:\Riot Games\Riot Client\RiotClientServices.exe, which made
+// every machine that installed the client elsewhere unusable, reported as a missing file.
 async function resolveClientExecutable() {
   const candidates = await clientExecutableCandidates();
   const found = await firstExisting(candidates);
@@ -82,19 +79,12 @@ export async function launchRiotClient() {
   await spawnClient([]);
 }
 
-// Starts Valorant by asking the RUNNING client, over the local API its own Play button
-// uses. This is deliberate and load-bearing — see launchRequestPath in play.js for why
-// passing the launcher `--launch-product` does not work: that path is an app command
-// gated behind Riot's direct-launch opt-in, which is disabled on this build, and the
-// attempt it makes loses a process-singleton race and exits without starting anything.
-//
-// The lockfile carries the port and the password for this session, so the request is
-// authorised with the same basic-auth scheme the client's other local endpoints use.
-// Nothing here is hardcoded about the game's install location: the route names the
-// product and patchline and the client resolves the rest.
-//
-// Not exported: one request is not a launch. Callers want launchValorantWhenReady, which
-// keeps asking until the game is actually up.
+// Starts Valorant by asking the RUNNING client, over the local API its own Play button uses.
+// Deliberate and load-bearing — see launchRequestPath in play.js for why passing the launcher
+// `--launch-product` does not work: that is an app command gated behind Riot's direct-launch
+// opt-in (disabled on this build) and it loses a process-singleton race. The lockfile carries the
+// port and password for basic auth, and nothing here hardcodes the install location.
+// Not exported: one request is not a launch — callers want launchValorantWhenReady.
 async function launchValorant() {
   const lockfile = await readLockfile();
   const requestPath = launchRequestPath({ patchline: await resolvePatchline() });
@@ -138,14 +128,11 @@ async function waitForValorantProcess(timeoutMs) {
   }
 }
 
-// Ask the client for a launch and keep asking until the game is actually running.
-//
-// One request is not enough, and this wrapper exists for exactly that: the client accepts a
-// launch request and then drops it while its own lifecycle is still settling — region
-// election, EULA, client config, Vanguard health check — which is precisely the window just
-// after a switch. A single request that returns 200 and produces nothing is the failure this
-// is written to stop reporting as a success, so the verdict here is the game PROCESS, never
-// the response code.
+// Ask the client for a launch and keep asking until the game is actually running. One request is
+// not enough: the client accepts a launch and then drops it while its own lifecycle is still
+// settling (region election, EULA, client config, Vanguard check) — exactly the window just after
+// a switch. The verdict here is the game PROCESS, never the response code, because a 200 that
+// produces nothing is the failure this exists to stop reporting as a success.
 export async function launchValorantWhenReady({
   delays = LAUNCH_RETRY_DELAYS,
   appearTimeout = LAUNCH_APPEAR_TIMEOUT
@@ -163,8 +150,8 @@ export async function launchValorantWhenReady({
     : 'Riot Client accepted the launch request but Valorant never started. Try PLAY again, or press Play in the Riot Client.');
 }
 
-// Whether the game is open right now. Used to refuse a second launch rather than to
-// detect anything about the account.
+// Whether the game is open right now — used to refuse a second launch, not to detect anything
+// about the account.
 export async function isValorantRunning() {
   try {
     const { stdout } = await exec('tasklist', ['/FI', 'IMAGENAME eq VALORANT.exe', '/NH']);

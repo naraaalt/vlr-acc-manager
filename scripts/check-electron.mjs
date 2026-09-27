@@ -1,7 +1,6 @@
-// Syntax-checks every Electron main-process file. Replaces the hand-maintained
-// `node --check a.js && node --check b.js` chain in package.json, which silently
-// stops covering new files (electron/lib/errorKind.js was never checked).
-// Portable across cmd/PowerShell/bash because it walks the tree in Node.
+// Syntax-checks every Electron main-process file, replacing the hand-maintained
+// `node --check` chain in package.json that silently missed new files
+// (electron/lib/errorKind.js). Node-side walk keeps cmd/PowerShell/bash portable.
 import { readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

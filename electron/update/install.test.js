@@ -1,12 +1,13 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { Script } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { buildHelperSource, buildInstallerArgs, helperPath, writeHelper } from './install.js';
 
 describe('buildInstallerArgs', () => {
-  // NSIS: /D= harus parameter TERAKHIR dan tidak boleh dikutip, walaupun path-nya ada spasi.
-  // spawn() dengan array argumen tidak lewat shell, jadi tidak ada yang perlu di-escape.
+  // NSIS: /D= must be the LAST parameter and must not be quoted, even when the path has spaces.
+  // spawn() with an argument array does not go through a shell, so nothing needs escaping.
   it('puts /D last', () => {
     expect(buildInstallerArgs('C:/Apps/Sapphire')).toEqual(['/S', '/D=C:/Apps/Sapphire']);
   });
@@ -32,44 +33,52 @@ describe('buildHelperSource', () => {
     expect(source).toContain('detached: true');
   });
   it('relaunches the app WITHOUT the flag that would turn it into a bare Node process', () => {
-    // Helper dijalankan dengan ELECTRON_RUN_AS_NODE=1, dan spawn() mewariskan environment —
-    // jadi tanpa membersihkannya, Sapphire yang dijalankan ulang bangun sebagai Node tanpa
-    // script: keluar seketika, tanpa jendela. Versi pertama dari tes ini hanya memeriksa
-    // 'detached: true' dan lolos, karena masalahnya ada di environment, bukan di cara spawn.
+    // The helper runs with ELECTRON_RUN_AS_NODE=1, and spawn() inherits the environment —
+    // so without clearing it, the relaunched Sapphire boots as Node without a
+    // script: exits instantly, no window. The first version of this test only checked
+    // 'detached: true' and passed, because the problem is in the environment, not in how it spawns.
     expect(source).toContain('delete cleanEnv.ELECTRON_RUN_AS_NODE');
     expect(source).toMatch(/spawn\(exePath, \[\], \{[^}]*env: cleanEnv/);
   });
   it('supports a dry run so the mechanism can be verified without an update', () => {
-    // Dry run = lewati installer tapi tetap tinggalkan jejak. Itu yang membuat T3.5 bisa
-    // membuktikan mekanismenya TANPA benar-benar mengupdate app.
+    // Dry run = skip the installer but still leave a trace. That is what lets T3.5
+    // prove the mechanism WITHOUT actually updating the app.
     expect(source).toContain("dryRun === 'true'");
     expect(source).toContain('dry-run-marker.txt');
     expect(source).toContain('not running the installer');
   });
   it('deletes the installer after a SUCCESSFUL install, and only then', () => {
-    // 100 MB per versi pernah tinggal di temp selamanya. Bersyarat pada exit code: setelah install
-    // GAGAL, file itu justru satu-satunya jalan mencoba lagi tanpa mengunduh ulang.
+    // 100 MB per version used to sit in temp forever. Conditional on the exit code: after a FAILED
+    // install, that file is the only way to retry without re-downloading.
     expect(source).toContain('exitCode === 0');
     expect(source).toContain('fs.rmSync(installer, { force: true })');
-    // Urutannya yang penting: penjaga harus lebih dulu, karena rmSync tanpa syarat akan menghapus
-    // jalan retry-nya. Dua assertion di atas lolos untuk kode yang salah urutan; yang ini tidak.
+    // The order is what matters: the guard must come first, because an unconditional rmSync would delete
+    // the retry path. The two assertions above pass for misordered code; this one does not.
     expect(source.indexOf('exitCode === 0')).toBeLessThan(source.indexOf('fs.rmSync(installer'));
   });
   it('writes a log, because stdio is ignored and a silent failure is undiagnosable', () => {
     expect(source).toContain('update.log');
   });
-  // Helper dijalankan sebagai Node biasa, jadi tidak boleh ada sintaks yang cuma ada di Electron.
+  // The helper runs as plain Node, so it must not contain syntax that only exists in Electron.
   it('uses only node builtins', () => {
     expect(source).toContain("require('node:child_process')");
     expect(source).not.toContain('require(\'electron\')');
   });
+  it('is parseable JavaScript, because a broken helper fails silently', () => {
+    // Every assertion above is a substring check, and all of them pass for a helper that cannot be
+    // parsed — the source is one big template literal, so a stray backtick or `${` inside a comment
+    // there corrupts the generated program while leaving the markers intact. That failure is the
+    // worst kind: the helper is spawned with ELECTRON_RUN_AS_NODE and stdio ignored, so it dies with
+    // no message after Sapphire has already quit — "the app closed and never came back".
+    expect(() => new Script(source)).not.toThrow();
+  });
 });
 
-// Ditemukan dari UPDATE SUNGGUHAN, bukan dari unit test: runUpdateHelper MEN-spawn path helper,
-// dan tidak ada apa pun yang menulis file itu. Electron dijalankan sebagai Node dengan path yang
-// tidak ada akan keluar seketika TANPA pesan, karena stdio-nya sengaja diabaikan — jadi gejalanya
-// "app menutup, versi tidak berubah, tidak ada log". Tes teks di atas tidak bisa menangkapnya, dan
-// proof dry-run juga tidak, karena proof itu MENULIS sendiri file helper-nya.
+// Found from a REAL UPDATE, not from a unit test: runUpdateHelper SPAWNS the helper path,
+// and nothing writes that file. Electron run as Node with a path that
+// does not exist exits instantly WITHOUT a message, because stdio is deliberately ignored — so the symptom
+// is "app closes, version does not change, no log". The text tests above cannot catch it, and
+// the dry-run proof cannot either, because that proof WRITES the helper file itself.
 describe('writeHelper', () => {
   it('writes the generated helper to disk, because nothing else does', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'sapphire-helper-test-'));

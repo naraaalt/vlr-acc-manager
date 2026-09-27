@@ -1,5 +1,4 @@
 // Brand mark + in-app line icons, all inline SVG (no asset files needed).
-// The mark reads its accent from the --brand theme token.
 
 export function BrandMark({ size = 18 }) {
   return (
@@ -20,6 +19,7 @@ const PATHS = {
   import: <><path d="M7 1.8v6.4M4.4 6l2.6 2.6L9.6 6" /><path d="M1.8 12.2h10.4" /></>,
   clock: <><circle cx="7" cy="7" r="5.4" /><path d="M7 3.9V7l2.2 1.4" /></>,
   cart: <><path d="M1.4 1.8h1.8l1.5 6.4h6.1l1.3-4.3H3.6" /><circle cx="5.6" cy="11.4" r="1" /><circle cx="10" cy="11.4" r="1" /></>,
+  box: <><path d="M7 1.6 12.4 4.6v5L7 12.4 1.6 9.6v-5Z" /><path d="M1.6 4.6 7 7.6l5.4-3" /><path d="M7 7.6v4.8" /></>,
   trash: <><path d="M2.5 3.8h9M5.5 3.8V2.2h3v1.6M3.5 3.8l.6 8.4h5.8l.6-8.4" /><path d="M5.6 6v4M8.4 6v4" /></>,
   back: <><path d="M8.5 2.5 4 7l4.5 4.5" /><path d="M4 7h8.5" /></>,
   close: <><path d="M3 3l8 8M11 3l-8 8" /></>,

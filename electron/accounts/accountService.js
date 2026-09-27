@@ -1,7 +1,7 @@
 import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, saveAccount, updateAccountSession } from './accountStore.js';
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
-import { fetchAccountProfile, fetchStorefront, getDailyOffers, nightMarketWindow } from '../riot/store.js';
-import { resolveDailyOffersOrFallback, resolveNightMarketOrFallback } from '../riot/contentCache.js';
+import { fetchAccountProfile, fetchStorefront, getDailyOffers, getFeaturedBundle, nightMarketWindow } from '../riot/store.js';
+import { resolveDailyOffersOrFallback, resolveFeaturedBundleOrFallback, resolveNightMarketOrFallback } from '../riot/contentCache.js';
 import { fail, classifyError } from '../lib/errorKind.js';
 
 function expiry(accessToken) {
@@ -9,26 +9,24 @@ function expiry(accessToken) {
 }
 async function resolvedStore(session) {
   const [storefront, profile] = await Promise.all([fetchStorefront(session), fetchAccountProfile(session)]);
-  // Riot's storefront is the authoritative part: the offers and their prices come
-  // from Riot itself. Names, images and showcase videos come from a third-party
-  // content service, so losing that service degrades the labels on a store Riot
-  // served perfectly well — it must not turn the account into an error.
+  // Riot's storefront is authoritative (offers and prices come from Riot); names, images and
+  // videos come from a third-party service, so losing it degrades the labels on a store Riot
+  // served fine — it must not turn the account into an error.
   const { offers, contentUnavailable } = await resolveDailyOffersOrFallback(getDailyOffers(storefront));
   return {
     accountName: session.accountName ?? null,
     offers,
     contentUnavailable,
     nightMarket: await resolvedNightMarket(storefront),
+    bundle: await resolvedFeaturedBundle(storefront),
     expiresIn: storefront?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds ?? null,
     profile
   };
 }
 
-// Night Market tidak ada sepanjang sebagian besar tahun, jadi ini jauh lebih sering mengembalikan
-// null daripada tidak — dan renderer memperlakukan null sebagai "tidak ada market", bukan sebagai
-// kegagalan. Sengaja diselesaikan SETELAH daily store: storefront yang tidak bisa menghasilkan offer
-// harian harus tetap menggagalkan akun ini seperti sebelumnya, bukan tertutupi oleh sebuah event yang
-// kebetulan sedang berjalan.
+// Night Market is missing for most of the year — far more often null than not, and the renderer
+// treats it as "no market" rather than a failure. Deliberately resolved AFTER the daily store:
+// a storefront that fails still fails this account, rather than being masked by a running event.
 async function resolvedNightMarket(storefront) {
   const market = nightMarketWindow(storefront);
   if (!market) return null;
@@ -36,16 +34,24 @@ async function resolvedNightMarket(storefront) {
   return { offers, contentUnavailable, endsAt: market.endsAt };
 }
 
-// PUUID of the Riot Client session that is signed in right now, or null while
-// the client sits at its sign-in screen (or is not running).
+// Featured bundle: like Night Market it is absent more often than present, and null means
+// "no bundle", not a failure. Resolved after the daily offers and outside their fallback
+// path, because a bundle that cannot be labelled must not touch the store.
+async function resolvedFeaturedBundle(storefront) {
+  const parsed = getFeaturedBundle(storefront);
+  if (!parsed) return null;
+  const { bundle, contentUnavailable } = await resolveFeaturedBundleOrFallback(parsed);
+  return { ...bundle, contentUnavailable };
+}
+
+// PUUID of the Riot Client session signed in right now, or null while it sits at sign-in.
 async function readLivePuuid() {
   try { return (await getSessionTokens()).puuid; } catch { return null; }
 }
 
-// Which saved account the live Riot Client session belongs to. The live
-// session's PUUID is authoritative: VamAccountId.instance is only written by
-// this app's own switcher, so it never marks an account signed in through Riot
-// Client directly. The marker is the fallback while no session is readable.
+// Which saved account the live session belongs to. The live PUUID is authoritative:
+// VamAccountId.instance is only written by this app's switcher, so it never marks an account
+// signed in through Riot Client directly; the marker is the fallback while no session is readable.
 function isLiveAccount(storedPuuid, id, livePuuid, activeId) {
   return livePuuid !== null ? storedPuuid === livePuuid : id === activeId;
 }
@@ -112,9 +118,8 @@ async function getSavedAccountStore(label) {
   return store;
 }
 
-// Which signed-in account a record belongs to, resolved the same way the
-// dashboard resolves it. Imported by the switcher so "is this account the live
-// one?" has exactly one answer in the codebase.
+// Which signed-in account a record belongs to, resolved the same way the dashboard resolves it.
+// Imported by the switcher so "is this account the live one?" has exactly one answer in the codebase.
 export async function isAccountLive(account) {
   const storedPuuid = account.puuid ?? account.apiSession?.puuid ?? null;
   return isLiveAccount(storedPuuid, account.id, await readLivePuuid(), await getActiveAccountId());
@@ -142,10 +147,9 @@ export async function getDashboard(onProgress = null) {
   const owners = new Map();
   const kindOf = (error) => (error?.kind ?? classifyError(error?.message));
 
-  // Fetch stores one account at a time. Riot rate-limits bursts; N accounts ×
-  // 2 requests in parallel is exactly the pattern that earns 429s. Each
-  // resolved account is handed to onProgress so the renderer paints it
-  // immediately instead of waiting for the whole batch.
+  // Fetch stores one account at a time. Riot rate-limits bursts; N accounts × 2 requests in
+  // parallel is exactly the pattern that earns 429s. Each resolved account is handed to
+  // onProgress so the renderer paints it immediately instead of waiting for the whole batch.
   const loadOne = async ({ account, storedPuuid, loadError }) => {
     const active = isLiveAccount(storedPuuid, account.id, livePuuid, activeId);
     if (loadError) return { ...account, active, status: 'error', error: loadError.message, errorKind: kindOf(loadError) };
@@ -157,22 +161,19 @@ export async function getDashboard(onProgress = null) {
     catch (error) { return { ...account, active, status: 'error', error: error.message, errorKind: kindOf(error) }; }
   };
 
-  // The header pill and the per-account ONLINE badge answer different
-  // questions, so both travel in the payload: `session.live` is true whenever
-  // a Riot Client session is readable, even with no saved account at all.
+  // The header pill and the per-account ONLINE badge answer different questions, so both travel
+  // in the payload: `session.live` is true whenever a Riot Client session is readable, even with
+  // no saved account at all.
   const dashboard = (loaded) => ({ accounts: loaded, session: { live: livePuuid !== null } });
 
-  // No saved accounts yet: return an empty list. Falling through to the
-  // stagger path would yield a one-element array holding undefined, which
-  // crashes the renderer on its first account read (blank window).
+  // No saved accounts yet: return an empty list. Falling through to the stagger path would yield
+  // a one-element array holding undefined, which crashes the renderer (blank window).
   if (hydrated.length === 0) return dashboard([]);
   if (hydrated.length === 1) {
-    // Single account: nothing to stagger.
     return dashboard(await Promise.all(hydrated.map(loadOne)));
   }
   const results = new Array(hydrated.length);
-  // Fixed 350ms stagger + sequential start (each store fetch itself takes
-  // 300-900ms, so this yields a comfortable gap between request pairs).
+  // Fixed 350ms stagger + sequential start (each store fetch itself takes 300-900ms).
   let chain = Promise.resolve();
   hydrated.forEach((entry, index) => {
     chain = chain

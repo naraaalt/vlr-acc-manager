@@ -1,6 +1,6 @@
-// One-off generator: writes build/icon.ico (multi-size) + build/icon.png
-// from the Sapphire gem geometry used in src/components/Icons.jsx.
-// Run: node scripts/make-icon.mjs   (zero deps — hand-rolled PNG/ICO encoders)
+// One-off generator: writes build/icon.ico (multi-size) + build/icon.png from the
+// Sapphire gem geometry in src/components/Icons.jsx (zero deps — hand-rolled
+// PNG/ICO encoders). Run: node scripts/make-icon.mjs
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import path from 'node:path';
@@ -15,7 +15,7 @@ const DEEP = [15, 82, 186];     // #0F52BA sapphire deep
 
 // Render the gem: hexagon outline + inner facets, with 2x supersampling.
 function renderGem(size) {
-  const ss = 2; // supersample factor
+  const ss = 2;
   const W = size * ss;
   const buf = Buffer.alloc(W * W * 4, 0);
 
@@ -49,11 +49,10 @@ function renderGem(size) {
       const px = x + 0.5, py = y + 0.5;
       const inHex = inPoly(px, py, hex);
       const inInner = inPoly(px, py, inner);
-      // distance to hexagon edge ≈: on hex but not deep inside inner → stroke zone
+      // distance to nearest hexagon edge, for the anti-aliased stroke below
       let color = null, alpha = 0;
 
       if (inHex) {
-        // find min distance to hex edges for anti-aliased stroke
         let d = Infinity;
         for (let i = 0, j = hex.length - 1; i < hex.length; j = i++) {
           const [x1, y1] = hex[j], [x2, y2] = hex[i];
@@ -62,9 +61,8 @@ function renderGem(size) {
           const ex = x1 + t * dx, ey = y1 + t * dy;
           d = Math.min(d, Math.hypot(px - ex, py - ey));
         }
-        // Gem facet layout (mirrors GemShape in Icons.jsx):
-        //   inner hexagon = deep sapphire, except its top-right wedge bright
-        //   outer ring = bright sapphire body
+        // Facet layout (mirrors GemShape in Icons.jsx): inner hexagon = deep
+        // sapphire except its top-right wedge; outer ring = bright sapphire body.
         const upperFacet = py < cy + (r - (cy - inner[0][1])) * 0.9;
         if (inInner) {
           color = upperFacet ? DEEP : BRAND;
@@ -103,7 +101,7 @@ function renderGem(size) {
   return out;
 }
 
-// PNG writer (uncompressed deflate blocks + CRC32)
+// PNG writer (deflate + CRC32)
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -165,7 +163,6 @@ function toICO(pngs) {
 const sizes = [16, 24, 32, 48, 64, 128, 256];
 const pngs = sizes.map((size) => ({ size, png: toPNG(renderGem(size), size) }));
 
-// icon.ico (multi-size)
 writeFileSync(path.join(outDir, 'icon.ico'), toICO(pngs));
 // icon.png (256px, for electron-builder + BrowserWindow icon fallback)
 const p256 = pngs.find((p) => p.size === 256);

@@ -65,8 +65,8 @@ export function registerIpcHandlers() {
     force: Boolean(options?.force)
   })));
 
-  // Hasil unduhan disimpan di SINI, bukan dikirim balik ke renderer untuk dipakai lagi:
-  // renderer tidak boleh menyebut path yang akan dieksekusi.
+  // The download result is kept HERE, not sent back to the renderer to be reused:
+  // the renderer must not name a path that will be executed.
   let verified = null;
 
   ipcMain.handle('update:download', (event, { info } = {}) => result(async () => {
@@ -94,11 +94,11 @@ export function registerIpcHandlers() {
       pid: process.pid,
       electronPath: process.execPath
     });
-    // Helper sudah detached dan menunggu PID ini hilang; keluar supaya installer bisa menimpa
-    // Sapphire.exe. Delay-nya bukan sekadar "supaya balasan IPC sempat sampai": renderer yang
-    // menampilkannya sebagai INSTALLING… plus toast, dan pada 400ms keduanya lewat sebelum
-    // terbaca — app yang menutup seketika setelah user menekan UPDATE tidak bisa dibedakan dari
-    // app yang crash. Helper sendiri menunggu sampai 60 detik, jadi jeda ini gratis.
+    // The helper is already detached and waiting for this PID to disappear; exit so the installer can overwrite
+    // Sapphire.exe. The delay is not merely "so the IPC reply has time to arrive": the renderer shows
+    // it as INSTALLING… plus a toast, and at 400ms both pass by before they can be
+    // read — an app that closes the instant after the user presses UPDATE cannot be told apart from
+    // an app that crashed. The helper itself waits up to 60 seconds, so this pause is free.
     setTimeout(() => app.quit(), 2500);
     return { helperPid };
   }));

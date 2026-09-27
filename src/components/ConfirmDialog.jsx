@@ -3,9 +3,8 @@ import { Icon } from './Icons.jsx';
 
 const ConfirmContext = createContext(null);
 
-// Promise-based confirm dialog styled like the app (replaces window.confirm,
-// which renders a native Windows dialog that clashes with the TUI skin).
-// Usage: const ok = await confirm({ title, body, confirmLabel, tone });
+// Promise-based confirm dialog replacing window.confirm, whose native Windows dialog
+// clashes with the TUI skin.
 export function ConfirmProvider({ children }) {
   const [dialog, setDialog] = useState(null);
   const resolverRef = useRef(null);
@@ -43,10 +42,9 @@ export function ConfirmProvider({ children }) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [dialog, settle]);
 
-  // `pending` is what lets the app's keymap stay out of the way while a dialog is up. The
-  // dialog's own listener is in the CAPTURE phase but only calls preventDefault, so keys it
-  // does not handle still reach the keymap behind it (H toggled skin previews, Q raised the
-  // quit prompt).
+  // `pending` keeps the app's keymap out of the way while a dialog is up. The listener below is in
+  // the CAPTURE phase but only calls preventDefault, so keys it does not handle (H, Q) still reach
+  // the keymap behind it.
   const value = useMemo(() => ({ confirm, pending: Boolean(dialog) }), [confirm, dialog]);
 
   return (

@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { LAUNCH_RETRY_DELAYS, launchRequestPath, planPlay, valorantPatchline } from './play.js';
 
-// Everything here is pure text/decision work: which request starts the game, which
-// patchline this machine actually has installed, and what a PLAY press means for one
-// account. None of it can be checked by pressing the button, because an accepted request
-// says nothing about whether a game window appears.
+// Pure text/decision work: which request starts the game, which patchline is installed, and what a
+// PLAY press means. An accepted request says nothing about whether a game window appears.
 
 describe('valorantPatchline', () => {
   const installed = (dir) => ({ associated_client: { [dir]: 'C:/Riot Games/Riot Client/RiotClientServices.exe' } });
@@ -30,9 +28,8 @@ describe('valorantPatchline', () => {
   });
 
   it('is not fooled by a directory that merely contains the word', () => {
-    // Segment matching, not substring matching: 'VALORANT-BACKUP' is not the
-    // Valorant product directory, so its sibling folder must not be read as a
-    // patchline.
+    // Segment matching, not substring: 'VALORANT-BACKUP' is not the Valorant product
+    // directory, so its sibling folder must not be read as a patchline.
     expect(valorantPatchline(installed('E:/VALORANT-BACKUP/banana/'))).toBe('live');
   });
 
@@ -63,8 +60,7 @@ describe('launchRequestPath', () => {
   });
 
   it('refuses to let a patchline climb out of its path segment', () => {
-    // This value comes from a file on disk and lands in a URL path, so a malformed one
-    // must not be able to address a different route.
+    // A malformed patchline from disk must not be able to address a different route.
     const path = launchRequestPath({ patchline: 'live/../../admin' });
     expect(path).toBe('/product-launcher/v1/products/valorant/patchlines/liveadmin');
     expect(path).not.toContain('..');
@@ -91,24 +87,23 @@ describe('planPlay', () => {
   });
 
   it('switches first when another account owns the session', () => {
-    // The client only acts on a launch request while it is signed in, so a press on any
-    // other row has to make it signed in first. PLAY stays ONE press: switch, wait for the
-    // session to settle, then launch. Refusing here is what made the control useless — on
-    // the machine this was built for, every saved account sat in exactly this state.
+    // The client only acts on a launch request while it is signed in, so a press on any other row
+    // must sign in first. PLAY stays ONE press: switch, wait, launch. Refusing here is what made the
+    // control useless — every saved account sat in exactly this state.
     expect(planPlay({ isActive: false, valorantRunning: false })).toBe('switch-then-launch');
   });
 
   it('refuses rather than closing a game that is open under another account', () => {
-    // A switch closes every Riot process, the running game included. Mid-match that is a
-    // killed game, so a press on another row must not do it: refuse and let the user decide.
+    // A switch closes every Riot process, the running game included. Mid-match that is a killed
+    // game, so a press on another row must refuse and let the user decide.
     expect(planPlay({ isActive: false, valorantRunning: true })).toBe('close-game-first');
   });
 });
 
 describe('LAUNCH_RETRY_DELAYS', () => {
   it('asks straight away rather than waiting first', () => {
-    // Riot Client is usually settled by the time a press lands, and making it wait would
-    // add seconds to every launch that was going to work anyway.
+    // Riot Client is usually settled by the time a press lands, and making it wait would add
+    // seconds to every launch that was going to work anyway.
     expect(LAUNCH_RETRY_DELAYS[0]).toBe(0);
   });
 

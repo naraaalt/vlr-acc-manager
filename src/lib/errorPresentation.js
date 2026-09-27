@@ -1,24 +1,15 @@
-// Renderer-side error presentation config, keyed by the `errorKind` field the
-// electron layer attaches to failures. The classifier itself lives in
-// electron/lib/errorKind.js and is imported here rather than duplicated — two
-// copies of the same regex table drift apart silently.
+// Renderer-side error presentation config, keyed by the `errorKind` the electron layer attaches to
+// failures. The classifier lives in electron/lib/errorKind.js — a duplicate regex table would drift.
 import { classifyError } from '../../electron/lib/errorKind.js';
 
 export { classifyError };
 
-// Copy + primary action per kind. `action` values are handled by the caller
-// (App.jsx maps them to real handlers).
-//
-// `launchable` answers a different question from `action`: may the PLAY control be
-// offered for an account in this state? It is NOT "did the store load". An expired
-// API token says nothing about the saved Riot Client credentials a switch writes —
-// those are a separate store, still on disk, which is why this kind's own recovery
-// copy is "switching restarts the Riot Client with this account". Hiding PLAY there
-// contradicts the guidance the panel right next to it gives, and on a real machine
-// every account sat in exactly that state, so the control rendered nowhere.
-//
-// An entry is unlaunchable when it is unusable AS AN ENTRY: one that points at
-// another entry's account, or one whose files could not be read at all.
+// Copy + primary action per kind; `action` values are handled by the caller (App.jsx maps them to real
+// handlers). `launchable` answers a different question: may PLAY be offered for an account in this
+// state? It is NOT "did the store load" — an expired API token says nothing about the saved Riot Client
+// credentials a switch writes, which are a separate store still on disk, so hiding PLAY there would
+// contradict the panel's own "switching restarts the Riot Client" copy. An entry is unlaunchable only
+// when it is unusable AS AN ENTRY: another entry's account, or unreadable files.
 const ERROR_PRESENTATION = {
   expired: {
     title: 'SESSION EXPIRED',
@@ -34,9 +25,8 @@ const ERROR_PRESENTATION = {
     action: 'refresh-all',
     actionLabel: 'RETRY',
     hint: 'Install Riot Client, or start it once so Windows records its location, then retry.',
-    // Launchable, despite reading like a dead end. The failure is the MACHINE's, not this
-    // entry's, and muting every row for it is the mistake this table already made once: a
-    // per-kind rule that hid PLAY on every account the user actually had.
+    // Launchable despite reading like a dead end: the failure is the MACHINE's, not this entry's,
+    // and muting every row for it is the mistake this table already made once.
     launchable: true
   },
   'fs-error': {
@@ -86,9 +76,8 @@ export function presentError(error, errorKind) {
   return { kind, ...ERROR_PRESENTATION[kind] };
 }
 
-// May PLAY be offered for an account in this state? No kind at all means the account
-// loaded cleanly. A kind the table does not know is treated as unlaunchable — an
-// unrecognised failure is not evidence the entry is usable.
+// May PLAY be offered for an account in this state? No kind means it loaded cleanly; a kind the table
+// does not know is unlaunchable, because an unrecognised failure is not evidence the entry is usable.
 export function canLaunch(errorKind) {
   if (!errorKind) return true;
   return ERROR_PRESENTATION[errorKind]?.launchable ?? false;

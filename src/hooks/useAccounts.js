@@ -6,12 +6,11 @@ export function useAccounts() {
   const [error, setError] = useState(null);
   const [errorKind, setErrorKind] = useState(null);
   // Whether a Riot Client session is readable right now — independent of how
-  // many accounts are saved. Drives the header RIOT SESSION pill.
+  // many accounts are saved. Drives the footer RIOT SESSION pill.
   const [session, setSession] = useState({ live: false });
   const [tcno, setTcno] = useState({ available: false, accounts: [] });
   const [switchingLabel, setSwitchingLabel] = useState(null);
-  // Kept apart from switchingLabel: PLAY switches on the way to launching, and the
-  // row has to be able to say which of the two it is doing.
+  // Kept apart from switchingLabel: PLAY switches on the way to launching, and the row must say which.
   const [playingLabel, setPlayingLabel] = useState(null);
 
   const [progress, setProgress] = useState(null);
@@ -31,9 +30,8 @@ export function useAccounts() {
     finally { setLoading(false); setProgress(null); }
   }, []);
 
-  // Progressive dashboard load: accounts appear one by one as their stores
-  // resolve. Progress events only arrive while the main promise is pending;
-  // the final set replaces any partial state when it lands.
+  // Progressive dashboard load: accounts appear one by one as their stores resolve. Progress events
+  // only arrive while the main promise is pending; the final set replaces any partial state.
   useEffect(() => {
     if (!window.valorant.onDashboardProgress) return undefined;
     window.valorant.onDashboardProgress((update) => {
@@ -49,9 +47,8 @@ export function useAccounts() {
     return undefined;
   }, []);
 
-  // System sleep/resume: after sleep the countdown anchors, rate-limit map and
-  // session validity are all stale. Re-run the dashboard fetch once, with a
-  // 15s debounce (resume fires alongside network reconnection flicker).
+  // System sleep/resume: after sleep the countdown anchors, rate-limit map and session validity are
+  // all stale, so re-run the dashboard fetch once — 15s debounce, resume fires with network flicker.
   const resumingRef = useRef(false);
   useEffect(() => {
     if (!window.valorant.onSystemResumed) return undefined;
@@ -89,7 +86,11 @@ export function useAccounts() {
     try {
       const response = await window.valorant.switchAccount(label);
       if (!response.ok) throw new Error(response.error);
+      const data = response.data;
       await refresh();
+      // Returned so the caller can tell a completed move from a failed one: `moved` is reported
+      // separately from a store-refresh error, since the session can move while the store fails.
+      return data;
     } finally { setSwitchingLabel(null); }
   }, [refresh]);
   const play = useCallback(async (label) => {
@@ -97,10 +98,18 @@ export function useAccounts() {
     try {
       const response = await window.valorant.playAccount(label);
       if (!response.ok) throw new Error(response.error);
-      // A launch changes no account state, so the dashboard is not re-read.
-      return response.data;
+      // A launch on its own changes no account state, so the dashboard is not re-read for one. A
+      // launch that SWITCHED first does: the `active` flag moved, and the renderer shows it as the
+      // ONLINE dot and as the row pinned to the top — left stale, the app would name the wrong account.
+      //
+      // Started, not awaited: holding the promise open for a full dashboard fetch (every store re-read
+      // from Riot) would keep `playingLabel` set — the row stuck on SWITCHING…, `busy` gating every
+      // control, the launch toast delayed by seconds; the dashboard still catches up.
+      const data = response.data;
+      if (data?.switched) void refresh();
+      return data;
     } finally { setPlayingLabel(null); }
-  }, []);
+  }, [refresh]);
   const refreshAccount = useCallback(async (label) => {
     const response = await window.valorant.refreshAccountMarket(label);
     if (!response.ok) throw new Error(response.error);

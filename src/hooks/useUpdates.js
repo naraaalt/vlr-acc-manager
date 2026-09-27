@@ -1,26 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSetting } from '../lib/settings.js';
 
-// Menjembatani update:check / update:download / update:install. Semua kerja nyata ada di main
-// process; hook ini cuma menyimpan status supaya UI bisa menggambarnya.
+// Bridges update:check / update:download / update:install — the real work lives in the main process.
 //
-// Cek otomatis dijalankan SEKALI per sesi, setelah window sempat paint, dan hanya kalau
-// settingnya hidup: cek update adalah request pihak ketiga, dan app ini sengaja menekan jumlahnya.
+// Auto-check runs ONCE per session after the window paints, and only if the setting is on — an
+// update check is a third-party request, and this app deliberately keeps the count down.
 export function useUpdates() {
   const [version, setVersion] = useState(null);
   const [release, setRelease] = useState(null);
-  const [status, setStatus] = useState('idle');   // idle|checking|available|downloading|ready|installing|error
+  const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Method bridge ini dijamin ada oleh gate `npm run bridge`, jadi try/catch-nya bukan penutup
-    // bug: tujuannya memastikan kekurangan apa pun di sisi MOCK tidak bikin app blank saat mount,
-    // yang merupakan mode gagal terburuk di sini.
+    // The `npm run bridge` gate guarantees this bridge exists, so this try/catch is not a bug
+    // cover-up: it's so any gap on the MOCK side doesn't blank the app on mount.
     try {
       window.valorant.getAppVersion().then(setVersion).catch(() => {});
       window.valorant.onUpdateProgress((update) => setProgress(update));
-    } catch { /* bridge tanpa method update: panel tetap tampil, versinya kosong */ }
+    } catch { /* bridge without the update method: panel still renders, version stays empty */ }
   }, []);
 
   const check = useCallback(async ({ force = false } = {}) => {
@@ -33,9 +31,9 @@ export function useUpdates() {
       setStatus(response.data.available ? 'available' : 'idle');
       return response.data;
     } catch (failure) {
-      // Kegagalan TIDAK pernah jadi toast saat cek otomatis — keputusan produk: offline harus
-      // terasa seperti tidak terjadi apa-apa. Pesannya cuma muncul di baris SYSTEM kalau user
-      // sendiri yang mencet CHECK NOW; tombol yang ditekan lalu diam akan terbaca sebagai rusak.
+      // A failure NEVER becomes a toast during auto-check: offline has to feel like nothing
+      // happened. The message only shows on the SYSTEM line when the user hits CHECK NOW — a button
+      // pressed and then silent reads as broken.
       setError(failure.message);
       setStatus('error');
       return null;
@@ -44,7 +42,7 @@ export function useUpdates() {
 
   useEffect(() => {
     if (!getSetting('autoCheckUpdates')) return undefined;
-    // Ditunda supaya render pertama (dan dashboard yang mahal) tidak bersaing dengan request ini.
+    // Delayed so the first render (and the expensive dashboard) doesn't compete with this request.
     const timer = setTimeout(() => { check(); }, 2500);
     return () => clearTimeout(timer);
   }, [check]);
@@ -60,8 +58,8 @@ export function useUpdates() {
       setStatus('ready');
       return response.data;
     } catch (failure) {
-      // Unduhan gagal itu BUKAN keadaan senyap: user baru saja mengonfirmasi dialog, jadi ia
-      // harus tahu. Kembali ke 'available' supaya pill-nya menawarkan percobaan kedua.
+      // A failed download is NOT a silent state: the user just confirmed a dialog. Back to
+      // 'available' so the pill offers a second attempt.
       setError(failure.message);
       setStatus('available');
       return null;
@@ -75,7 +73,7 @@ export function useUpdates() {
     // A failure here has to leave a pressable pill: 'ready' claimed the download was finished
     // and waiting on a restart, which is not true any more and offers no way to try again.
     if (!response.ok) { setError(response.error); setStatus('error'); return false; }
-    // Kalau sukses, app-nya keluar sebentar lagi — tidak ada state yang perlu dirapikan.
+    // On success the app quits shortly — no state needs cleaning up.
     return true;
   }, []);
 

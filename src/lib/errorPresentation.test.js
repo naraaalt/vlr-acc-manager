@@ -1,16 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { canLaunch, presentError } from './errorPresentation.js';
 
-// PLAY's visibility rule. It is not "did the store load" — an expired API token is
-// the ordinary result of Riot rotating sessions, and the saved Riot Client
-// credentials a switch writes are a different store entirely, so such an account can
-// still be switched to and launched. What rules PLAY out is an entry that is
-// unusable AS AN ENTRY: one pointing at another entry's account, or one whose files
-// could not be read at all.
-//
-// This rule had to be pinned down because the first version hid PLAY behind
-// `status === 'error'`, and on a real machine every account sat in that state — zero
-// controls rendered from a build that was otherwise correct.
+// PLAY's visibility rule (owned by playGate.js). It is not "did the store load": an expired API token
+// is the ordinary result of Riot rotating sessions, and the Riot Client credentials a switch writes are
+// a different store, so such an account can still be switched to and launched. What rules PLAY out is
+// an entry unusable AS AN ENTRY — another entry's account, or files that could not be read.
 
 describe('canLaunch', () => {
   it('offers PLAY for an account with no error at all', () => {
@@ -48,8 +42,8 @@ describe('canLaunch', () => {
 
 describe('the presentation table', () => {
   it('decides launchability for every error kind it knows', () => {
-    // A guard, not a behaviour test: adding a kind without answering "can we launch
-    // from this?" would otherwise inherit whatever the fallback happens to be.
+    // A guard, not a behaviour test: a kind added without answering "can we launch from this?"
+    // would otherwise inherit whatever the fallback happens to be.
     const kinds = ['expired', 'riot-missing', 'fs-error', 'network', 'duplicate', 'store', 'unknown'];
     for (const kind of kinds) {
       expect(typeof presentError('boom', kind).launchable, kind).toBe('boolean');

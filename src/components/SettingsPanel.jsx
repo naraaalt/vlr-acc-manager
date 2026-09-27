@@ -2,16 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icons.jsx';
 import { SETTINGS, getSettings, setSetting, subscribeSettings } from '../lib/settings.js';
 
-// Renders itself from the registry in src/lib/settings.js: one row per entry, and no
-// per-setting markup in here. Adding a preference is one registry entry, not a UI change.
+// Renders itself from the registry in src/lib/settings.js: adding a preference is one registry entry,
+// not a UI change.
 //
-// Rows are deliberately one line high. The hint for the FOCUSED row renders in the panel
-// footer: at two lines per row the list overflows its max-height on a 1280x832 window, and
-// five rows at ~35px each is ~180px against a 466px budget, plus the SYSTEM row — measured
-// headlessly at both 900px and 700px tall rather than trusted.
+// Rows are deliberately one line high — at two lines per row the list overflows its max-height on a
+// 1280x832 window (measured headlessly at 900px and 700px tall rather than trusted).
 //
-// Escape is handled by App.jsx's keymap guard, which also swallows every other key while
-// this is open. Arrows and Enter are handled here, by the modal itself.
+// Escape is handled by App.jsx's keymap guard, which swallows every other key while this is open;
+// arrows and Enter are handled here, by the modal itself.
 function SettingRow({ setting, value, focused, onFocus, onAct }) {
   const changed = value !== setting.default;
   return (
@@ -44,8 +42,7 @@ function SettingRow({ setting, value, focused, onFocus, onAct }) {
           </>
         )}
       </div>
-      {/* The slot is always present so a row does not jump sideways when the revert
-          button appears. */}
+      {/* Always present so a row does not jump sideways when the revert button appears. */}
       <div className="set-revert-slot">
         {changed && (
           <button
@@ -64,19 +61,16 @@ export default function SettingsPanel({ onClose, version, updateState, onCheckUp
   const [values, setValues] = useState(getSettings);
   const [focused, setFocused] = useState(0);
   const sectionRef = useRef(null);
-  // Hanya entri yang opt in. Entri panel:false tetap hidup di store (dipakai keybind/overlay
-  // lain) — lihat catatan skema di src/lib/settings.js.
+  // Only entries that opt in: panel:false entries stay alive in the store for other keybinds/overlays.
   const rows = SETTINGS.filter((setting) => setting.panel !== false);
-  // Baris SYSTEM bukan setting (tidak ada yang dipersist), tapi ia tetap satu perhentian panah:
-  // permukaan yang keyboard-first ini tidak boleh punya satu-satunya kontrol yang cuma bisa
-  // diklik mouse. Karena itu `focused` berjalan 0..rows.length.
+  // The SYSTEM row is not a setting (not persisted) but is still one arrow stop: this
+  // keyboard-first surface must not have a control that is only mouse-clickable, so `focused` = 0..rows.length.
   const systemIndex = rows.length;
   const onSystemRow = focused === systemIndex;
 
   useEffect(() => subscribeSettings(setValues), []);
   useEffect(() => { sectionRef.current?.focus(); }, []);
 
-  // direction 1 = forwards, -1 = backwards.
   const act = (setting, direction) => {
     if (!setting) return;
     const value = values[setting.id];
@@ -104,9 +98,8 @@ export default function SettingsPanel({ onClose, version, updateState, onCheckUp
 
   const updateLabel = updateState?.status === 'available' ? `${updateState.release?.latestVersion ?? ''} AVAILABLE`
     : updateState?.status === 'downloading' ? `DOWNLOADING ${updateState.progress?.total ? `${Math.round((updateState.progress.received / updateState.progress.total) * 100)}%` : '…'}`
-      // 'ready' means the download is verified and the installer is being started, which is a
-      // moment rather than a state the user acts on — the pill says RESTARTING… for the same
-      // reason. The old wording ("RESTART TO UPDATE") asked for a restart that never happens.
+      // 'ready' means the installer is being started — a moment, not a state the user acts on. The
+      // old wording ("RESTART TO UPDATE") asked for a restart that never happens; hence RESTARTING….
       : updateState?.status === 'ready' ? 'STARTING INSTALLER…'
         : updateState?.status === 'installing' ? 'INSTALLING…'
           : updateState?.status === 'checking' ? 'CHECKING…'

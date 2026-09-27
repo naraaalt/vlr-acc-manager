@@ -1,14 +1,11 @@
-// Dead-CSS audit: lists class selectors defined in src/styles.css that no
-// source file references.
+// Dead-CSS audit: lists class selectors defined in src/styles.css that no source
+// file references.
 //
-// How it matches, and why it errs toward "used":
-//   - dynamic names are the norm here (`acct${sel ? ' sel' : ''}`), so every
-//     string literal and template fragment in src/ is treated as a haystack;
-//   - a class counts as used if its name appears anywhere in those literals,
-//     even loosely. False "used" is safe (we keep CSS); false "dead" would
-//     delete live styling, so anything ambiguous is reported as used.
-// Output is grouped by file section and must be reviewed by hand before
-// anything is deleted.
+// Every string literal / template fragment under src/ is the haystack (dynamic
+// names like `acct${sel ? ' sel' : ''}` are the norm), and a class counts as used
+// if its name appears there even loosely — false "used" is safe, false "dead"
+// would delete live styling. Output is grouped by file section and must be
+// reviewed by hand before anything is deleted.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +19,6 @@ const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
 const selectors = new Map(); // class -> [line numbers]
 withoutComments.split('\n').forEach((line, index) => {
   const lineNumber = index + 1;
-  // Only look at selector lines (before the opening brace).
   const selectorPart = line.split('{')[0];
   if (!selectorPart) return;
   for (const match of selectorPart.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {

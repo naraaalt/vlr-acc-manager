@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { clampOfferCursor, stepOfferCursor } from './offerCursor.js';
 
-// Kursor daily store adalah indeks kartu yang sedang ditunjuk, dan `null` berarti "belum ada yang
-// ditunjuk". `null` itu keadaan awal yang sah, bukan kekurangan: kartu tidak lagi clickable, jadi
-// tidak ada alasan satu kartu menyala begitu aplikasi dibuka atau akun berganti.
+// The daily store cursor is the index of the card being pointed at; `null` (a valid initial state, not
+// a shortcoming) means nothing has been pointed at yet, because cards are not clickable — so there is
+// no reason for one card to light up as soon as the app opens or the account changes.
 
 describe('clampOfferCursor', () => {
   it('keeps a cursor that points inside the list', () => {
@@ -12,8 +12,8 @@ describe('clampOfferCursor', () => {
   });
 
   it('pulls a stale cursor back to the last offer', () => {
-    // Refresh bisa mengembalikan daftar yang lebih pendek. Indeks lama tidak boleh menunjuk ke
-    // ruang kosong, dan juga tidak boleh dilempar sebagai error.
+    // A refresh can return a shorter list: the old index must not point at empty space, or be thrown
+    // as an error.
     expect(clampOfferCursor(9, 4)).toBe(3);
   });
 
@@ -30,8 +30,8 @@ describe('clampOfferCursor', () => {
 
 describe('stepOfferCursor', () => {
   it('enters the list from the end the arrow came from', () => {
-    // Panah kanan dari kosong mendarat di kartu pertama, panah kiri di kartu terakhir. Tanpa ini,
-    // tombol pertama yang ditekan setelah membuka aplikasi melompat ke ujung yang salah.
+    // Right arrow from empty lands on the first card, left on the last; without this the first key
+    // pressed after opening the app jumps to the wrong end.
     expect(stepOfferCursor(null, 1, 4)).toBe(0);
     expect(stepOfferCursor(null, -1, 4)).toBe(3);
   });
@@ -42,8 +42,7 @@ describe('stepOfferCursor', () => {
   });
 
   it('moves from the offer actually shown, not from the stale index', () => {
-    // 9 sudah tidak ada lagi di daftar empat offer: yang terlihat adalah offer terakhir, jadi
-    // langkah berikutnya dihitung dari situ.
+    // 9 is no longer in the four-offer list: what is shown is the last offer, so step from there.
     expect(stepOfferCursor(9, 1, 4)).toBe(0);
     expect(stepOfferCursor(9, -1, 4)).toBe(2);
   });

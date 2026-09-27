@@ -7,12 +7,9 @@ import {
   uniqueClients
 } from './riotClientPath.js';
 
-// Finding RiotClientServices.exe is pure text work: which records on a machine name the
-// client, and where each one keeps that name. It is tested here rather than on this machine
-// because the case that matters is the one this developer's PC does not have — a Riot Client
-// installed somewhere other than C:\Riot Games\Riot Client. The app used to compose that
-// path, so every such machine was permanently unusable, and the miss was reported as a
-// missing file (which the error table reads as "close your antivirus").
+// Finding RiotClientServices.exe is pure text work, tested here because the case that matters is
+// the one this PC does not have: a client installed somewhere other than C:\Riot Games. The app
+// used to compose that path, so such machines were unusable, reported as a missing file.
 
 const E = 'E:/Riot Games/Riot Client/RiotClientServices.exe';
 const D = 'D:\\Games\\Riot Client\\RiotClientServices.exe';
@@ -32,8 +29,7 @@ describe('clientCandidates', () => {
   });
 
   it('finds the client on a drive that is not the system drive', () => {
-    // The whole point: nothing here assumes C:, so a machine that put Riot Games on E: is
-    // driven exactly like one that did not.
+    // The whole point: nothing here assumes C:, so a machine that put Riot Games on E: works.
     expect(clientCandidates({ rc_default: D })).toEqual([D]);
   });
 
@@ -49,8 +45,7 @@ describe('clientCandidates', () => {
   });
 
   it('drops values that are not the client executable', () => {
-    // `associated_client` maps a product to whichever client owns it, so a value pointing at
-    // something else is not the thing to spawn.
+    // `associated_client` can point at something other than the client we spawn.
     expect(clientCandidates({
       rc_default: 'C:/League/LeagueClient.exe',
       associated_client: { 'E:/x/': null, 'E:/y/': 42, 'E:/z/': '   ' }
@@ -120,8 +115,8 @@ describe('protocolExecutable', () => {
   });
 
   it('refuses a handler that points at something else', () => {
-    // The registry is machine state: a stale or foreign handler must not become the
-    // executable this app spawns.
+    // The registry is machine state: a stale or foreign handler must not become the executable
+    // this app spawns.
     expect(protocolExecutable('"C:\\Windows\\System32\\cmd.exe" /c calc')).toBe(null);
     expect(protocolExecutable('')).toBe(null);
     expect(protocolExecutable(null)).toBe(null);

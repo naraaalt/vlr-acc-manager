@@ -9,6 +9,7 @@ A Windows desktop app for viewing the daily Valorant store across saved Riot Cli
 - Daily store for every saved account: skin names, rendered art, VP prices, and a countdown to the rotation.
 - Every offer is framed in its skin's tier colour, so the tier reads at a glance without a label.
 - Night Market, when Riot is running one: that account's six discounted offers, sorted by tier and then by discount, each drawn in its own tier colour and marked once opened.
+- Featured bundle, when Riot is selling one: the bundle's key art, its discount and countdown, and every item inside it — weapon skins, melee, buddy, spray and player card — each with its own price, its tier colour where it has one, and the showcase video behind a **PREVIEW** button.
 - Skin previews — upgrade levels and colour variants — in a modal, with a volume slider that persists across skins and restarts.
 - Riot ID, account level, competitive rank, RR and placement progress, per account.
 - Save and switch Riot Client sessions, or import them from TCNO Account Switcher.
@@ -30,7 +31,8 @@ Download [`Sapphire Setup <version>.exe`](../../releases) and run it. The portab
 4. **Open the market view** with `M` — the store on its own, larger. `H` collapses the offer previews.
 5. **Preview a skin** with `P`, which plays the in-game video of the offer you are pointing at. The cards are not buttons: the only thing to click inside one is its **PREVIEW** button.
 6. **Open the Night Market** when Riot is running one — a `NIGHT MARKET VIEW` entry appears in the `STORE REFRESHES IN` row, and lists that account's discounted offers. `Esc` goes back.
-7. **Switch the Riot session to an account** with `S`: the saved session is restored and Riot Client opens.
+7. **Open the Featured Bundle** when Riot is selling one — a second entry in the same row carries the bundle's name and its discount. `B` opens it too, and `Esc` goes back. Items whose price is included in the bundle read `INCLUDED` rather than `0 VP`; items with showcase video carry a **PREVIEW** button.
+8. **Switch the Riot session to an account** with `S`, or with a row's own **SWITCH** button: the saved session is restored and Riot Client opens. The account you switched to becomes the selected one — the details panel and the daily store below it describe that account, not the one you came from — and a store page that is already open follows it too, so nothing on screen keeps describing a session you are no longer signed into.
 
 Riot Client must be running and signed in before the app can read a session. Its install location does not matter: Sapphire reads where this PC put it, so another drive is fine.
 
@@ -50,6 +52,7 @@ The app is keyboard-first; the same list is in the **Commands** panel in the sid
 | `H` | Show or hide skin previews |
 | `O` | Cycle the account sort order |
 | `M` | Toggle the market view |
+| `B` | Toggle the featured bundle page |
 | `A` | Add an account |
 | `X` | Delete the selected account |
 | `I` | Import detected TCNO accounts (when available) |

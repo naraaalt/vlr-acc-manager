@@ -1,13 +1,11 @@
-// Parsing + pembanding versi untuk release GitHub. MURNI: nol network, nol Electron, nol fs.
-// Semua keputusan — ada versi lebih baru, file mana installernya, digest dipublish atau tidak —
-// diuji di unit test, bukan ditemukan di mesin user.
-//
-// Modul ini SENGAJA tidak import 'electron': vitest jalan di Node biasa.
+// GitHub release parsing + version comparison. PURE: zero network, zero Electron, zero fs, so
+// every decision (a newer version exists, which file is the installer, digest is published) is tested
+// in unit tests instead of being discovered on a user's machine.
 
 export const REPO = 'naraaalt/vlr-acc-manager';
 
-// '0.1.10' lebih baru dari '0.1.9'. Perbandingan string kebalikannya, dan pembanding yang salah
-// ke arah itu bikin app berhenti nawarin update SELAMANYA begitu versi ke-10 rilis.
+// '0.1.10' is newer than '0.1.9'. String comparison says the opposite, and a comparator that gets
+// that direction wrong makes the app stop offering updates FOREVER once the tenth version ships.
 export function compareVersions(a, b) {
   const parts = (value) => String(value ?? '').replace(/^v/i, '').trim()
     .split('.')
@@ -22,13 +20,12 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-// electron-builder juga bikin build portable ("Sapphire 0.1.3.exe"). Itu BUKAN yang dijalankan
-// untuk update di tempat, jadi filter yang menyingkirkannya.
+// electron-builder also produces a portable build ("Sapphire 0.1.3.exe"). That is NOT what runs for an
+// in-place update, so this filter skips it.
 //
-// Pemisah katanya spasi/titik/dash/underscore, bukan cuma spasi: GitHub menormalkan spasi di nama
-// asset upload REST jadi TITIK, jadi release yang SUNGGUHAN berisi "Sapphire.Setup.0.1.3.exe".
-// Menerima keduanya penting — pola yang hanya menerima spasi membuat updater tidak menemukan
-// installer-nya dan diam-diam berhenti menawarkan update.
+// The word separators are space/dot/dash/underscore, not just space: GitHub normalises spaces in
+// REST-uploaded asset names to DOTS, so a real release contains "Sapphire.Setup.0.1.3.exe". A pattern
+// that only accepts spaces makes the updater miss its installer and silently stop offering updates.
 const INSTALLER_NAME = /^Sapphire[ ._-]+Setup[ ._-]+.+\.exe$/i;
 
 export function pickInstaller(assets) {
@@ -49,7 +46,7 @@ function base(currentVersion, reason) {
 }
 
 /**
- * @param {object|null} payload  hasil JSON dari /releases/latest, atau null kalau 404
+ * @param {object|null} payload  JSON result from /releases/latest, or null on 404
  * @param {string} currentVersion  app.getVersion()
  * @returns {{ available: boolean, currentVersion: string, latestVersion: string|null,
  *   reason: 'ok'|'up-to-date'|'no-releases'|'prerelease'|'draft'|'no-installer'|'malformed',
@@ -57,8 +54,8 @@ function base(currentVersion, reason) {
  *   notes: string|null, publishedAt: string|null }}
  */
 export function readRelease(payload, currentVersion) {
-  // 404 dari /releases/latest adalah cara GitHub bilang "belum ada yang dipublish". Itu BUKAN
-  // error yang perlu ditampilkan — itu justru keadaan repo ini sekarang.
+  // A 404 from /releases/latest is how GitHub says "nothing published yet" — not an error
+  // worth showing, it is in fact this repo's current state.
   if (payload == null) return base(currentVersion, 'no-releases');
   if (typeof payload !== 'object' || typeof payload.tag_name !== 'string' || !payload.tag_name.trim()) {
     return base(currentVersion, 'malformed');
@@ -79,8 +76,8 @@ export function readRelease(payload, currentVersion) {
       name: installer.name,
       url: installer.browser_download_url ?? null,
       size: Number.isFinite(installer.size) ? installer.size : null,
-      // GitHub mempublish {"digest":"sha256:..."} untuk asset yang diupload sejak pertengahan
-      // 2025. Diperlakukan opsional: asset lama bisa null.
+      // GitHub publishes {"digest":"sha256:..."} for assets uploaded since mid
+      // 2025. Treated as optional: older assets can be null.
       digest: typeof installer.digest === 'string' ? installer.digest : null
     } : null,
     notes: typeof payload.body === 'string' ? payload.body.slice(0, 4000) : null,

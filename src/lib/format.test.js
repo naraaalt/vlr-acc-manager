@@ -271,9 +271,6 @@ describe('cx', () => {
     expect(cx('acct', false, 'sel', null, undefined, '')).toBe('acct sel');
   });
 });
-// fmtCountdown mencetak jam, dan itu benar untuk daily store yang selalu di bawah 24 jam. Night
-// Market berjalan sekitar dua minggu, jadi 13 hari tercetak sebagai '312:00:00' — angka yang tidak
-// ada yang membacanya sebagai tiga belas hari.
 describe('fmtDuration', () => {
   it('prints days once there is at least one', () => {
     expect(fmtDuration((12 * 86400) + (22 * 3600) + (41 * 60))).toBe('12D 22H 41M');

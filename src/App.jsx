@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddAccountModal from './components/AddAccountModal.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
-import { AccountOverview, DailyStore, MarketView, NightMarketEntry, NightMarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
+import { AccountOverview, DailyStore, FeaturedBundleEntry, FeaturedBundleView, MarketView, NightMarketEntry, NightMarketView, StoreRefreshStrip, SkinPreviewModal } from './components/StorePanel.jsx';
 import { useAccounts } from './hooks/useAccounts.js';
 import { useUpdates } from './hooks/useUpdates.js';
 import { useConfirm } from './components/ConfirmDialog.jsx';
@@ -18,10 +18,8 @@ import { updateBusyLabel, updateInFlight, updatePillText } from './lib/updatePil
 import { Icon, BrandMark } from './components/Icons.jsx';
 import WindowControls from './components/WindowControls.jsx';
 
-// Skeleton mirror of the dashboard layout: same panels, grayed shimmer bars
-// and empty card frames instead of a blank screen while accounts load. When
-// progressive-load progress events arrive, shows "FETCHING x/y" with the
-// label of the account currently being fetched.
+// Skeleton mirror of the dashboard layout — stands in for the dashboard while
+// accounts load, and shows "FETCHING x/y" once progress events arrive.
 function LoadingSkeleton({ progress = null }) {
   return (
     <>
@@ -81,32 +79,31 @@ export default function App() {
   const [filter, setFilter] = useState('');
   const [adding, setAdding] = useState(false);
   const [marketLabel, setMarketLabel] = useState(null);
-  // Mekanisme yang sama dengan marketLabel: satu label, bukan boolean, karena halamannya harus tetap
-  // menampilkan akun yang benar kalau pilihannya berpindah di belakangnya.
+  // Same as marketLabel: a label, not a boolean, so the page keeps pointing at the right account
+  // if the selection shifts behind it.
   const [nightMarketLabel, setNightMarketLabel] = useState(null);
+  // Same again for Featured Bundle: the three are mutually exclusive — only one page may be
+  // mounted, because only one can be read by the user at a time.
+  const [bundleLabel, setBundleLabel] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
-  // Kursor daily store: indeks kartu yang sedang ditunjuk, atau null saat belum ada. Kartu tidak
-  // clickable lagi (hover yang memindahkannya), dan null adalah keadaan awal yang sah — kartu nomor
-  // satu yang menyala sendiri terbaca sebagai pilihan yang dibuat aplikasi, bukan oleh user.
+  // Daily store cursor: the card currently pointed at, or null when there is none — null is in fact
+  // the valid initial state. The rules live in src/lib/offerCursor.js.
   const [selectedOffer, setSelectedOffer] = useState(null);
   // [H] skin-preview toggle persists across restarts via uiPrefs.
   const [previewsHidden, setPreviewsHidden] = useState(getPreviewsHidden);
   // Account sort mode (active-first is the invariant; this reorders the rest).
   const [sortMode, setSortMode] = useState(getSortMode);
-  // Objek offer-nya sendiri, bukan indeks ke salah satu daftar: sekarang ada dua layar yang membuka
-  // showcase, dan indeks harus menyebutkan daftar yang mana.
+  // The offer object itself, not an index into one of the lists: two screens now open the
+  // showcase, and an index would have to say which list.
   const [previewOffer, setPreviewOffer] = useState(null);
   const [commandFlash, setCommandFlash] = useState(null);
   const [toast, setToast] = useState(null);
   const [quitOpen, setQuitOpen] = useState(false);
-  // The settings panel is opened from the header button only (no keybind), but it has to be
-  // in the keymap guard: see the first block of keyHandler.
+  // Opened by the header button only, but it must stay in the keymap guard (see keyHandler).
   const [settingsOpen, setSettingsOpen] = useState(false);
   const updates = useUpdates();
-  // DISMISS = diam sampai app ditutup, BUKAN skip versi: penawarannya muncul lagi setelah
-  // restart, jadi tidak ada update yang bisa hilang selamanya gara-gara satu klik nyasar.
-  // Baris SYSTEM di panel tetap menampilkan versi yang tersedia — yang dibuang nag-nya, bukan
-  // faktanya.
+  // DISMISS = silent until the app is closed, NOT skip version: the offer comes back after a restart.
+  // The SYSTEM row still shows the available version — the nag is dropped, not the fact.
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [busyLabel, setBusyLabel] = useState(null);
@@ -115,11 +112,8 @@ export default function App() {
   const { accounts: loadedAccounts, loading, error, errorKind, progress, session, tcno, switchingLabel, playingLabel, refresh, capture, addManually, remove, rename, switchTo, play, refreshAccount, importTcno } = useAccounts();
   const { confirm, pending: confirmPending } = useConfirm();
 
-  // The signed-in account always sits at the top of the list, even after an
-  // app restart: the backend `active` flag only holds while that account's
-  // live Riot session token is valid, and it is recomputed on every load.
-  // orderAccounts owns that invariant (unit-tested); the selected mode only
-  // reorders the accounts below it.
+  // The active-first invariant is orderAccounts' own (see src/lib/accountOrder.js); the
+  // selected mode only reorders the accounts below it.
   const accounts = useMemo(
     () => orderAccounts(loadedAccounts, sortMode, parseRank),
     [loadedAccounts, sortMode]
@@ -128,13 +122,9 @@ export default function App() {
   const busy = Boolean(switchingLabel) || Boolean(playingLabel) || Boolean(busyLabel);
   const tcnoAvailable = Boolean(tcno.available);
 
-  // Keep a selection once accounts load: the remembered account when REOPEN LAST ACCOUNT is
-  // on, else the active account, else first ready, else first. Falls back the same way after
-  // a refresh removed the current selection.
-  //
-  // The remembered label is only a preference among accounts that still exist. It can never
-  // outrank the signed-in invariant — that is about ORDER in the list and is owned by
-  // orderAccounts, not about which row is highlighted.
+  // Keep a selection once accounts load: the remembered account when REOPEN LAST ACCOUNT is on, else
+  // active, else first ready, else first — same fallback after a refresh removed the current one.
+  // The remembered label is a preference only; it never outranks the signed-in list ORDER.
   useEffect(() => {
     setSelectedLabel((current) => {
       if (current && accounts.some((account) => account.label === current)) return current;
@@ -149,8 +139,7 @@ export default function App() {
     });
   }, [accounts]);
 
-  // Remember the selection only while the setting is on, so turning it off leaves nothing
-  // behind for a later launch to pick up.
+  // Remembered only while the setting is on, so turning it off leaves nothing for a later launch.
   useEffect(() => {
     if (getSetting('restoreLastSelection') && selectedLabel) setLastSelection(selectedLabel);
   }, [selectedLabel]);
@@ -158,8 +147,7 @@ export default function App() {
   const needle = filter.trim().toLocaleLowerCase();
   const visible = accounts.filter((account) => `${account.label} ${account.accountName ?? ''} ${account.store?.accountName ?? ''}`.toLocaleLowerCase().includes(needle));
   const selectedIndex = visible.findIndex((account) => account.label === selectedLabel);
-  // Render-time fallback mirrors the selection effect above, so a render that
-  // happens before the effect runs still has a concrete account.
+  // Mirrors the selection effect above, so a render before that effect runs still has a concrete account.
   const selectedAccount = selectedIndex >= 0
     ? visible[selectedIndex]
     : visible.find((account) => account.active)
@@ -168,20 +156,23 @@ export default function App() {
       ?? null;
   const activeIndex = selectedAccount ? visible.indexOf(selectedAccount) : -1;
   const marketAccount = accounts.find((account) => account.label === marketLabel && account.status === 'ready');
-  const nightMarketAccount = accounts.find((account) => account.label === nightMarketLabel && account.status === 'ready');
-  // The pill reports the Riot Client session itself, not saved-account
-  // bookkeeping: a signed-in client is ACTIVE even with zero accounts saved.
+  // The doors' gates MINUS their time window: a market that expires while its page is open stays
+  // readable instead of vanishing under the reader. Without the ownership test, pressing S onto a
+  // ready account not selling a bundle rendered FeaturedBundleView's shell around null — an empty page.
+  const nightMarketAccount = accounts.find((account) => account.label === nightMarketLabel
+    && account.status === 'ready' && account.store?.nightMarket?.offers?.length > 0);
+  const bundleAccount = accounts.find((account) => account.label === bundleLabel
+    && account.status === 'ready' && account.store?.bundle?.items?.length > 0);
+  // The pill reports the Riot Client session itself: a signed-in client is ACTIVE with zero accounts saved.
   const sessionActive = Boolean(session.live);
 
-  // Ganti akun = daftar offer yang benar-benar berbeda, jadi kursor lama tidak berarti apa-apa di
-  // sini: dibiarkan, ia menunjuk offer yang tidak pernah dilihat user di akun ini. Direset ke null,
-  // bukan ke 0 — mengembalikannya ke kartu pertama cuma memindahkan masalahnya.
+  // Switching account = a different offer list, so the old cursor points at an offer the user never
+  // saw on this account. Reset to null, not 0 — the first card only moves the problem.
   useEffect(() => { setSelectedOffer(null); }, [selectedLabel]);
 
-  // Daily store resets on a fixed 00:00 UTC server schedule — the same instant
-  // worldwide (17:00 PT / 20:00 ET / 07:00 WIB, per region), shifting only when
-  // a local region observes DST. Counting straight to the next UTC midnight
-  // keeps the timer exact even when the last store snapshot is stale.
+  // Daily store resets on a fixed 00:00 UTC server schedule — one instant worldwide (17:00 PT /
+  // 20:00 ET / 07:00 WIB), shifting only where a region observes DST. Counting straight to the next
+  // UTC midnight keeps the timer exact even when the last store snapshot is stale.
   const countdown = useMemo(() => fmtCountdown(storeCountdownSeconds(now)), [now]);
 
   useEffect(() => {
@@ -202,8 +193,7 @@ export default function App() {
     flashTimer.current = setTimeout(() => setCommandFlash(null), 650);
   }, []);
 
-  // [O] cycles the account sort. The active account stays pinned first in every
-  // mode, so cycling can never hide the signed-in account.
+  // [O] cycles the sort; the active account stays pinned first in every mode, so it can never be hidden.
   const cycleSort = useCallback(() => {
     flash('O');
     setSortMode((current) => {
@@ -214,11 +204,9 @@ export default function App() {
     });
   }, [flash, showToast]);
 
-  // Daily rotation: the moment the countdown crosses 00:00 UTC the store is
-  // new, so tell the user and pull it. crossedStoreReset is monotonic, so this
-  // fires once per rotation — including when the machine slept through it.
-  // Skipped while a load is already in flight so a resume-triggered refresh
-  // and this one cannot stack into a double request.
+  // The moment the countdown crosses 00:00 UTC the store is new, so tell the user and pull it.
+  // crossedStoreReset is monotonic, so this fires once per rotation — including when the machine
+  // slept through it. Skipped while a load is in flight so a resume-triggered refresh cannot stack.
   const lastTickRef = useRef(now);
   useEffect(() => {
     const previous = lastTickRef.current;
@@ -231,8 +219,7 @@ export default function App() {
       });
     }
     if (!getSetting('autoSyncOnRotation')) {
-      // Still surface the event rather than swallowing it: the store rotated whether or not
-      // this app pulled the new offers.
+      // Still surface it: the store rotated whether or not this app pulled the new offers.
       showToast('DAILY STORE RESET — AUTO-SYNC OFF', 'ok');
       return;
     }
@@ -246,15 +233,10 @@ export default function App() {
     }
   }, [now, loading, accounts.length, refresh, showToast]);
 
-  // Night Market tidak punya jadwal yang bisa dipakai menggantungkan notice — Riot membukanya kapan
-  // ia membukanya. Jadi notice-nya digerakkan oleh DATANYA, bukan oleh jam: sync pertama yang
-  // melaporkan jendela yang sidik jarinya belum pernah diumumkan untuk akun itu. Berjalan dari
-  // daftar akun dan bukan dari timer juga berarti jendela yang terbuka saat aplikasi tertutup
-  // diumumkan pada peluncuran berikutnya, yang memang saat paling awal aplikasi bisa tahu.
-  //
-  // Ingatannya ditulis SEBELUM notice dikirim: persist() menulis lewat localStorage secara sinkron,
-  // jadi render ulang yang menjalankan efek ini lagi sudah melihat sidik jarinya dan tetap diam,
-  // alih-alih mengumumkan jendela yang sama dua kali dalam satu sesi.
+  // Night Market has no schedule, so its notice is driven by its DATA: the first sync that
+  // reports a window with a signature never announced for that account. Running off the
+  // account list, not a timer, means a window that opened while the app was closed is announced on
+  // the next launch. Its memory is written BEFORE the notice is sent (src/lib/settings.js).
   useEffect(() => {
     const announced = getAnnouncedNightMarkets();
     const fresh = accounts
@@ -267,8 +249,7 @@ export default function App() {
     if (getSetting('notifyNightMarket')) {
       window.valorant?.notifyStoreReset?.({
         title: 'Night Market',
-        // Bukan "store rotated": ini satu-satunya event yang per-akun dan layak membuka aplikasi,
-        // jadi isinya menyebut berapa akun yang punya alih-alih memakai kalimat daily store.
+        // Not the daily store sentence: this event is per-account, so the body names how many accounts have one.
         body: names.length === 1 ? `${names[0]} — a Night Market is open.` : `${names.length} accounts — a Night Market is open.`
       });
     }
@@ -278,8 +259,7 @@ export default function App() {
   const doSwitch = useCallback(async (label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
-    // CONFIRM SWITCH & DELETE is the one setting that REMOVES a safeguard, so the prompt is
-    // read here rather than baked in: off means act immediately.
+    // CONFIRM SWITCH & DELETE REMOVES a safeguard, so it is read here at press time: off acts immediately.
     if (getSetting('confirmDestructive')) {
       const ok = await confirm({
         title: 'SWITCH ACCOUNT',
@@ -290,16 +270,37 @@ export default function App() {
       if (!ok) return;
     }
     flash('S');
+    // The panel follows at PRESS time, not when the switch reports back: a switch restarts Riot Client
+    // and waits for the new session (60s window), and waiting for `moved` would leave the panel and the
+    // daily store on the account the user just left. Not a lie meanwhile — the target reads SAVED.
+    const previous = selectedLabel;
+    setSelectedLabel(target);
     switchTo(target)
-      .then(() => showToast(`SWITCHED SESSION → ${target.toUpperCase()}`, 'ok'))
-      .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
-  }, [busy, selectedAccount, switchTo, showToast, flash, confirm]);
+      .then((data) => {
+        // The open page follows the session: left alone it keeps pointing at the PREVIOUS account, and
+        // because the header prints that label the switch looks like it did nothing. Retargeted on
+        // `moved`, not full success — the main process reports the move separately from a refresh failure.
+        if (data?.moved) {
+          setMarketLabel((current) => (current ? target : current));
+          setNightMarketLabel((current) => (current ? target : current));
+          setBundleLabel((current) => (current ? target : current));
+        }
+        // The move is reported either way; a store that could not be read yet is a warning on top of it.
+        if (data?.refreshError) showToast(`${target.toUpperCase()} SWITCHED — STORE NOT READ YET`, 'warn');
+        else showToast(`SWITCHED SESSION → ${target.toUpperCase()}`, 'ok');
+      })
+      .catch((failure) => {
+        // switchTo rejects for exactly the failures BEFORE the client is touched, so nothing moved and
+        // the panel must go back — but only if it is still where this press put it: an arrow key during
+        // the wait is the user's own, newer choice and outranks this press's undo.
+        setSelectedLabel((current) => (current === target ? previous : current));
+        showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn');
+      });
+  }, [busy, selectedAccount, selectedLabel, switchTo, showToast, flash, confirm]);
 
-  // PLAY puts this account in the game, in one press: it switches Riot Client to the account
-  // first when that account is not the one signed in, then launches. No prompt — the press is
-  // the instruction, and the one case where it would be destructive (ending a game that is
-  // already open under another account) is refused by the main process rather than confirmed
-  // here. See src/lib/playGate.js for when the control is offered at all.
+  // PLAY is one press: switch Riot Client to the account when it does not own the session, then
+  // launch. No prompt — the press is the instruction; the destructive case (ending a game already
+  // open under another account) is refused by the main process. Offered per src/lib/playGate.js.
   const doPlay = useCallback((label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
@@ -308,12 +309,14 @@ export default function App() {
         if (data?.reason === 'already-running') showToast('VALORANT IS ALREADY RUNNING', 'warn');
         else if (data?.reason === 'close-game-first') showToast('CLOSE VALORANT FIRST — SWITCHING WOULD END THE OPEN GAME', 'warn');
         else if (data?.launched) showToast(`${data.switched ? 'SWITCHED + ' : ''}LAUNCHING VALORANT — ${target.toUpperCase()}`, 'ok');
+        // PLAY switches too, and the panel has to follow — gated on the backend's `switched` flag rather
+        // than at press time like SWITCH, because a PLAY press can be refused outright (a game already
+        // open under another account) with nothing happening at all.
+        if (data?.switched) setSelectedLabel(target);
       })
       .catch((failure) => showToast((failure?.message ?? String(failure)).toUpperCase(), 'warn'));
   }, [busy, selectedAccount, play, showToast]);
 
-  // Rate limiting: Riot dislikes bursts. Manual refreshes are gated to one
-  // per account per 30s (refresh-all marks every account + its own timer).
   const doRefresh = useCallback((label) => {
     const target = label ?? selectedAccount?.label;
     if (!target || busy) return;
@@ -373,7 +376,11 @@ export default function App() {
 
   const openMarket = useCallback((label) => {
     const target = accounts.find((account) => account.label === label);
-    if (target?.status === 'ready' && !busy) setMarketLabel(label);
+    if (target?.status === 'ready' && !busy) {
+      setMarketLabel(label);
+      setNightMarketLabel(null);
+      setBundleLabel(null);
+    }
   }, [accounts, busy]);
 
   const startUpdate = useCallback(async () => {
@@ -387,15 +394,12 @@ export default function App() {
       danger: true
     });
     if (!ok) return;
-    // Both halves report themselves, and each one has to: after the dialog closes, nothing else
-    // on screen says whether the press did anything. The download reports itself through the
-    // pill (see src/lib/updatePill.js), and the install gets a toast because the pill is about
-    // to disappear with the window — a press that is followed by the app closing, with no words
-    // for it, is indistinguishable from a crash.
+    // Both halves report themselves, and each one has to: after the dialog closes nothing else on
+    // screen says whether the press did anything. The download reports through the pill
+    // (src/lib/updatePill.js); the install gets a toast because the pill disappears with the window.
     const downloaded = await updates.download();
     if (!downloaded) {
-      // The pill goes back to offering the version, which on its own looks like nothing was
-      // ever tried. Say that it failed.
+      // The pill goes back to offering the version, which on its own looks like nothing was ever tried.
       showToast('UPDATE DOWNLOAD FAILED — CHECK YOUR CONNECTION AND TRY AGAIN', 'warn');
       return;
     }
@@ -407,26 +411,40 @@ export default function App() {
   const toggleMarket = useCallback(() => {
     if (busy) return;
     setMarketLabel((current) => (current ? null : selectedAccount?.status === 'ready' ? selectedAccount.label : null));
+    setNightMarketLabel(null);
+    setBundleLabel(null);
   }, [busy, selectedAccount]);
 
-  // Single global keymap. The listener subscribes once and always reads the
-  // freshest closure through the ref. The ref is refreshed in an effect rather
-  // than during render: writing a ref while rendering is unsafe under
-  // concurrent rendering, where a discarded render would still mutate it.
+  // Same as toggleMarket, but gated on an account that REALLY has a bundle: [B] on an account without
+  // one does nothing instead of opening an empty page.
+  const toggleBundle = useCallback(() => {
+    if (busy) return;
+    if (!(selectedAccount?.store?.bundle?.items?.length > 0)) return;
+    setBundleLabel((current) => (current ? null : selectedAccount.label));
+    setNightMarketLabel(null);
+    setMarketLabel(null);
+  }, [busy, selectedAccount]);
+
+  // Flash and toggle together: called by the keymap and the COMMANDS panel in the sidebar.
+  const openBundle = useCallback(() => {
+    flash('B');
+    toggleBundle();
+  }, [flash, toggleBundle]);
+
+  // Single global keymap: the listener subscribes once and reads the freshest closure through the ref.
+  // The ref is refreshed in an effect, not during render — a discarded render would still mutate it.
   const keyHandlerRef = useRef(null);
   const keyHandler = (event) => {
     if (confirmPending) {
-      // A pending confirmation is the topmost layer and owns the keyboard. Its own listener
-      // handles Escape/Enter/Tab (in the capture phase), but it only calls preventDefault —
-      // so without this guard every other key reaches the keymap BEHIND it: H toggled skin
-      // previews, Q raised the quit prompt, A raised the add-account modal.
+      // A pending confirmation owns the keyboard. Its own listener handles Escape/Enter/Tab in the
+      // capture phase but only calls preventDefault, so without this guard every other key reaches
+      // the keymap BEHIND it: H toggled previews, Q raised the quit prompt, A raised the add modal.
       return;
     }
     if (settingsOpen) {
-      // Without this the app's own hotkeys fire BEHIND the open modal: X would raise the
-      // delete confirmation, Q the quit prompt, A the add-account modal, H would toggle a
-      // setting nobody can see. The panel's own onKeyDown owns the arrows and Enter; this
-      // only closes on Escape.
+      // Without this the app's hotkeys fire BEHIND the open modal: X raised the delete confirmation,
+      // Q the quit prompt, A the add-account modal, H toggled a setting nobody can see. The panel's
+      // own onKeyDown owns the arrows and Enter; this only closes on Escape.
       if (event.key === 'Escape') setSettingsOpen(false);
       return;
     }
@@ -445,11 +463,11 @@ export default function App() {
     }
     const target = event.target;
     const inText = target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
-    // Overlay close beats input blur: one Escape always closes the topmost
-    // layer, whether or not the modal input currently holds focus.
-    if (event.key === 'Escape' && (inText || marketLabel || nightMarketLabel)) {
+    // Overlay close beats input blur: one Escape always closes the topmost layer, focused input or not.
+    if (event.key === 'Escape' && (inText || marketLabel || nightMarketLabel || bundleLabel)) {
       event.preventDefault();
       if (inText) target.blur();
+      else if (bundleLabel) setBundleLabel(null);
       else if (nightMarketLabel) setNightMarketLabel(null);
       else setMarketLabel(null);
       return;
@@ -483,12 +501,20 @@ export default function App() {
       case 'Enter':
         event.preventDefault();
         flash('M');
+        // Opening the market view means closing the other two pages: otherwise [Enter] on the bundle
+        // page looks like it does nothing — the bundle page wins in the render branch.
+        setBundleLabel(null);
+        setNightMarketLabel(null);
         if (!busy && selectedAccount?.status === 'ready') setMarketLabel(selectedAccount.label);
         return;
       case 'm':
       case 'M':
         flash('M');
         toggleMarket();
+        return;
+      case 'b':
+      case 'B':
+        openBundle();
         return;
       case 's':
       case 'S':
@@ -500,8 +526,7 @@ export default function App() {
         return;
       case 'h':
       case 'H': {
-        // Compute next state outside the updater: a side effect inside a state
-        // updater runs twice under StrictMode.
+        // Compute next state outside the updater: a side effect inside one runs twice under StrictMode.
         const nextHidden = !previewsHidden;
         flash('H');
         setPreviewsHidden(nextHidden);
@@ -510,8 +535,7 @@ export default function App() {
       }
       case 'p':
       case 'P': {
-        // Kursor kosong berarti tidak ada kartu yang ditunjuk, jadi [P] tidak melakukan apa pun —
-        // membuka kartu pertama berarti menebak, dan user tidak pernah menunjuknya.
+        // Empty cursor = no card pointed at, so [P] stays silent: opening the first card would be guessing.
         const offers = selectedAccount?.status === 'ready' ? (selectedAccount.store?.offers ?? []) : [];
         const index = clampOfferCursor(selectedOffer, offers.length);
         const offer = index === null ? null : offers[index];
@@ -528,8 +552,7 @@ export default function App() {
         return;
       case 'a':
       case 'A':
-        // preventDefault stops the key's default text insertion from landing
-        // in the modal input that autofocuses during this same keypress.
+        // preventDefault keeps this key out of the modal input that autofocuses on the same keypress.
         event.preventDefault();
         flash('A');
         setAdding(true);
@@ -543,15 +566,15 @@ export default function App() {
         setQuitOpen(true);
         return;
       case 'Escape':
-        if (nightMarketLabel) setNightMarketLabel(null);
+        if (bundleLabel) setBundleLabel(null);
+        else if (nightMarketLabel) setNightMarketLabel(null);
         else if (marketLabel) setMarketLabel(null);
         return;
       default:
     }
   };
-  // No dependency array on purpose: this runs after every commit and keeps the
-  // ref pointing at the newest closure. It is declared before the listener
-  // effect so the ref is populated before input can arrive.
+  // No dependency array on purpose: runs after every commit, keeping the ref on the newest closure.
+  // Declared before the listener effect so the ref is populated before input can arrive.
   useEffect(() => { keyHandlerRef.current = keyHandler; });
 
   useEffect(() => {
@@ -560,9 +583,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // The settings panel is the other writer for these two, and App mirrors both in state.
-  // Subscribing is what keeps a change made in the panel visible immediately in the sidebar,
-  // the store and the sort button instead of drifting until the next launch.
+  // The settings panel is the other writer for these two; subscribing keeps its change visible
+  // immediately in the sidebar, the store and the sort button instead of drifting to next launch.
   useEffect(() => subscribeSettings(() => {
     setPreviewsHidden(getSetting('previewsHidden'));
     setSortMode(getSetting('sortMode'));
@@ -576,19 +598,16 @@ export default function App() {
         <BrandMark size={20} />
         <span className="brand-vlr">SAPPHIRE</span>
       </div>
-      {/* Kontrol app-level (settings) duduk di sebelah identitas app, BUKAN di cluster
-          kanan bareng ADD. Dulu ia di sana dan terbaca sebagai sepasang kotak dengan ADD —
-          dua aksi yang tidak berhubungan, berdampingan tanpa pemisah. Jangan dipindah balik
-          ke .header-right tanpa memberi pemisah visual. */}
+      {/* App-level controls (settings) sit next to the app identity, NOT in the right cluster with
+          ADD — there it reads as a pair of boxes with ADD. Do not move it back to
+          .header-right without giving it a visual separator. */}
       <button type="button" className="ghost-btn hdr-settings" onClick={() => setSettingsOpen(true)} title="Settings" aria-label="Open settings"><Icon name="settings" /></button>
       <div className="header-right">
         {updates.release?.available && !updateDismissed && (
           <span className="update-notice">
-            {/* The pill is the whole progress report during an update: the settings panel is
-                shut when a press happens, and the window closes the moment the installer
-                starts. So it says DOWNLOADING n%, then INSTALLING…, and while it does the
-                press and the dismiss cross are both closed — a second press restarts the
-                download, and dismissing hides the only thing reporting it. */}
+            {/* The pill is the whole progress report during an update: the settings panel is shut when
+                a press happens and the window closes the moment the installer starts. So press and
+                dismiss are both closed while it runs — a second press restarts the download. */}
             <button
               type="button"
               className={`update-pill${updates.status === 'ready' ? ' ready' : ''}${updateInFlight(updates.status) ? ' busy' : ''}`}
@@ -610,15 +629,20 @@ export default function App() {
           </span>
         )}
         <button type="button" className="ghost-btn" onClick={() => setAdding(true)}><Icon name="plus" />ADD</button>
-        <span className="session-pill">
-          <span className={`dot ${pill.on ? 'on' : pill.text === 'ERROR' ? 'err' : 'off'}`} />
-          RIOT SESSION: {pill.text}
-        </span>
       </div>
       <WindowControls />
     </header>
 
-    {nightMarketAccount
+    {bundleAccount
+      ? <main className="app-main market-main">
+          <FeaturedBundleView
+            account={bundleAccount}
+            now={now}
+            onBack={() => setBundleLabel(null)}
+            onPreview={setPreviewOffer}
+          />
+        </main>
+      : nightMarketAccount
       ? <main className="app-main market-main">
           <NightMarketView
             account={nightMarketAccount}
@@ -639,6 +663,7 @@ export default function App() {
             switchingLabel={switchingLabel} playingLabel={playingLabel}
             onSwitch={doSwitch} onPlay={doPlay} onRefresh={doRefresh} onRefreshAll={doRefreshAll}
             onDelete={doDelete} onRename={doRename} onImport={() => setAdding(true)} onAdd={() => setAdding(true)}
+            onOpenBundle={openBundle}
           />
           <div className="v-divider" aria-hidden="true" />
           <section className="content" aria-label="Account details">
@@ -677,9 +702,18 @@ export default function App() {
                 {selectedAccount.status === 'ready' && <>
                   <StoreRefreshStrip
                     countdown={countdown}
-                    entry={nightMarketOpen(selectedAccount.store?.nightMarket, now) && (
-                      <NightMarketEntry onOpen={() => setNightMarketLabel(selectedAccount.label)} />
-                    )}
+                    entry={<>
+                      {selectedAccount.store?.bundle?.items?.length > 0 && (
+                        <FeaturedBundleEntry
+                          name={selectedAccount.store.bundle.name}
+                          discountPercent={selectedAccount.store.bundle.discountPercent}
+                          onOpen={() => { setBundleLabel(selectedAccount.label); setNightMarketLabel(null); setMarketLabel(null); }}
+                        />
+                      )}
+                      {nightMarketOpen(selectedAccount.store?.nightMarket, now) && (
+                        <NightMarketEntry onOpen={() => { setNightMarketLabel(selectedAccount.label); setBundleLabel(null); setMarketLabel(null); }} />
+                      )}
+                    </>}
                   />
                   <DailyStore
                     account={selectedAccount}
@@ -700,8 +734,14 @@ export default function App() {
 
     <footer className="app-footer">
       <div className="brand"><BrandMark size={14} /></div>
-      <span className="foot-title">SAPPHIRE ACCOUNT MANAGER</span>
-      <span className="foot-meta">LOCAL-ONLY · SESSIONS STAY ON THIS PC · FULL KEYBINDS IN COMMANDS PANEL</span>
+      {/* Status row: identity on the left, version and Riot session state on the right. `?? '—'` because the bridge
+          answers late: an empty version beats a footer that jumps when its promise
+          lands. RIOT SESSION moved here from the header because it is STATE, not an action. */}
+      <span className="foot-version">SAPPHIRE {updates.version ?? '—'}</span>
+      <span className="session-pill">
+        <span className={`dot ${pill.on ? 'on' : pill.text === 'ERROR' ? 'err' : 'off'}`} />
+        RIOT SESSION: {pill.text}
+      </span>
     </footer>
 
     <div

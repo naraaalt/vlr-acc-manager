@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { downloadPercent, updateBusyLabel, updateInFlight, updatePillText } from './updatePill.js';
 
-// The pill is the only update surface a person sees while the settings panel is shut, so these
-// are the states a press passes through, in order. The defect they exist to prevent: a press
-// that changes nothing on screen for the length of a 96 MB download, then a window that closes
-// before the change can be read.
+// The pill is the only update surface while the settings panel is shut: a press used to change nothing
+// on screen for a whole 96 MB download, then the window closed before the change could be read.
 
 describe('updatePillText', () => {
   it('offers the version before anything has started', () => {
@@ -44,8 +42,8 @@ describe('updatePillText', () => {
   });
 
   it('admits a failure instead of falling back to the offer', () => {
-    // Falling through to "UPDATE 0.1.6" after a failed attempt reads as "press me again" with
-    // no sign anything was tried, which is how a silent revert looked before.
+    // Falling through to "UPDATE 0.1.6" after a failed attempt reads as "press me again" with no
+    // sign anything was tried, which is how a silent revert looked before.
     expect(updatePillText({ status: 'error', latestVersion: '0.1.6' })).toBe('UPDATE FAILED');
   });
 
