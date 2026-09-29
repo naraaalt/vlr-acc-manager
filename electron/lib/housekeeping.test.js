@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, mkdir, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, mkdir, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -134,10 +134,13 @@ describe('sweepScratch', () => {
   };
   const exists = async (file) => { try { await stat(file); return true; } catch { return false; } };
 
+  // TWO fixtures, because the two halves of the sweep read different clocks and a test cannot fake
+  // both. Directory ages come from mtime, which `utimes` backdates. FILE ages come from birthtime —
+  // see appearedAtMs — and nothing in Node can backdate a creation time, so a file fixture is aged by
+  // telling the sweep that time has passed instead. Mixing them would mean one `now` for both, and a
+  // directory that must stay "fresh" would age along with the file that must be stale.
   async function fixture() {
     const root = await mkdtemp(path.join(tmpdir(), 'sapphire-sweep-'));
-    const updateDir = path.join(root, 'sapphire-update');
-    const updaterCacheDir = path.join(root, 'valorant-account-manager-updater');
     const appExeName = 'Sapphire.exe';
 
     // Shape 1, ours and stale: the IN-PLACE update, which is the shape our own updater produces on
@@ -171,37 +174,27 @@ describe('sweepScratch', () => {
     // A directory with a `resources` folder but no marker at all -> kept.
     await plant(root, 'notanapp/resources/thing.dat');
 
-    // Installer, stale -> gone; freshly used -> kept; the helper and its log -> always kept.
-    await plant(root, 'sapphire-update/Sapphire.Setup.0.1.5.exe');
-    await plant(root, 'sapphire-update/Sapphire.Setup.0.1.6.exe', { age: 5 * 1000 });
-    await plant(root, 'sapphire-update/apply-update.cjs');
-    await plant(root, 'sapphire-update/update.log');
+    // Both sweep targets exist but are empty here: the file half has its own fixture.
+    const updateDir = path.join(root, 'sapphire-update');
+    const updaterCacheDir = path.join(root, 'valorant-account-manager-updater');
+    await mkdir(updateDir, { recursive: true });
+    await mkdir(updaterCacheDir, { recursive: true });
 
-    // The installer's own cache: the abandoned copy -> gone, one written seconds ago -> kept.
-    await plant(root, 'valorant-account-manager-updater/installer.exe');
-    await plant(root, 'valorant-account-manager-updater/Sapphire.Setup.0.1.9.exe', { age: 5 * 1000 });
     return { root, updateDir, updaterCacheDir, appExeName };
   }
 
-  it('removes exactly the stale things it owns and nothing else', async () => {
+  it('removes exactly the stale directories it owns and nothing else', async () => {
     const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
       const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
       // nsINPLACE.tmp is the one that matters most: it is the shape our own updater produces on
       // EVERY update, and a content-only ownership check cannot see it.
       expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsINPLACE.tmp', 'nsOURS.tmp']);
-      expect(result.removedInstallers).toEqual(['Sapphire.Setup.0.1.5.exe']);
-      expect(result.removedUpdaterCache).toEqual(['installer.exe']);
       // The evidence that it kept what matters, asserted by name rather than by a count.
       expect(await exists(path.join(root, 'nsBUSY.tmp/7z-out/resources/app-update.yml'))).toBe(true);
       expect(await exists(path.join(root, 'nsTHEIRS.tmp/7z-out/resources/app-update.yml'))).toBe(true);
       expect(await exists(path.join(root, 'nsOTHERAPP.tmp/old-install/TheirApp.exe'))).toBe(true);
       expect(await exists(path.join(root, 'notanapp/resources/thing.dat'))).toBe(true);
-      expect(await exists(path.join(updateDir, 'Sapphire.Setup.0.1.6.exe'))).toBe(true);
-      expect(await exists(path.join(updateDir, 'apply-update.cjs'))).toBe(true);
-      expect(await exists(path.join(updateDir, 'update.log'))).toBe(true);
-      expect(await exists(path.join(updaterCacheDir, 'Sapphire.Setup.0.1.9.exe'))).toBe(true);
-      expect(await exists(path.join(updaterCacheDir, 'installer.exe'))).toBe(false);
       expect(await exists(path.join(root, 'nsOURS.tmp'))).toBe(false);
       expect(await exists(path.join(root, 'nsINPLACE.tmp'))).toBe(false);
       expect(await exists(path.join(root, '3JxRANDOMNAME'))).toBe(false);
@@ -331,6 +324,86 @@ describe('sweepScratch', () => {
         'notanapp', 'nsBUSY.tmp', 'nsOTHERAPP.tmp', 'nsTHEIRS.tmp', 'sapphire-update',
         'unrelated.txt', 'valorant-account-manager-updater'
       ]);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+});
+
+// The FILE half of the sweep, which ages on a different clock from the directories above.
+describe('sweepScratch installer files', () => {
+  const plantFile = async (file, content = 'x') => {
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, content);
+    return file;
+  };
+  const exists = async (file) => { try { await stat(file); return true; } catch { return false; } };
+
+  async function fileFixture() {
+    const root = await mkdtemp(path.join(tmpdir(), 'sapphire-files-'));
+    const updateDir = path.join(root, 'sapphire-update');
+    const updaterCacheDir = path.join(root, 'valorant-account-manager-updater');
+    // Freshly written, so birthtime and mtime agree: this is a file that has just appeared.
+    await plantFile(path.join(updateDir, 'Sapphire.Setup.0.1.5.exe'));
+    await plantFile(path.join(updaterCacheDir, 'installer.exe'));
+    // Never swept: not `.exe`. The helper is still useful after an install, and so is its log.
+    await plantFile(path.join(updateDir, 'apply-update.cjs'));
+    await plantFile(path.join(updateDir, 'update.log'));
+    return { root, updateDir, updaterCacheDir, appExeName: 'Sapphire.exe' };
+  }
+
+  // Time is moved forward rather than the file's timestamp moved back: a creation time cannot be
+  // backdated, and inventing one would test the fixture instead of the rule.
+  const HOURS_2 = 2 * 60 * 60 * 1000;
+
+  it('keeps an installer that has just been written, then collects it once it is old enough', async () => {
+    const { root, updateDir, updaterCacheDir, appExeName } = await fileFixture();
+    try {
+      const now = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(now.removedInstallers).toEqual([]);
+      expect(now.removedUpdaterCache).toEqual([]);
+      expect(await exists(path.join(updateDir, 'Sapphire.Setup.0.1.5.exe'))).toBe(true);
+      expect(await exists(path.join(updaterCacheDir, 'installer.exe'))).toBe(true);
+
+      const later = await sweepScratch({
+        tempRoot: root, updateDir, updaterCacheDir, appExeName, now: Date.now() + HOURS_2
+      });
+      expect(later.removedInstallers).toEqual(['Sapphire.Setup.0.1.5.exe']);
+      expect(later.removedUpdaterCache).toEqual(['installer.exe']);
+      // The helper and its log survive even then: the rule is `.exe` only.
+      expect(await exists(path.join(updateDir, 'apply-update.cjs'))).toBe(true);
+      expect(await exists(path.join(updateDir, 'update.log'))).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('keeps a just-arrived copy whose mtime is old, because a copy inherits the source timestamp', async () => {
+    // The installer's own cache is a COPY of the installer, and Windows carries the source's
+    // last-write time across a copy — measured on this machine: a file backdated five hours and then
+    // copied arrived with that five-hour-old mtime intact and a birthtime of now. So the cached
+    // installer's mtime is the installer's BUILD time, and an age guard reading mtime passes the
+    // instant the copy lands. This is the case that made that guard inert; the age has to come from
+    // when the file appeared.
+    const { root, updateDir, updaterCacheDir, appExeName } = await fileFixture();
+    try {
+      const source = path.join(root, 'built-installer.exe');
+      await plantFile(source);
+      const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
+      await utimes(source, fiveHoursAgo, fiveHoursAgo);
+      await copyFile(source, path.join(updaterCacheDir, 'installer.exe'));
+
+      // The premise, asserted rather than assumed: the copy really did inherit the old timestamp, so
+      // an mtime-based guard would have collected it on this very sweep.
+      const copied = await stat(path.join(updaterCacheDir, 'installer.exe'));
+      expect(Date.now() - copied.mtimeMs).toBeGreaterThan(INSTALL_DIR_MIN_AGE_MS);
+      expect(Date.now() - copied.birthtimeMs).toBeLessThan(60 * 1000);
+
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(result.removedUpdaterCache).toEqual([]);
+      expect(await exists(path.join(updaterCacheDir, 'installer.exe'))).toBe(true);
+
+      // ...and it IS collected once the copy itself has been sitting there long enough.
+      const later = await sweepScratch({
+        tempRoot: root, updateDir, updaterCacheDir, appExeName, now: Date.now() + 11 * 60 * 1000
+      });
+      expect(later.removedUpdaterCache).toEqual(['installer.exe']);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });

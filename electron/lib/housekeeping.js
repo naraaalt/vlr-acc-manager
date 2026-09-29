@@ -137,6 +137,21 @@ async function appRunningFrom(appRoot) {
   }
 }
 
+// How long a FILE has existed at this path — which is not what `mtime` answers once a copy is
+// involved. Windows preserves the source's last-write time across a copy, MEASURED here: a file
+// backdated five hours and then copied arrived with the five-hour-old mtime intact and a birthtime of
+// now. The installer's own cache is exactly that — a copy of itself — so its mtime is the installer's
+// BUILD time, not when the copy landed, and an age guard reading mtime would pass the moment the file
+// appeared. birthtime is when it landed.
+//
+// Deliberately NOT applied to the scratch DIRECTORY shapes: those mtimes are set locally by NSIS
+// writing into them, with nothing copied in from elsewhere, so there is no foreign timestamp to
+// inherit. `fallback` covers filesystems that do not report a creation time.
+function appearedAtMs(info) {
+  if (!info) return 0;
+  return Number(info.birthtimeMs) > 0 ? info.birthtimeMs : info.mtimeMs;
+}
+
 // The `.exe` files in one directory that are old enough to be garbage. Kept separate from the
 // directory sweep because the two answer different questions.
 async function staleInstallerFiles(directory, now, minAgeMs = INSTALLER_MIN_AGE_MS) {
@@ -144,7 +159,7 @@ async function staleInstallerFiles(directory, now, minAgeMs = INSTALLER_MIN_AGE_
   for (const dirent of await listDirectory(directory)) {
     if (!dirent.isFile() || !/\.exe$/i.test(dirent.name)) continue;
     const info = await statSafe(path.join(directory, dirent.name));
-    files.push({ name: dirent.name, mtimeMs: info?.mtimeMs ?? 0 });
+    files.push({ name: dirent.name, mtimeMs: appearedAtMs(info) });
   }
   return staleInstallers(files, { now, minAgeMs });
 }
@@ -212,8 +227,10 @@ export async function sweepScratch({ tempRoot, updateDir, updaterCacheDir, appEx
   // downloads go to %TEMP%\sapphire-update and are hashed there. 96 MB, and it is replaced rather
   // than accumulated (the file name is constant), so this is a bounded cost and not a growing one.
   //
-  // Guarded by the install-directory age instead of the installer one: unlike the downloaded
-  // installer there is nothing to retry from this file, so it does not have to wait an hour.
+  // The age is measured from the copy LANDING, not from the file's last-write time: this file is a
+  // copy, so its mtime is the installer's build time and would make any guard pass instantly. See
+  // appearedAtMs. Guarded by the install-directory age rather than the installer one, because unlike
+  // the downloaded installer there is nothing to retry from this file.
   if (updaterCacheDir) {
     for (const name of await staleInstallerFiles(updaterCacheDir, now, INSTALL_DIR_MIN_AGE_MS)) {
       const target = path.join(updaterCacheDir, name);
