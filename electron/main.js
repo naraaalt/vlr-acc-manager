@@ -106,7 +106,12 @@ if (!isPrimaryInstance) {
       updaterCacheDir: path.join(process.env.LOCALAPPDATA ?? '', `${LEGACY_USER_DATA_NAME}-updater`),
       // The in-place-update shape keeps no readable content — only the old executable NSIS moved
       // aside — so it is recognised by this process's own file name rather than by a literal.
-      appExeName: path.basename(app.getPath('exe'))
+      //
+      // PACKAGED ONLY. Under `npm run dev` / `npm start` this path is `electron.exe`, and handing
+      // that to the sweep would make any Electron app's scratch directory on this machine match —
+      // deleting exactly the thing the module exists to protect. Unpackaged means there is no
+      // installer scratch of ours to collect, so the honest answer is "no name to match on".
+      appExeName: app.isPackaged ? path.basename(app.getPath('exe')) : undefined
     })
       .then((swept) => {
         if (swept.bytes) console.log(`Reclaimed ${(swept.bytes / 1048576).toFixed(1)} MB of leftover update files.`);

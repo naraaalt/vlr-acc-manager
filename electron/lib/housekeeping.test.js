@@ -211,12 +211,54 @@ describe('sweepScratch', () => {
   it('does not remove an in-place scratch directory when no executable name was supplied', async () => {
     // The `old-install` shape has no readable content to prove ownership with, so it depends on the
     // caller naming this process's executable. A caller that forgets must leave the directory alone
-    // rather than fall back to a literal.
+    // rather than fall back to a literal. This is the DEV case: unpackaged, main.js passes undefined
+    // precisely because the name there would be `electron.exe`, which is every Electron app's name.
     const { root, updateDir, updaterCacheDir } = await fixture();
     try {
       const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
       expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
       expect(await exists(path.join(root, 'nsINPLACE.tmp/old-install/Sapphire.exe'))).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('does not treat a generic Electron executable name as proof of ownership', async () => {
+    // Measured shape of the bug this guards: under `npm run dev`, app.getPath('exe') is
+    // node_modules/electron/dist/electron.exe. If that name reached the sweep, every Electron app's
+    // in-place scratch directory on the machine would match ours.
+    const { root, updateDir, updaterCacheDir } = await fixture();
+    try {
+      await plant(root, 'nsTHEIRDEV.tmp/old-install/electron.exe');
+      await ageDir(path.join(root, 'nsTHEIRDEV.tmp'), 90 * 24 * 60 * MINUTE);
+      const result = await sweepScratch({
+        tempRoot: root, updateDir, updaterCacheDir, appExeName: 'electron.exe'
+      });
+      // It does match — which is exactly why main.js must not pass a name when unpackaged.
+      expect(result.removedDirs).toContain('nsTHEIRDEV.tmp');
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('leaves an in-place directory alone when the moved-aside executable is not ours', async () => {
+    // Same NSIS name, same `old-install` folder, a different application's executable.
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
+    try {
+      await plant(root, 'nsNOTOURS.tmp/old-install/OtherApp.exe');
+      await ageDir(path.join(root, 'nsNOTOURS.tmp'), 90 * 24 * 60 * MINUTE);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(result.removedDirs).not.toContain('nsNOTOURS.tmp');
+      expect(await exists(path.join(root, 'nsNOTOURS.tmp/old-install/OtherApp.exe'))).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('leaves an in-place directory alone when the directory is not NSIS scratch', async () => {
+    // Our executable, in an `old-install` folder, but the directory name is not one NSIS creates —
+    // so the only thing tying it to us is a name we did not generate.
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
+    try {
+      await plant(root, 'someone-elses-folder/old-install/Sapphire.exe');
+      await ageDir(path.join(root, 'someone-elses-folder'), 90 * 24 * 60 * MINUTE);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(result.removedDirs).not.toContain('someone-elses-folder');
+      expect(await exists(path.join(root, 'someone-elses-folder/old-install/Sapphire.exe'))).toBe(true);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
