@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -7,38 +7,52 @@ import {
   backupsToPrune, staleInstallDirs, staleInstallers, sweepScratch
 } from './housekeeping.js';
 
-// The app left real garbage on this machine: six NSIS directories holding a copy of the OLD
-// Sapphire.exe (1.3 GB), and a downloaded installer that was never deleted after a successful
-// install (100 MB per version). None of it was ever collected. These tests pin the RULES that
-// decide what is safe to delete, because the risky half of housekeeping is deleting too much:
-// another app's installer, or one that is still running, must survive.
+// The app left real garbage on this machine — 2.1 GB across five abandoned directories in %TEMP%
+// (the NSIS scratch and a second, randomly-named copy of the payload) plus a 96 MB installer cache
+// under %LOCALAPPDATA% — and none of it was ever collected, because the sweep's ownership test
+// required an `old-install\Sapphire.exe` that the real layout never contains. These tests pin the
+// RULES that decide what is safe to delete, because the risky half of housekeeping is deleting too
+// much: another app's installer, or one that is still running, must survive.
 
 const MINUTE = 60 * 1000;
 const entry = (name, ageMs, extra = {}) => ({ name, mtimeMs: Date.now() - ageMs, ...extra });
 
 describe('staleInstallDirs', () => {
-  it('removes an old directory that still holds our replaced executable', () => {
-    const dirs = [entry('nsABCD1.tmp', 3 * 60 * MINUTE, { hasOldInstall: true })];
-    expect(staleInstallDirs(dirs)).toEqual(['nsABCD1.tmp']);
+  const ours = (name, ageMs, extra = {}) => entry(name, ageMs, { owned: true, inUse: false, ...extra });
+
+  it('removes an old directory that holds our own build', () => {
+    expect(staleInstallDirs([ours('nsABCD1.tmp', 3 * 60 * MINUTE)])).toEqual(['nsABCD1.tmp']);
   });
 
-  it('keeps a directory whose install may still be running', () => {
-    // NSIS moves the old exe aside at the START of an install and cleans up at the end. Deleting
-    // mid-install would break the install that is happening right now.
-    const dirs = [entry('nsABCD1.tmp', 30 * 1000, { hasOldInstall: true })];
-    expect(staleInstallDirs(dirs)).toEqual([]);
+  it('removes the randomly-named copy too, which no name pattern could ever match', () => {
+    // Measured on a real machine: `%TEMP%\3JxWNWkJWREg9oOFGgmSStKSmWu\`, a complete copy of the
+    // payload. It was invisible to the previous sweep, which only looked at `ns*.tmp`.
+    expect(staleInstallDirs([ours('3JxWNWkJWREg9oOFGgmSStKSmWu', 3 * 60 * MINUTE)]))
+      .toEqual(['3JxWNWkJWREg9oOFGgmSStKSmWu']);
   });
 
   it('keeps a directory that is not ours, however old it is', () => {
-    // ns*.tmp belongs to whichever installer created it, and this machine can have another app's
-    // installer in flight. The only proof of ownership is our own exe inside it.
-    const dirs = [entry('nsOTHER.tmp', 90 * 24 * 60 * MINUTE, { hasOldInstall: false })];
-    expect(staleInstallDirs(dirs)).toEqual([]);
+    // `ns*.tmp` belongs to whichever installer created it, and this machine runs other Electron apps
+    // whose installers leave the same shape behind. Ownership is the only thing that may decide this.
+    expect(staleInstallDirs([entry('nsOTHER.tmp', 90 * 24 * 60 * MINUTE, { owned: false, inUse: false })]))
+      .toEqual([]);
+  });
+
+  it('keeps a directory whose install may still be running', () => {
+    // The scratch directory is written from the START of an install to the end. Deleting mid-install
+    // would break the install happening right now.
+    expect(staleInstallDirs([ours('nsABCD1.tmp', 30 * 1000)])).toEqual([]);
+  });
+
+  it('keeps a directory an app is running from, however old it is', () => {
+    // The portable build unpacks into %TEMP% and runs from there, so it is indistinguishable from a
+    // leftover except for one thing: its own executable is locked while it runs.
+    expect(staleInstallDirs([ours('3JxWNWkJWREg9oOFGgmSStKSmWu', 90 * 24 * 60 * MINUTE, { inUse: true })]))
+      .toEqual([]);
   });
 
   it('takes the boundary exactly at the minimum age', () => {
-    const dirs = [entry('nsOLD.tmp', INSTALL_DIR_MIN_AGE_MS + MINUTE, { hasOldInstall: true })];
-    expect(staleInstallDirs(dirs)).toEqual(['nsOLD.tmp']);
+    expect(staleInstallDirs([ours('nsOLD.tmp', INSTALL_DIR_MIN_AGE_MS + MINUTE)])).toEqual(['nsOLD.tmp']);
   });
 
   it('survives an empty or shapeless list', () => {
@@ -98,81 +112,156 @@ describe('backupsToPrune', () => {
 // The rules above are only worth anything if the runner applies them to a real filesystem, so these
 // tests build one. Every path is under a fresh mkdtemp: nothing here can touch the real machine.
 describe('sweepScratch', () => {
-  const plant = async (root, relative, { age = 3 * 60 * MINUTE } = {}) => {
+  // The real `resources\app-update.yml` electron-builder writes into every build. Its two identity
+  // lines are the ownership proof, so a fixture that gets them wrong would test nothing.
+  const appUpdateYml = (owner, repo) => `owner: ${owner}\nrepo: ${repo}\nprovider: github\nupdaterCacheDirName: valorant-account-manager-updater\n`;
+  const OURS = appUpdateYml('naraaalt', 'vlr-acc-manager');
+  const THEIRS = appUpdateYml('someone-else', 'some-other-app');
+
+  const plant = async (root, relative, { age = 3 * 60 * MINUTE, content = 'x' } = {}) => {
     const file = path.join(root, relative);
     await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, 'x');
+    await writeFile(file, content);
     const when = new Date(Date.now() - age);
     await utimes(file, when, when);
     return file;
+  };
+  // Directory mtimes decide the age, so a fixture has to age the directory itself, not only the
+  // files inside it — `utimes` on a parent does not follow what a child write did.
+  const ageDir = async (target, ageMs) => {
+    const when = new Date(Date.now() - ageMs);
+    await utimes(target, when, when);
   };
   const exists = async (file) => { try { await stat(file); return true; } catch { return false; } };
 
   async function fixture() {
     const root = await mkdtemp(path.join(tmpdir(), 'sapphire-sweep-'));
     const updateDir = path.join(root, 'sapphire-update');
-    // ours, stale -> gone
-    await plant(root, 'nsOURS.tmp/old-install/Sapphire.exe');
-    // ours, fresh (an install in flight) -> kept
-    await plant(root, 'nsBUSY.tmp/old-install/Sapphire.exe', { age: 5 * 1000 });
-    // not ours, however old -> kept
-    await plant(root, 'nsTHEIRS.tmp/payload.dat');
-    // installer, stale -> gone; freshly used -> kept; the helper and its log -> always kept
+    const updaterCacheDir = path.join(root, 'valorant-account-manager-updater');
+
+    // Shape 1, ours and stale: the NSIS scratch, payload unpacked into `7z-out\` — the layout that
+    // actually exists on disk, and the one the previous `old-install` marker never matched.
+    await plant(root, 'nsOURS.tmp/7z-out/resources/app-update.yml', { content: OURS });
+    await plant(root, 'nsOURS.tmp/7z-out/Sapphire.exe');
+    await ageDir(path.join(root, 'nsOURS.tmp'), 3 * 60 * MINUTE);
+
+    // Shape 2, ours and stale: a complete second copy under a random name, no `ns` prefix at all.
+    await plant(root, '3JxRANDOMNAME/resources/app-update.yml', { content: OURS });
+    await plant(root, '3JxRANDOMNAME/Sapphire.exe');
+    await ageDir(path.join(root, '3JxRANDOMNAME'), 3 * 60 * MINUTE);
+
+    // Ours but fresh (an install or a portable run in flight) -> kept.
+    await plant(root, 'nsBUSY.tmp/7z-out/resources/app-update.yml', { age: 5 * 1000, content: OURS });
+    await ageDir(path.join(root, 'nsBUSY.tmp'), 5 * 1000);
+
+    // Another app's scratch: same shape, same file name, different identity -> kept however old.
+    await plant(root, 'nsTHEIRS.tmp/7z-out/resources/app-update.yml', { content: THEIRS });
+    await ageDir(path.join(root, 'nsTHEIRS.tmp'), 90 * 24 * 60 * MINUTE);
+
+    // A directory with a `resources` folder but no marker at all -> kept.
+    await plant(root, 'notanapp/resources/thing.dat');
+
+    // Installer, stale -> gone; freshly used -> kept; the helper and its log -> always kept.
     await plant(root, 'sapphire-update/Sapphire.Setup.0.1.5.exe');
     await plant(root, 'sapphire-update/Sapphire.Setup.0.1.6.exe', { age: 5 * 1000 });
     await plant(root, 'sapphire-update/apply-update.cjs');
     await plant(root, 'sapphire-update/update.log');
-    return { root, updateDir };
+
+    // The installer's own cache: the abandoned copy -> gone, one written seconds ago -> kept.
+    await plant(root, 'valorant-account-manager-updater/installer.exe');
+    await plant(root, 'valorant-account-manager-updater/Sapphire.Setup.0.1.9.exe', { age: 5 * 1000 });
+    return { root, updateDir, updaterCacheDir };
   }
 
   it('removes exactly the stale things it owns and nothing else', async () => {
-    const { root, updateDir } = await fixture();
+    const { root, updateDir, updaterCacheDir } = await fixture();
     try {
-      const result = await sweepScratch({ tempRoot: root, updateDir });
-      expect(result.removedDirs).toEqual(['nsOURS.tmp']);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
       expect(result.removedInstallers).toEqual(['Sapphire.Setup.0.1.5.exe']);
+      expect(result.removedUpdaterCache).toEqual(['installer.exe']);
       // The evidence that it kept what matters, asserted by name rather than by a count.
-      expect(await exists(path.join(root, 'nsBUSY.tmp/old-install/Sapphire.exe'))).toBe(true);
-      expect(await exists(path.join(root, 'nsTHEIRS.tmp/payload.dat'))).toBe(true);
+      expect(await exists(path.join(root, 'nsBUSY.tmp/7z-out/resources/app-update.yml'))).toBe(true);
+      expect(await exists(path.join(root, 'nsTHEIRS.tmp/7z-out/resources/app-update.yml'))).toBe(true);
+      expect(await exists(path.join(root, 'notanapp/resources/thing.dat'))).toBe(true);
       expect(await exists(path.join(updateDir, 'Sapphire.Setup.0.1.6.exe'))).toBe(true);
       expect(await exists(path.join(updateDir, 'apply-update.cjs'))).toBe(true);
       expect(await exists(path.join(updateDir, 'update.log'))).toBe(true);
+      expect(await exists(path.join(updaterCacheDir, 'Sapphire.Setup.0.1.9.exe'))).toBe(true);
+      expect(await exists(path.join(updaterCacheDir, 'installer.exe'))).toBe(false);
       expect(await exists(path.join(root, 'nsOURS.tmp'))).toBe(false);
+      expect(await exists(path.join(root, '3JxRANDOMNAME'))).toBe(false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it.runIf(process.platform === 'win32')('leaves a directory an app is running from, because the portable build lives in temp', async () => {
+    // Windows refuses to open a running executable for writing — measured on this machine against a
+    // live process: `fs.open('C:\Windows\explorer.exe', 'r+')` fails with EPERM, while the same call
+    // on the not-running Sapphire.exe succeeds. That is the ONLY signal separating a portable build
+    // the user is looking at from an abandoned copy of the same files.
+    //
+    // A running image cannot be faked in a unit test, so the read-only attribute stands in for it:
+    // it is the same refusal (`r+` -> EPERM) for the same reason (write access denied).
+    const { root, updateDir, updaterCacheDir } = await fixture();
+    const exe = path.join(root, '3JxRANDOMNAME/Sapphire.exe');
+    try {
+      await chmod(exe, 0o444);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      expect(result.removedDirs).toEqual(['nsOURS.tmp']);
+      expect(await exists(path.join(root, '3JxRANDOMNAME/resources/app-update.yml'))).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('still removes a directory whose executable is already gone', async () => {
+    // A missing exe is NOT "running". Getting that backwards would make a half-deleted leftover
+    // permanent, which is the bug this whole sweep exists to fix.
+    const { root, updateDir, updaterCacheDir } = await fixture();
+    try {
+      await rm(path.join(root, 'nsOURS.tmp/7z-out/Sapphire.exe'), { force: true });
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
   it('reports the bytes it reclaimed, so the saving is a measured number', async () => {
-    const { root, updateDir } = await fixture();
+    const { root, updateDir, updaterCacheDir } = await fixture();
     try {
-      const result = await sweepScratch({ tempRoot: root, updateDir });
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
       expect(result.bytes).toBeGreaterThan(0);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
   it('is idempotent: a second sweep finds nothing and does not throw', async () => {
-    const { root, updateDir } = await fixture();
+    const { root, updateDir, updaterCacheDir } = await fixture();
     try {
-      await sweepScratch({ tempRoot: root, updateDir });
-      const again = await sweepScratch({ tempRoot: root, updateDir });
+      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      const again = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
       expect(again.removedDirs).toEqual([]);
       expect(again.removedInstallers).toEqual([]);
+      expect(again.removedUpdaterCache).toEqual([]);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
   it('never throws when the directories do not exist at all', async () => {
     // This runs during app startup. A housekeeping failure must never be the reason Sapphire does
     // not open, so a missing temp root is a no-op rather than an error.
-    await expect(sweepScratch({ tempRoot: path.join(tmpdir(), 'does-not-exist-at-all'), updateDir: path.join(tmpdir(), 'also-missing') }))
-      .resolves.toMatchObject({ removedDirs: [], removedInstallers: [] });
+    await expect(sweepScratch({
+      tempRoot: path.join(tmpdir(), 'does-not-exist-at-all'),
+      updateDir: path.join(tmpdir(), 'also-missing'),
+      updaterCacheDir: path.join(tmpdir(), 'missing-too')
+    })).resolves.toMatchObject({ removedDirs: [], removedInstallers: [], removedUpdaterCache: [] });
   });
 
   it('leaves a plain file in temp alone', async () => {
-    const { root, updateDir } = await fixture();
+    const { root, updateDir, updaterCacheDir } = await fixture();
     try {
       await plant(root, 'unrelated.txt');
-      await sweepScratch({ tempRoot: root, updateDir });
+      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
       expect(await exists(path.join(root, 'unrelated.txt'))).toBe(true);
-      expect((await readdir(root)).sort()).toEqual(['nsBUSY.tmp', 'nsTHEIRS.tmp', 'sapphire-update', 'unrelated.txt']);
+      expect((await readdir(root)).sort()).toEqual([
+        'notanapp', 'nsBUSY.tmp', 'nsTHEIRS.tmp', 'sapphire-update',
+        'unrelated.txt', 'valorant-account-manager-updater'
+      ]);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 });

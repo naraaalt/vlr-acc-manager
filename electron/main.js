@@ -97,7 +97,14 @@ if (!isPrimaryInstance) {
     // awaited and it never throws: nobody needs the result, the window must already be
     // visible, and housekeeping must not be the reason Sapphire fails to open. This sweep is also what
     // covers up for old builds, which do not know how to delete the installer.
-    sweepScratch({ tempRoot: app.getPath('temp'), updateDir: updateRoot(app.getPath('temp')) })
+    sweepScratch({
+      tempRoot: app.getPath('temp'),
+      updateDir: updateRoot(app.getPath('temp')),
+      // electron-builder names the updater's cache folder after package.json's `name` — the same
+      // value as the userData pin above — under Local, not Roaming. Nothing here reads it; the
+      // installer's silent path copies itself into it and leaves it there.
+      updaterCacheDir: path.join(process.env.LOCALAPPDATA ?? '', `${LEGACY_USER_DATA_NAME}-updater`)
+    })
       .then((swept) => {
         if (swept.bytes) console.log(`Reclaimed ${(swept.bytes / 1048576).toFixed(1)} MB of leftover update files.`);
       })

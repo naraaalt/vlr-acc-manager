@@ -1,16 +1,25 @@
-// Discards the garbage left behind by the update process: the NSIS installer moves the old Sapphire.exe to
-// `%TEMP%\nsXXXX.tmp\old-install\` then abandons that directory (225 MB per install — measured
-// 1.3 GB after six updates), and a downloaded installer (100 MB per version) is never
-// deleted. The sweep pattern already exists in accountStore.js (`sweepStaleTempFiles`).
+// Discards the garbage the update process leaves behind. MEASURED on a real machine after four
+// updates — 2.1 GB, none of it ever collected:
 //
-// WHAT IS RISKY IS NOT DELETING, BUT DELETING TOO MUCH: so every decision lives in a
-// pure function that can be tested, and its runner is best-effort — a file that fails to delete is retried on the
-// next launch, while the app must stay open.
+//   %TEMP%\nsXXXX.tmp\               1.3 GB  NSIS scratch: `app-64.7z` plus the payload it unpacked
+//                                            into `7z-out\`
+//   %TEMP%\<28 random characters>\   0.7 GB  a second, complete copy of that same payload
+//   %LOCALAPPDATA%\<name>-updater\    96 MB  the installer's silent-install cache
+//
+// The previous sweep looked for a directory named `ns*.tmp` that contained
+// `old-install\Sapphire.exe`. NEITHER exists on disk: the payload sits in `7z-out\`, and the second
+// copy has no `ns` prefix for a name pattern to match. That is why all of the above survived.
+//
+// WHAT IS RISKY IS NOT DELETING, BUT DELETING TOO MUCH: so ownership is proven by CONTENT (our own
+// `app-update.yml` inside the directory), a directory an app is running from is left alone, and every
+// decision lives in a pure function that can be tested. The runner is best-effort — a file that fails
+// to delete is retried on the next launch, while the app must stay open.
 //
 // DELIBERATELY does not import 'electron': all paths come in as parameters, so its tests run on plain Node.
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { REPO } from '../update/release.js';
 
 // NSIS only finishes writing to its directory a few seconds before we look at it. This age limit is
 // what separates "an install that just ran" from "the leftovers of an install that has finished".
@@ -26,12 +35,17 @@ export const INSTALLER_MIN_AGE_MS = 60 * 60 * 1000;
 // nothing can use the old ones anymore.
 export const BACKUPS_KEPT = 5;
 
-// The ns*.tmp directory belongs to whoever created it, so "ns" is not proof of ownership — and this machine
-// can have another app's installer running. The only valid proof is
-// the Sapphire.exe that we ourselves moved into it.
+// A directory is ours only if it holds our own build's `resources\app-update.yml`. That is content,
+// not a name: `ns*.tmp` belongs to whichever installer created it, this machine runs other Electron
+// apps whose installers leave the same shape behind, and the random-named copy would never match a
+// name pattern anyway.
+//
+// `inUse` is the second half of the guard, and it is not hypothetical: the PORTABLE build unpacks
+// into %TEMP% under a random name, so a running portable is byte-for-byte the same thing as a
+// leftover. Deleting that would break the copy the user is looking at.
 export function staleInstallDirs(entries, { now = Date.now(), minAgeMs = INSTALL_DIR_MIN_AGE_MS } = {}) {
   return (entries ?? [])
-    .filter((entry) => entry?.hasOldInstall)
+    .filter((entry) => entry?.owned && !entry.inUse)
     .filter((entry) => now - Number(entry.mtimeMs) > minAgeMs)
     .map((entry) => entry.name);
 }
@@ -59,6 +73,66 @@ async function statSafe(target) {
   try { return await fs.stat(target); } catch { return null; }
 }
 
+async function readTextSafe(file) {
+  try { return await fs.readFile(file, 'utf8'); } catch { return null; }
+}
+
+// Where a build's own payload sits inside a scratch directory, relative to that directory. BOTH
+// shapes are listed because both were found on disk, and the marker is READ rather than assumed: a
+// directory that merely has a `resources` folder proves nothing.
+const OWNERSHIP_MARKERS = [
+  ['resources', 'app-update.yml'],
+  ['7z-out', 'resources', 'app-update.yml']
+];
+
+// `REPO` is the single source of truth for who we are; app-update.yml spells the same identity as
+// two separate lines, so it is split rather than duplicated here.
+const [APP_OWNER, APP_REPO] = REPO.split('/');
+
+// The app root inside a scratch directory, or null when the directory is not one of ours. BOTH lines
+// must match: another app's build carries its own `owner`/`repo`, and a substring test would let a
+// value that merely contains ours through.
+async function ownedAppRoot(directory) {
+  for (const marker of OWNERSHIP_MARKERS) {
+    const file = path.join(directory, ...marker);
+    const text = await readTextSafe(file);
+    if (text === null) continue;
+    const lines = text.split(/\r?\n/).map((line) => line.trim());
+    if (!lines.includes(`owner: ${APP_OWNER}`) || !lines.includes(`repo: ${APP_REPO}`)) continue;
+    return path.dirname(path.dirname(file));
+  }
+  return null;
+}
+
+// Windows locks a running executable against writing, so a directory whose Sapphire.exe cannot be
+// opened for writing belongs to an app that is running RIGHT NOW — the portable build, whose
+// extraction directory is otherwise indistinguishable from a leftover.
+//
+// A missing executable is not "running"; anything else (locked, or refused for a permission reason
+// we cannot tell apart from a lock) is treated as running. The cost of guessing that way is a
+// directory that gets swept on the next launch, against a cost of breaking a running app.
+async function appRunningFrom(appRoot) {
+  try {
+    const handle = await fs.open(path.join(appRoot, 'Sapphire.exe'), 'r+');
+    await handle.close();
+    return false;
+  } catch (error) {
+    return error?.code !== 'ENOENT';
+  }
+}
+
+// The `.exe` files in one directory that are old enough to be garbage. Kept separate from the
+// directory sweep because the two answer different questions.
+async function staleInstallerFiles(directory, now, minAgeMs = INSTALLER_MIN_AGE_MS) {
+  const files = [];
+  for (const dirent of await listDirectory(directory)) {
+    if (!dirent.isFile() || !/\.exe$/i.test(dirent.name)) continue;
+    const info = await statSafe(path.join(directory, dirent.name));
+    files.push({ name: dirent.name, mtimeMs: info?.mtimeMs ?? 0 });
+  }
+  return staleInstallers(files, { now, minAgeMs });
+}
+
 // Sizes are collected BEFORE deleting, because afterwards there is nothing left to measure — and
 // this number is what lets the sweep be reported as "so many MB back" instead of merely claimed.
 async function measure(target) {
@@ -72,21 +146,31 @@ async function measure(target) {
 
 // Runs on app start. Always resolves — a housekeeping failure must not be a reason
 // for Sapphire not opening.
-export async function sweepScratch({ tempRoot, updateDir, now = Date.now() } = {}) {
-  const result = { removedDirs: [], removedInstallers: [], bytes: 0 };
+export async function sweepScratch({ tempRoot, updateDir, updaterCacheDir, now = Date.now() } = {}) {
+  const result = { removedDirs: [], removedInstallers: [], removedUpdaterCache: [], bytes: 0 };
   if (!tempRoot) return result;
 
+  // EVERY directory, not just the ones named `ns*.tmp`: one of the two shapes measured on a real
+  // machine has a random name, so a name pattern is the one filter that cannot be used. The probe
+  // costs two stats per directory, and the marker file is only read when one of them hits.
+  //
+  // The age guard is what keeps this away from an install that is still on screen: an installer
+  // sitting on its directory prompt holds its scratch directory open, and that directory is ours by
+  // content, so age is the only thing separating it from a leftover. Ten minutes of user inattention
+  // is the assumed limit, and the cost of guessing wrong is an install that fails and has to be run
+  // again — the payload is read out of the scratch before anything is written to the install
+  // directory, so there is no half-installed app to recover from.
   for (const dirent of await listDirectory(tempRoot)) {
-    if (!dirent.isDirectory() || !/^ns.*\.tmp$/i.test(dirent.name)) continue;
+    if (!dirent.isDirectory()) continue;
     const full = path.join(tempRoot, dirent.name);
-    // The age is taken from the MARKER FILE, not from its parent directory. The `ns*.tmp` directory is created
-    // earlier and its mtime can be touched by anything writing inside it — while
-    // the Sapphire.exe NSIS moved in there has exactly the right time: when the installer started.
-    const marker = await statSafe(path.join(full, 'old-install', 'Sapphire.exe'));
+    const appRoot = await ownedAppRoot(full);
+    if (!appRoot) continue;
+    const info = await statSafe(full);
     const entries = [{
       name: dirent.name,
-      mtimeMs: marker?.mtimeMs ?? 0,
-      hasOldInstall: Boolean(marker)
+      mtimeMs: info?.mtimeMs ?? 0,
+      owned: true,
+      inUse: await appRunningFrom(appRoot)
     }];
     for (const name of staleInstallDirs(entries, { now })) {
       result.bytes += await measure(full);
@@ -98,17 +182,28 @@ export async function sweepScratch({ tempRoot, updateDir, now = Date.now() } = {
   // .exe only: the helper (`apply-update.cjs`) and its logs are never touched here, because
   // both are still useful after the install finishes.
   if (updateDir) {
-    const files = [];
-    for (const dirent of await listDirectory(updateDir)) {
-      if (!dirent.isFile() || !/\.exe$/i.test(dirent.name)) continue;
-      const info = await statSafe(path.join(updateDir, dirent.name));
-      files.push({ name: dirent.name, mtimeMs: info?.mtimeMs ?? 0 });
-    }
-    for (const name of staleInstallers(files, { now })) {
+    for (const name of await staleInstallerFiles(updateDir, now)) {
       const target = path.join(updateDir, name);
       result.bytes += await measure(target);
       await fs.rm(target, { force: true }).catch(() => {});
       result.removedInstallers.push(name);
+    }
+  }
+
+  // electron-builder's own updater cache — the folder other apps on this machine have as
+  // `comfyui-desktop-2-updater` and `pi-fategui-updater`, named after package.json's `name`. On a
+  // silent install the installer copies ITSELF here, and nothing in this app ever reads it: our
+  // downloads go to %TEMP%\sapphire-update and are hashed there. 96 MB, and it is replaced rather
+  // than accumulated (the file name is constant), so this is a bounded cost and not a growing one.
+  //
+  // Guarded by the install-directory age instead of the installer one: unlike the downloaded
+  // installer there is nothing to retry from this file, so it does not have to wait an hour.
+  if (updaterCacheDir) {
+    for (const name of await staleInstallerFiles(updaterCacheDir, now, INSTALL_DIR_MIN_AGE_MS)) {
+      const target = path.join(updaterCacheDir, name);
+      result.bytes += await measure(target);
+      await fs.rm(target, { force: true }).catch(() => {});
+      result.removedUpdaterCache.push(name);
     }
   }
 
