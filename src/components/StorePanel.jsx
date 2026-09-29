@@ -325,17 +325,23 @@ export function NightMarketView({ account, now, onBack, onPreview }) {
 // blue, NOT gold — gold in this app means "a number worth reading" and is already taken by Night
 // Market. Only the bundle name and its discount are printed; a missing discount (Riot sends two
 // identical totals) is not printed at all, rather than printed as -0%.
-export function FeaturedBundleEntry({ name, discountPercent, onOpen }) {
+//
+// ONE door regardless of how many bundles are on sale: Riot usually runs a promo alongside the main
+// bundle, and a second door competes with the countdown and the Night Market for the same row. Which
+// bundle you are looking at is chosen on the page instead, so `extra` is how many FURTHER bundles the
+// page holds — a second sale stays visible without a second door.
+export function FeaturedBundleEntry({ name, discountPercent, extra = 0, onOpen }) {
   return (
     <span
       className="rs-bundle" role="button" tabIndex={0}
-      title="Open the featured bundle"
+      title={extra > 0 ? `Open the featured bundles (${extra + 1} on sale)` : 'Open the featured bundle'}
       onClick={onOpen}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
     >
       <Icon name="box" size={12} />
       <span className="rb-lbl">{name}</span>
       {discountPercent != null && <span className="rb-off">-{discountPercent}%</span>}
+      {extra > 0 && <span className="rb-more">+{extra}</span>}
       <span className="nm-go">VIEW</span>
     </span>
   );
@@ -357,8 +363,12 @@ function bundleKindLabel(item) {
 // Market, because a bundle is one set Riot already arranged — weapons first, accessories after.
 //
 // It takes the bundle ITSELF, not the account: Riot can be selling more than one at a time, so which
-// one this page is about is decided by the door that was pressed, not by the account.
-export function FeaturedBundleView({ bundle, now, onBack, onPreview }) {
+// one this page is about is chosen here, by the tabs — not derived from the account.
+//
+// The tabs render ONLY when there is more than one: a single tab is a control that cannot do anything.
+// They are real buttons, so Tab and Enter reach them without a keybinding; `[` and `]` step through
+// them for speed, because this app is keyboard-first.
+export function FeaturedBundleView({ bundle, bundles = [], now, onBack, onSelect, onPreview }) {
   // The same helper as Night Market: it only needs a window with an absolute end, not offers.
   const remaining = nightMarketCountdown(bundle?.endsAt, now);
   const items = bundle?.items ?? [];
@@ -382,6 +392,24 @@ export function FeaturedBundleView({ bundle, now, onBack, onPreview }) {
           {bundle ? ` · ${bundle.price.toLocaleString('en-US')} VP` : ''}
         </span>
       </div>
+      {bundles.length > 1 && (
+        <div className="bundle-tabs" role="tablist" aria-label="Bundles on sale">
+          {bundles.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="tab"
+              aria-selected={entry.id === bundle?.id}
+              className={`bundle-tab${entry.id === bundle?.id ? ' on' : ''}`}
+              onClick={() => onSelect(entry.id)}
+            >
+              <span className="bt-name">{entry.name}</span>
+              {entry.discountPercent != null && <span className="bt-off">-{entry.discountPercent}%</span>}
+              <span className="bt-price">{entry.price.toLocaleString('en-US')} VP</span>
+            </button>
+          ))}
+        </div>
+      )}
       {bundle?.contentUnavailable && (
         <p className="snap-note">SKIN NAMES AND PREVIEWS UNAVAILABLE — RIOT&apos;S OFFERS AND PRICES BELOW.</p>
       )}

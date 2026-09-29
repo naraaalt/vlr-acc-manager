@@ -517,7 +517,31 @@ input::placeholder { color: var(--faint); }
 .rs-bundle .icon { color: var(--brand); opacity: .95; }
 .rb-lbl { color: var(--brand); font-size: 9.5px; font-weight: 800; letter-spacing: .16em; }
 .rb-off { color: var(--brand); font-size: 9.5px; font-weight: 800; letter-spacing: .1em; }
+/* How many FURTHER bundles the page holds. Dimmer than the name and the discount: it is a count, not an
+   offer, and it must not read as a second discount sitting beside the first. */
+.rb-more { color: var(--dim); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .rs-bundle:hover .nm-go { color: var(--brand); }
+
+/* ---------- bundle tabs ---------- */
+/* Only rendered when Riot is selling more than one bundle: a lone tab is a control that cannot do
+   anything. Laid out as a row of equal-height buttons so the strip does not jump when the active one
+   changes — the discount and the price are what differ, and a tab that grew would move its neighbours. */
+.bundle-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.bundle-tab {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 6px 11px; font-family: inherit; cursor: pointer; user-select: none;
+  border: 1px solid var(--border2); background: var(--panel); color: var(--dim);
+}
+.bundle-tab:hover { border-color: var(--brand); color: var(--text-bright); }
+.bundle-tab:focus-visible { outline: 1px solid var(--brand); outline-offset: 1px; }
+/* The active tab carries the brand edge the selected account row uses, so "which one am I looking at"
+   reads the same way in both places. */
+.bundle-tab.on { border-color: var(--brand); background: var(--panel3); box-shadow: inset 2px 0 0 var(--brand); }
+.bt-name { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; }
+.bundle-tab.on .bt-name { color: var(--text-bright); }
+.bt-off { font-size: 10px; font-weight: 800; letter-spacing: .06em; color: var(--gold); }
+.bt-price { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--faint); }
+.bundle-tab.on .bt-price { color: var(--dim); }
 
 /* Hero: wide key art on the left, price block on the right. Its height is pinned so the row does not
    jump when the image finishes loading — bundle art comes from a third-party CDN, and without a

@@ -424,8 +424,8 @@ export default function App() {
   }, [busy, selectedAccount]);
 
   // Same as toggleMarket, but gated on an account that REALLY sells a bundle: [B] on an account with
-  // none does nothing instead of opening an empty page. It opens the FIRST bundle — with two on sale
-  // the doors in the refresh strip are how you pick the other one, and a key press has to pick one.
+  // none does nothing instead of opening an empty page. It opens the FIRST bundle; the tabs on the
+  // page are how you reach the others.
   const toggleBundle = useCallback(() => {
     if (busy) return;
     const first = selectedAccount?.store?.bundles?.[0];
@@ -434,6 +434,12 @@ export default function App() {
     setNightMarketLabel(null);
     setMarketLabel(null);
   }, [busy, selectedAccount]);
+
+  // Which bundle the open page is about. The account and the page stay as they are — only the id moves,
+  // so switching bundles cannot drop the reader back to the dashboard.
+  const selectBundle = useCallback((id) => {
+    setOpenBundle((current) => (current ? { ...current, id } : current));
+  }, []);
 
   // Flash and toggle together: called by the keymap and the COMMANDS panel in the sidebar.
   const doOpenBundle = useCallback(() => {
@@ -483,6 +489,19 @@ export default function App() {
       return;
     }
     if (inText) return;
+    // Bundle page: [ and ] step between the bundles on sale, wrapping at both ends. Only while that page
+    // is open, so the brackets stay free everywhere else; the tabs themselves are buttons, so this is
+    // the fast path rather than the only one.
+    if (openBundle && (event.key === '[' || event.key === ']')) {
+      event.preventDefault();
+      if (accountBundles.length > 1) {
+        const at = accountBundles.findIndex((entry) => entry.id === openBundle.id);
+        const step = event.key === ']' ? 1 : -1;
+        const next = accountBundles[((at < 0 ? 0 : at) + step + accountBundles.length) % accountBundles.length];
+        selectBundle(next.id);
+      }
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r') {
       event.preventDefault();
       doRefreshAll();
@@ -647,8 +666,10 @@ export default function App() {
       ? <main className="app-main market-main">
           <FeaturedBundleView
             bundle={activeBundle}
+            bundles={accountBundles}
             now={now}
             onBack={() => setOpenBundle(null)}
+            onSelect={selectBundle}
             onPreview={setPreviewOffer}
           />
         </main>
@@ -713,17 +734,17 @@ export default function App() {
                   <StoreRefreshStrip
                     countdown={countdown}
                     entry={<>
-                      {/* One door per bundle on sale: Riot can run a second promo bundle alongside the
-                          main one, and both are real offers with their own discount. Keyed on the bundle
-                          id, not the index — the list is rebuilt on every refresh. */}
-                      {(selectedAccount.store?.bundles ?? []).map((entry) => (
+                      {/* ONE door for the bundle page, whatever the number on sale: the page itself is
+                          where you choose between them. `extra` is the count of the others, so a second
+                          sale is still visible in this row without a second control competing for it. */}
+                      {selectedAccount.store?.bundles?.length > 0 && (
                         <FeaturedBundleEntry
-                          key={entry.id}
-                          name={entry.name}
-                          discountPercent={entry.discountPercent}
-                          onOpen={() => { setOpenBundle({ label: selectedAccount.label, id: entry.id }); setNightMarketLabel(null); setMarketLabel(null); }}
+                          name={selectedAccount.store.bundles[0].name}
+                          discountPercent={selectedAccount.store.bundles[0].discountPercent}
+                          extra={selectedAccount.store.bundles.length - 1}
+                          onOpen={() => { setOpenBundle({ label: selectedAccount.label, id: selectedAccount.store.bundles[0].id }); setNightMarketLabel(null); setMarketLabel(null); }}
                         />
-                      ))}
+                      )}
                       {nightMarketOpen(selectedAccount.store?.nightMarket, now) && (
                         <NightMarketEntry onOpen={() => { setNightMarketLabel(selectedAccount.label); setOpenBundle(null); setMarketLabel(null); }} />
                       )}
