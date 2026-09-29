@@ -138,14 +138,20 @@ describe('sweepScratch', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'sapphire-sweep-'));
     const updateDir = path.join(root, 'sapphire-update');
     const updaterCacheDir = path.join(root, 'valorant-account-manager-updater');
+    const appExeName = 'Sapphire.exe';
 
-    // Shape 1, ours and stale: the NSIS scratch, payload unpacked into `7z-out\` — the layout that
-    // actually exists on disk, and the one the previous `old-install` marker never matched.
+    // Shape 1, ours and stale: the IN-PLACE update, which is the shape our own updater produces on
+    // every update. NSIS moves the old executable aside and abandons it; there is no payload and no
+    // `app-update.yml` to read here, so this is the shape a content-only check cannot see.
+    await plant(root, 'nsINPLACE.tmp/old-install/Sapphire.exe');
+    await ageDir(path.join(root, 'nsINPLACE.tmp'), 3 * 60 * MINUTE);
+
+    // Shape 2, ours and stale: the NSIS scratch, payload unpacked into `7z-out\`.
     await plant(root, 'nsOURS.tmp/7z-out/resources/app-update.yml', { content: OURS });
     await plant(root, 'nsOURS.tmp/7z-out/Sapphire.exe');
     await ageDir(path.join(root, 'nsOURS.tmp'), 3 * 60 * MINUTE);
 
-    // Shape 2, ours and stale: a complete second copy under a random name, no `ns` prefix at all.
+    // Shape 3, ours and stale: a complete second copy under a random name, no `ns` prefix at all.
     await plant(root, '3JxRANDOMNAME/resources/app-update.yml', { content: OURS });
     await plant(root, '3JxRANDOMNAME/Sapphire.exe');
     await ageDir(path.join(root, '3JxRANDOMNAME'), 3 * 60 * MINUTE);
@@ -157,6 +163,10 @@ describe('sweepScratch', () => {
     // Another app's scratch: same shape, same file name, different identity -> kept however old.
     await plant(root, 'nsTHEIRS.tmp/7z-out/resources/app-update.yml', { content: THEIRS });
     await ageDir(path.join(root, 'nsTHEIRS.tmp'), 90 * 24 * 60 * MINUTE);
+
+    // Another app's IN-PLACE scratch: NSIS name, but the executable it moved aside is not ours.
+    await plant(root, 'nsOTHERAPP.tmp/old-install/TheirApp.exe');
+    await ageDir(path.join(root, 'nsOTHERAPP.tmp'), 90 * 24 * 60 * MINUTE);
 
     // A directory with a `resources` folder but no marker at all -> kept.
     await plant(root, 'notanapp/resources/thing.dat');
@@ -170,19 +180,22 @@ describe('sweepScratch', () => {
     // The installer's own cache: the abandoned copy -> gone, one written seconds ago -> kept.
     await plant(root, 'valorant-account-manager-updater/installer.exe');
     await plant(root, 'valorant-account-manager-updater/Sapphire.Setup.0.1.9.exe', { age: 5 * 1000 });
-    return { root, updateDir, updaterCacheDir };
+    return { root, updateDir, updaterCacheDir, appExeName };
   }
 
   it('removes exactly the stale things it owns and nothing else', async () => {
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
-      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
-      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      // nsINPLACE.tmp is the one that matters most: it is the shape our own updater produces on
+      // EVERY update, and a content-only ownership check cannot see it.
+      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsINPLACE.tmp', 'nsOURS.tmp']);
       expect(result.removedInstallers).toEqual(['Sapphire.Setup.0.1.5.exe']);
       expect(result.removedUpdaterCache).toEqual(['installer.exe']);
       // The evidence that it kept what matters, asserted by name rather than by a count.
       expect(await exists(path.join(root, 'nsBUSY.tmp/7z-out/resources/app-update.yml'))).toBe(true);
       expect(await exists(path.join(root, 'nsTHEIRS.tmp/7z-out/resources/app-update.yml'))).toBe(true);
+      expect(await exists(path.join(root, 'nsOTHERAPP.tmp/old-install/TheirApp.exe'))).toBe(true);
       expect(await exists(path.join(root, 'notanapp/resources/thing.dat'))).toBe(true);
       expect(await exists(path.join(updateDir, 'Sapphire.Setup.0.1.6.exe'))).toBe(true);
       expect(await exists(path.join(updateDir, 'apply-update.cjs'))).toBe(true);
@@ -190,7 +203,20 @@ describe('sweepScratch', () => {
       expect(await exists(path.join(updaterCacheDir, 'Sapphire.Setup.0.1.9.exe'))).toBe(true);
       expect(await exists(path.join(updaterCacheDir, 'installer.exe'))).toBe(false);
       expect(await exists(path.join(root, 'nsOURS.tmp'))).toBe(false);
+      expect(await exists(path.join(root, 'nsINPLACE.tmp'))).toBe(false);
       expect(await exists(path.join(root, '3JxRANDOMNAME'))).toBe(false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it('does not remove an in-place scratch directory when no executable name was supplied', async () => {
+    // The `old-install` shape has no readable content to prove ownership with, so it depends on the
+    // caller naming this process's executable. A caller that forgets must leave the directory alone
+    // rather than fall back to a literal.
+    const { root, updateDir, updaterCacheDir } = await fixture();
+    try {
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
+      expect(await exists(path.join(root, 'nsINPLACE.tmp/old-install/Sapphire.exe'))).toBe(true);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
@@ -202,12 +228,12 @@ describe('sweepScratch', () => {
     //
     // A running image cannot be faked in a unit test, so the read-only attribute stands in for it:
     // it is the same refusal (`r+` -> EPERM) for the same reason (write access denied).
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     const exe = path.join(root, '3JxRANDOMNAME/Sapphire.exe');
     try {
       await chmod(exe, 0o444);
-      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
-      expect(result.removedDirs).toEqual(['nsOURS.tmp']);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(result.removedDirs.sort()).toEqual(['nsINPLACE.tmp', 'nsOURS.tmp']);
       expect(await exists(path.join(root, '3JxRANDOMNAME/resources/app-update.yml'))).toBe(true);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
@@ -215,27 +241,27 @@ describe('sweepScratch', () => {
   it('still removes a directory whose executable is already gone', async () => {
     // A missing exe is NOT "running". Getting that backwards would make a half-deleted leftover
     // permanent, which is the bug this whole sweep exists to fix.
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
       await rm(path.join(root, 'nsOURS.tmp/7z-out/Sapphire.exe'), { force: true });
-      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
-      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsOURS.tmp']);
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      expect(result.removedDirs.sort()).toEqual(['3JxRANDOMNAME', 'nsINPLACE.tmp', 'nsOURS.tmp']);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
   it('reports the bytes it reclaimed, so the saving is a measured number', async () => {
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
-      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      const result = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
       expect(result.bytes).toBeGreaterThan(0);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
   it('is idempotent: a second sweep finds nothing and does not throw', async () => {
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
-      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
-      const again = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
+      const again = await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
       expect(again.removedDirs).toEqual([]);
       expect(again.removedInstallers).toEqual([]);
       expect(again.removedUpdaterCache).toEqual([]);
@@ -248,18 +274,19 @@ describe('sweepScratch', () => {
     await expect(sweepScratch({
       tempRoot: path.join(tmpdir(), 'does-not-exist-at-all'),
       updateDir: path.join(tmpdir(), 'also-missing'),
-      updaterCacheDir: path.join(tmpdir(), 'missing-too')
+      updaterCacheDir: path.join(tmpdir(), 'missing-too'),
+      appExeName: 'Sapphire.exe'
     })).resolves.toMatchObject({ removedDirs: [], removedInstallers: [], removedUpdaterCache: [] });
   });
 
   it('leaves a plain file in temp alone', async () => {
-    const { root, updateDir, updaterCacheDir } = await fixture();
+    const { root, updateDir, updaterCacheDir, appExeName } = await fixture();
     try {
       await plant(root, 'unrelated.txt');
-      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir });
+      await sweepScratch({ tempRoot: root, updateDir, updaterCacheDir, appExeName });
       expect(await exists(path.join(root, 'unrelated.txt'))).toBe(true);
       expect((await readdir(root)).sort()).toEqual([
-        'notanapp', 'nsBUSY.tmp', 'nsTHEIRS.tmp', 'sapphire-update',
+        'notanapp', 'nsBUSY.tmp', 'nsOTHERAPP.tmp', 'nsTHEIRS.tmp', 'sapphire-update',
         'unrelated.txt', 'valorant-account-manager-updater'
       ]);
     } finally { await rm(root, { recursive: true, force: true }); }

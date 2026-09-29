@@ -103,7 +103,10 @@ if (!isPrimaryInstance) {
       // electron-builder names the updater's cache folder after package.json's `name` — the same
       // value as the userData pin above — under Local, not Roaming. Nothing here reads it; the
       // installer's silent path copies itself into it and leaves it there.
-      updaterCacheDir: path.join(process.env.LOCALAPPDATA ?? '', `${LEGACY_USER_DATA_NAME}-updater`)
+      updaterCacheDir: path.join(process.env.LOCALAPPDATA ?? '', `${LEGACY_USER_DATA_NAME}-updater`),
+      // The in-place-update shape keeps no readable content — only the old executable NSIS moved
+      // aside — so it is recognised by this process's own file name rather than by a literal.
+      appExeName: path.basename(app.getPath('exe'))
     })
       .then((swept) => {
         if (swept.bytes) console.log(`Reclaimed ${(swept.bytes / 1048576).toFixed(1)} MB of leftover update files.`);

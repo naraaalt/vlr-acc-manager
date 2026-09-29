@@ -1,19 +1,22 @@
 // Discards the garbage the update process leaves behind. MEASURED on a real machine after four
-// updates — 2.1 GB, none of it ever collected:
+// updates — 2.1 GB, none of it ever collected. There are FOUR shapes, and the sweep has to know all
+// of them: the first version of this file knew one, the second knew three, and each time the shape
+// that was missed was the one that had just been produced.
 //
-//   %TEMP%\nsXXXX.tmp\               1.3 GB  NSIS scratch: `app-64.7z` plus the payload it unpacked
-//                                            into `7z-out\`
-//   %TEMP%\<28 random characters>\   0.7 GB  a second, complete copy of that same payload
-//   %LOCALAPPDATA%\<name>-updater\    96 MB  the installer's silent-install cache
+//   %TEMP%\nsXXXX.tmp\old-install\<our exe>   216 MB  in-place update: NSIS moves the OLD executable
+//                                                     aside and abandons it. THIS is the shape our own
+//                                                     updater produces on every update.
+//   %TEMP%\nsXXXX.tmp\                         451 MB  full install: `app-64.7z` plus the payload it
+//                                                     unpacked into `7z-out\`
+//   %TEMP%\<28 random characters>\             356 MB  portable extraction: the same payload again,
+//                                                     with no `ns` prefix for a name pattern to match
+//   %LOCALAPPDATA%\<name>-updater\              96 MB  the installer's silent-install cache
 //
-// The previous sweep looked for a directory named `ns*.tmp` that contained
-// `old-install\Sapphire.exe`. NEITHER exists on disk: the payload sits in `7z-out\`, and the second
-// copy has no `ns` prefix for a name pattern to match. That is why all of the above survived.
-//
-// WHAT IS RISKY IS NOT DELETING, BUT DELETING TOO MUCH: so ownership is proven by CONTENT (our own
-// `app-update.yml` inside the directory), a directory an app is running from is left alone, and every
-// decision lives in a pure function that can be tested. The runner is best-effort — a file that fails
-// to delete is retried on the next launch, while the app must stay open.
+// WHAT IS RISKY IS NOT DELETING, BUT DELETING TOO MUCH, so ownership is proven by CONTENT wherever
+// content exists to read — our own `app-update.yml` naming this repository — and by the executable's
+// own name where it does not. A directory an app is running from is left alone, and every decision
+// lives in a pure function that can be tested. The runner is best-effort: a file that fails to delete
+// is retried on the next launch, while the app must stay open.
 //
 // DELIBERATELY does not import 'electron': all paths come in as parameters, so its tests run on plain Node.
 
@@ -85,21 +88,34 @@ const OWNERSHIP_MARKERS = [
   ['7z-out', 'resources', 'app-update.yml']
 ];
 
+// NSIS's own scratch directory. The in-place-update shape has no payload and no `app-update.yml` to
+// read — all it holds is the OLD executable, moved aside — so this shape is recognised by the name
+// NSIS gives the directory plus the executable's own name.
+const NSIS_SCRATCH_NAME = /^ns.*\.tmp$/i;
+
 // `REPO` is the single source of truth for who we are; app-update.yml spells the same identity as
 // two separate lines, so it is split rather than duplicated here.
 const [APP_OWNER, APP_REPO] = REPO.split('/');
 
-// The app root inside a scratch directory, or null when the directory is not one of ours. BOTH lines
-// must match: another app's build carries its own `owner`/`repo`, and a substring test would let a
-// value that merely contains ours through.
-async function ownedAppRoot(directory) {
+// The app root inside a scratch directory, or null when the directory is not one of ours.
+//
+// `appExeName` is the running executable's own file name, passed in rather than assumed: the
+// `old-install` shape is the only proof available for the shape that has no readable content, and
+// comparing against the name this process is actually running under is stronger than a literal.
+async function ownedAppRoot(directory, appExeName) {
   for (const marker of OWNERSHIP_MARKERS) {
     const file = path.join(directory, ...marker);
     const text = await readTextSafe(file);
     if (text === null) continue;
     const lines = text.split(/\r?\n/).map((line) => line.trim());
+    // BOTH lines must match: another app's build carries its own `owner`/`repo`, and a substring test
+    // would let a value that merely contains ours through.
     if (!lines.includes(`owner: ${APP_OWNER}`) || !lines.includes(`repo: ${APP_REPO}`)) continue;
     return path.dirname(path.dirname(file));
+  }
+
+  if (appExeName && NSIS_SCRATCH_NAME.test(path.basename(directory))) {
+    if (await statSafe(path.join(directory, 'old-install', appExeName))) return directory;
   }
   return null;
 }
@@ -146,12 +162,12 @@ async function measure(target) {
 
 // Runs on app start. Always resolves — a housekeeping failure must not be a reason
 // for Sapphire not opening.
-export async function sweepScratch({ tempRoot, updateDir, updaterCacheDir, now = Date.now() } = {}) {
+export async function sweepScratch({ tempRoot, updateDir, updaterCacheDir, appExeName, now = Date.now() } = {}) {
   const result = { removedDirs: [], removedInstallers: [], removedUpdaterCache: [], bytes: 0 };
   if (!tempRoot) return result;
 
-  // EVERY directory, not just the ones named `ns*.tmp`: one of the two shapes measured on a real
-  // machine has a random name, so a name pattern is the one filter that cannot be used. The probe
+  // EVERY directory, not just the ones named `ns*.tmp`: one of the two payload shapes measured on a
+  // real machine has a random name, so a name pattern is the one filter that cannot be used. The probe
   // costs two stats per directory, and the marker file is only read when one of them hits.
   //
   // The age guard is what keeps this away from an install that is still on screen: an installer
@@ -163,7 +179,7 @@ export async function sweepScratch({ tempRoot, updateDir, updaterCacheDir, now =
   for (const dirent of await listDirectory(tempRoot)) {
     if (!dirent.isDirectory()) continue;
     const full = path.join(tempRoot, dirent.name);
-    const appRoot = await ownedAppRoot(full);
+    const appRoot = await ownedAppRoot(full, appExeName);
     if (!appRoot) continue;
     const info = await statSafe(full);
     const entries = [{
