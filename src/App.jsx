@@ -82,9 +82,11 @@ export default function App() {
   // Same as marketLabel: a label, not a boolean, so the page keeps pointing at the right account
   // if the selection shifts behind it.
   const [nightMarketLabel, setNightMarketLabel] = useState(null);
-  // Same again for Featured Bundle: the three are mutually exclusive — only one page may be
-  // mounted, because only one can be read by the user at a time.
-  const [bundleLabel, setBundleLabel] = useState(null);
+  // Same again for Featured Bundles: the three are mutually exclusive — only one page may be
+  // mounted, because only one can be read by the user at a time. An OBJECT rather than a bare label,
+  // because Riot can be selling more than one bundle at once: the label names the account and the id
+  // names which of that account's bundles is open.
+  const [openBundle, setOpenBundle] = useState(null);
   const [selectedLabel, setSelectedLabel] = useState(null);
   // Daily store cursor: the card currently pointed at, or null when there is none — null is in fact
   // the valid initial state. The rules live in src/lib/offerCursor.js.
@@ -156,13 +158,19 @@ export default function App() {
       ?? null;
   const activeIndex = selectedAccount ? visible.indexOf(selectedAccount) : -1;
   const marketAccount = accounts.find((account) => account.label === marketLabel && account.status === 'ready');
-  // The doors' gates MINUS their time window: a market that expires while its page is open stays
+  // The door's gate MINUS its time window: a market that expires while its page is open stays
   // readable instead of vanishing under the reader. Without the ownership test, pressing S onto a
-  // ready account not selling a bundle rendered FeaturedBundleView's shell around null — an empty page.
+  // ready account not selling a market left the page mounted over nothing.
   const nightMarketAccount = accounts.find((account) => account.label === nightMarketLabel
     && account.status === 'ready' && account.store?.nightMarket?.offers?.length > 0);
-  const bundleAccount = accounts.find((account) => account.label === bundleLabel
-    && account.status === 'ready' && account.store?.bundle?.items?.length > 0);
+  // The open bundle, resolved from the account it belongs to. The id is a preference, not a
+  // requirement: a switch can move the page to an account that does not sell the bundle that was
+  // open, and the page is about that account's sale rather than about that one bundle, so it falls
+  // back to whatever that account does have. Both are null when the account sells none — which is
+  // what stops FeaturedBundleView rendering its shell around nothing.
+  const bundleAccount = openBundle ? accounts.find((account) => account.label === openBundle.label && account.status === 'ready') : null;
+  const accountBundles = bundleAccount?.store?.bundles ?? [];
+  const activeBundle = accountBundles.find((entry) => entry.id === openBundle?.id) ?? accountBundles[0] ?? null;
   // The pill reports the Riot Client session itself: a signed-in client is ACTIVE with zero accounts saved.
   const sessionActive = Boolean(session.live);
 
@@ -283,7 +291,7 @@ export default function App() {
         if (data?.moved) {
           setMarketLabel((current) => (current ? target : current));
           setNightMarketLabel((current) => (current ? target : current));
-          setBundleLabel((current) => (current ? target : current));
+          setOpenBundle((current) => (current ? { label: target, id: current.id } : current));
         }
         // The move is reported either way; a store that could not be read yet is a warning on top of it.
         if (data?.refreshError) showToast(`${target.toUpperCase()} SWITCHED — STORE NOT READ YET`, 'warn');
@@ -379,7 +387,7 @@ export default function App() {
     if (target?.status === 'ready' && !busy) {
       setMarketLabel(label);
       setNightMarketLabel(null);
-      setBundleLabel(null);
+      setOpenBundle(null);
     }
   }, [accounts, busy]);
 
@@ -412,21 +420,23 @@ export default function App() {
     if (busy) return;
     setMarketLabel((current) => (current ? null : selectedAccount?.status === 'ready' ? selectedAccount.label : null));
     setNightMarketLabel(null);
-    setBundleLabel(null);
+    setOpenBundle(null);
   }, [busy, selectedAccount]);
 
-  // Same as toggleMarket, but gated on an account that REALLY has a bundle: [B] on an account without
-  // one does nothing instead of opening an empty page.
+  // Same as toggleMarket, but gated on an account that REALLY sells a bundle: [B] on an account with
+  // none does nothing instead of opening an empty page. It opens the FIRST bundle — with two on sale
+  // the doors in the refresh strip are how you pick the other one, and a key press has to pick one.
   const toggleBundle = useCallback(() => {
     if (busy) return;
-    if (!(selectedAccount?.store?.bundle?.items?.length > 0)) return;
-    setBundleLabel((current) => (current ? null : selectedAccount.label));
+    const first = selectedAccount?.store?.bundles?.[0];
+    if (!first) return;
+    setOpenBundle((current) => (current ? null : { label: selectedAccount.label, id: first.id }));
     setNightMarketLabel(null);
     setMarketLabel(null);
   }, [busy, selectedAccount]);
 
   // Flash and toggle together: called by the keymap and the COMMANDS panel in the sidebar.
-  const openBundle = useCallback(() => {
+  const doOpenBundle = useCallback(() => {
     flash('B');
     toggleBundle();
   }, [flash, toggleBundle]);
@@ -464,10 +474,10 @@ export default function App() {
     const target = event.target;
     const inText = target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
     // Overlay close beats input blur: one Escape always closes the topmost layer, focused input or not.
-    if (event.key === 'Escape' && (inText || marketLabel || nightMarketLabel || bundleLabel)) {
+    if (event.key === 'Escape' && (inText || marketLabel || nightMarketLabel || openBundle)) {
       event.preventDefault();
       if (inText) target.blur();
-      else if (bundleLabel) setBundleLabel(null);
+      else if (openBundle) setOpenBundle(null);
       else if (nightMarketLabel) setNightMarketLabel(null);
       else setMarketLabel(null);
       return;
@@ -503,7 +513,7 @@ export default function App() {
         flash('M');
         // Opening the market view means closing the other two pages: otherwise [Enter] on the bundle
         // page looks like it does nothing — the bundle page wins in the render branch.
-        setBundleLabel(null);
+        setOpenBundle(null);
         setNightMarketLabel(null);
         if (!busy && selectedAccount?.status === 'ready') setMarketLabel(selectedAccount.label);
         return;
@@ -514,7 +524,7 @@ export default function App() {
         return;
       case 'b':
       case 'B':
-        openBundle();
+        doOpenBundle();
         return;
       case 's':
       case 'S':
@@ -566,7 +576,7 @@ export default function App() {
         setQuitOpen(true);
         return;
       case 'Escape':
-        if (bundleLabel) setBundleLabel(null);
+        if (openBundle) setOpenBundle(null);
         else if (nightMarketLabel) setNightMarketLabel(null);
         else if (marketLabel) setMarketLabel(null);
         return;
@@ -633,12 +643,12 @@ export default function App() {
       <WindowControls />
     </header>
 
-    {bundleAccount
+    {activeBundle
       ? <main className="app-main market-main">
           <FeaturedBundleView
-            account={bundleAccount}
+            bundle={activeBundle}
             now={now}
-            onBack={() => setBundleLabel(null)}
+            onBack={() => setOpenBundle(null)}
             onPreview={setPreviewOffer}
           />
         </main>
@@ -663,7 +673,7 @@ export default function App() {
             switchingLabel={switchingLabel} playingLabel={playingLabel}
             onSwitch={doSwitch} onPlay={doPlay} onRefresh={doRefresh} onRefreshAll={doRefreshAll}
             onDelete={doDelete} onRename={doRename} onImport={() => setAdding(true)} onAdd={() => setAdding(true)}
-            onOpenBundle={openBundle}
+            onOpenBundle={doOpenBundle}
           />
           <div className="v-divider" aria-hidden="true" />
           <section className="content" aria-label="Account details">
@@ -703,15 +713,19 @@ export default function App() {
                   <StoreRefreshStrip
                     countdown={countdown}
                     entry={<>
-                      {selectedAccount.store?.bundle?.items?.length > 0 && (
+                      {/* One door per bundle on sale: Riot can run a second promo bundle alongside the
+                          main one, and both are real offers with their own discount. Keyed on the bundle
+                          id, not the index — the list is rebuilt on every refresh. */}
+                      {(selectedAccount.store?.bundles ?? []).map((entry) => (
                         <FeaturedBundleEntry
-                          name={selectedAccount.store.bundle.name}
-                          discountPercent={selectedAccount.store.bundle.discountPercent}
-                          onOpen={() => { setBundleLabel(selectedAccount.label); setNightMarketLabel(null); setMarketLabel(null); }}
+                          key={entry.id}
+                          name={entry.name}
+                          discountPercent={entry.discountPercent}
+                          onOpen={() => { setOpenBundle({ label: selectedAccount.label, id: entry.id }); setNightMarketLabel(null); setMarketLabel(null); }}
                         />
-                      )}
+                      ))}
                       {nightMarketOpen(selectedAccount.store?.nightMarket, now) && (
-                        <NightMarketEntry onOpen={() => { setNightMarketLabel(selectedAccount.label); setBundleLabel(null); setMarketLabel(null); }} />
+                        <NightMarketEntry onOpen={() => { setNightMarketLabel(selectedAccount.label); setOpenBundle(null); setMarketLabel(null); }} />
                       )}
                     </>}
                   />

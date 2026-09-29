@@ -280,6 +280,45 @@ const bundleFixture = () => {
   };
 };
 
+// A SECOND bundle, because Riot runs a promo bundle alongside the main one and a single-bundle
+// fixture cannot show the two doors or the page picking between them. Smaller and more heavily
+// discounted on purpose, and with a SHORTER window — that is what the live payload does, and it is
+// why each page prints its own countdown instead of one shared figure.
+const promoBundleFixture = () => {
+  const items = [
+    {
+      id: 'promo-skin', kind: 'skin', itemTypeId: SKIN_TYPE,
+      name: 'Galleria Warden', image: 'https://media.valorant-api.com/weaponskinlevels/2f3f4a4a-4c5a-4f5f-8a1a-1b2c3d4e5f60/displayicon.png',
+      video: null, levels: [], chromas: [], tier: TIER.select,
+      price: 525, basePrice: 875, discountPercent: 0, included: false, quantity: 1
+    },
+    {
+      id: 'promo-buddy', kind: 'buddy', itemTypeId: BUDDY_TYPE,
+      name: 'Warden Buddy', image: null, video: null, levels: [], chromas: [], tier: null,
+      price: 0, basePrice: 475, discountPercent: 0, included: true, quantity: 1
+    },
+    {
+      id: 'promo-spray', kind: 'spray', itemTypeId: SPRAY_TYPE,
+      name: 'Warden Spray', image: null, video: null, levels: [], chromas: [], tier: null,
+      price: 0, basePrice: 325, discountPercent: 0, included: true, quantity: 1
+    }
+  ];
+  const baseTotal = items.reduce((sum, item) => sum + (item.basePrice ?? 0), 0);
+  const price = items.reduce((sum, item) => sum + (item.price ?? item.basePrice ?? 0), 0);
+  return {
+    id: 'mock-bundle-warden',
+    name: 'Warden Launch',
+    art: { wide: null, tall: null, logo: null },
+    items,
+    baseTotal,
+    price,
+    discountPercent: Math.round((1 - price / baseTotal) * 100),
+    endsAt: Date.now() + (2 * 24 * 3600_000),
+    endsInSeconds: 2 * 24 * 3600,
+    contentUnavailable: false
+  };
+};
+
 // A ready account with a small store. Levels/ranks differ across the fixture so
 // every sort mode produces a visibly different order.
 const readyAccount = (id, label, accountName, level, rank, rr, price) => ({
@@ -288,7 +327,7 @@ const readyAccount = (id, label, accountName, level, rank, rr, price) => ({
   store: {
     accountName, expiresIn: 52337,
     profile: { level, rank, rr, placementsRemaining: 0 },
-    bundle: bundleFixture(),
+    bundles: [bundleFixture(), promoBundleFixture()],
     offers: [
       offerOf(id, 'Prime Classic', 'https://media.valorant-api.com/weaponskinlevels/c7695ce7-4fc9-1c79-64b3-8c8f9e21571c/displayicon.png', price)
     ]
@@ -311,7 +350,7 @@ const accounts = [
     store: {
       accountName: 'Main#SEVEN', expiresIn: 52337,
       profile: { level: 121, rank: 'Diamond 2', rr: 85, placementsRemaining: 0 },
-      bundle: bundleFixture(),
+      bundles: [bundleFixture(), promoBundleFixture()],
       offers: [
         offerOf('1', 'Reaver Vandal', 'https://media.valorant-api.com/weaponskinlevels/ba42fe63-457a-78ce-4499-47950a698129/displayicon.png', 1775, false, TIER.premium),
         offerOf('2', 'Singularity Knife', 'https://media.valorant-api.com/weaponskinlevels/ea441610-42da-e46f-8d7b-1b9759c105cd/displayicon.png', 3550, false, TIER.exclusive),
@@ -552,7 +591,7 @@ if (location.hash === '#bundle-none') {
     const payload = await realDashboard();
     if (!payload?.ok) return payload;
     return { ...payload, data: { ...payload.data, accounts: payload.data.accounts.map((account) => account.store
-      ? { ...account, store: { ...account.store, bundle: null } }
+      ? { ...account, store: { ...account.store, bundles: [] } }
       : account) } };
   };
 }
@@ -637,12 +676,12 @@ if (location.hash === '#no-content') {
             offers: account.store.offers.map((offer) => ({
               ...offer, name: 'Unknown skin', image: null, video: null, levels: [], chromas: [], tier: null
             })),
-            bundle: account.store.bundle ? {
-              ...account.store.bundle,
+            bundles: account.store.bundles.map((bundle) => ({
+              ...bundle,
               name: 'Unknown bundle',
               art: { wide: null, tall: null, logo: null },
               contentUnavailable: true,
-              items: account.store.bundle.items.map((item) => ({
+              items: bundle.items.map((item) => ({
                 ...item,
                 // The KIND survives the outage, exactly as the main process now resolves it: Riot's
                 // ItemTypeID still says what the object is even when no list can name it. Hardcoding
@@ -651,7 +690,7 @@ if (location.hash === '#no-content') {
                 kind: (${JSON.stringify(ITEM_TYPE_KINDS)})[item.itemTypeId] ?? 'other',
                 name: 'Unknown item', image: null, video: null, levels: [], chromas: [], tier: null
               }))
-            } : null
+            }))
           }
         } : account)
       }

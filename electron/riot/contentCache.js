@@ -317,20 +317,20 @@ function unavailableFeaturedBundle(bundle) {
   };
 }
 
-export async function resolveFeaturedBundle(bundle) {
-  const [index, bundles] = await Promise.all([
+export async function resolveFeaturedBundles(bundles) {
+  const [index, bundleIndex] = await Promise.all([
     getContentIndex(),
     // The list supplies a name and a picture and nothing else, so its failure becomes empty metadata HERE,
     // at the one call site that knows what the list is for: letting it travel would report a content outage.
     getBundleIndex().catch(() => new Map())
   ]);
-  return featuredBundleRecord(index, bundles, bundle);
+  return bundles.map((bundle) => featuredBundleRecord(index, bundleIndex, bundle));
 }
 
-export async function resolveFeaturedBundleOrFallback(bundle) {
+export async function resolveFeaturedBundlesOrFallback(bundles) {
   try {
-    return { bundle: await resolveFeaturedBundle(bundle), contentUnavailable: false };
+    return { bundles: await resolveFeaturedBundles(bundles), contentUnavailable: false };
   } catch {
-    return { bundle: unavailableFeaturedBundle(bundle), contentUnavailable: true };
+    return { bundles: bundles.map((bundle) => unavailableFeaturedBundle(bundle)), contentUnavailable: true };
   }
 }

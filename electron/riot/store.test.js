@@ -245,10 +245,10 @@ const FEATURED = {
   BundleRemainingDurationInSeconds: 345_600
 };
 
-describe('getFeaturedBundle', () => {
+describe('getFeaturedBundles', () => {
   it('reads the item ids, both prices, the promo flag and the percent', async () => {
-    const { getFeaturedBundle } = await loadStore();
-    expect(getFeaturedBundle({ FeaturedBundle: FEATURED }, 1_000_000)).toEqual({
+    const { getFeaturedBundles } = await loadStore();
+    expect(getFeaturedBundles({ FeaturedBundle: FEATURED }, 1_000_000)).toEqual([{
       id: 'bundle-asset-id',
       endsAt: 1_000_000 + 345_600_000,
       endsInSeconds: 345_600,
@@ -256,29 +256,85 @@ describe('getFeaturedBundle', () => {
         { itemTypeId: 'type-skin', itemId: 'level-1', quantity: 1, basePrice: 2475, discountedPrice: 2475, discountPercent: 0, isPromoItem: false },
         { itemTypeId: 'type-buddy', itemId: 'buddy-1', quantity: 1, basePrice: 475, discountedPrice: 475, discountPercent: 0, isPromoItem: true }
       ]
-    });
+    }]);
   });
 
   it('keys on the item id, which is the namespace the content index is built on', async () => {
     // Keying on Bundle.ID or on the row id would resolve no names and no images, and the failure would look like a content outage.
-    const { getFeaturedBundle } = await loadStore();
-    const items = getFeaturedBundle({ FeaturedBundle: FEATURED }).items;
-    expect(items.map((item) => item.itemId)).toEqual(['level-1', 'buddy-1']);
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: FEATURED });
+    expect(bundle.items.map((item) => item.itemId)).toEqual(['level-1', 'buddy-1']);
   });
 
   it('carries quantity through without multiplying it into the price', async () => {
     // BasePrice is the line's own price, not a unit price: a bundle with Quantity 2 still reports the price Riot sent, not twice it.
-    const { getFeaturedBundle } = await loadStore();
-    const bundle = getFeaturedBundle({ FeaturedBundle: { Bundle: {
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: { Bundle: {
       DataAssetID: 'b', Items: [{ Item: { ItemID: 'level-1', Quantity: 2 }, BasePrice: 2475, DiscountedPrice: 1980 }]
     } } });
     expect(bundle.items[0]).toMatchObject({ quantity: 2, basePrice: 2475, discountedPrice: 1980 });
   });
 
-  it('falls back to Bundles[0] when Bundle is absent', async () => {
-    // Some payloads carry `Bundles` instead of `Bundle`: without this fallback those accounts would never see the page.
-    const { getFeaturedBundle } = await loadStore();
-    const bundle = getFeaturedBundle({ FeaturedBundle: {
+  it('returns EVERY bundle on sale, not just the first', async () => {
+    // Measured live: Riot ran Champions 2026 (7 items, 33% off) alongside Warden Launch (4 items, 51% off).
+    // Reading only the primary hid the larger discount completely.
+    const { getFeaturedBundles } = await loadStore();
+    const bundles = getFeaturedBundles({ FeaturedBundle: {
+      Bundle: { DataAssetID: 'primary', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+      Bundles: [
+        { DataAssetID: 'primary', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+        { DataAssetID: 'promo', Items: [{ Item: { ItemID: 'level-2' }, BasePrice: 200 }] }
+      ]
+    } });
+    expect(bundles.map((bundle) => bundle.id)).toEqual(['primary', 'promo']);
+    expect(bundles[1].items.map((item) => item.itemId)).toEqual(['level-2']);
+  });
+
+  it('dedupes the repeat of the primary bundle that Bundles carries as its first entry', async () => {
+    // The live payload repeats it verbatim. Without this the same bundle draws two doors and two pages.
+    const { getFeaturedBundles } = await loadStore();
+    const bundles = getFeaturedBundles({ FeaturedBundle: {
+      Bundle: { DataAssetID: 'same', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+      Bundles: [
+        { DataAssetID: 'same', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+        { DataAssetID: 'same', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] }
+      ]
+    } });
+    expect(bundles).toHaveLength(1);
+    expect(bundles[0].id).toBe('same');
+  });
+
+  it('takes each bundle OWN duration, not the top-level one', async () => {
+    // The top-level FeaturedBundle.BundleRemainingDurationInSeconds is NOT the primary bundle's window:
+    // live, it held the SECOND bundle's value (7.5 days) while the primary's own field said 21.5 days,
+    // so preferring it under-reported the main bundle by a fortnight.
+    const { getFeaturedBundles } = await loadStore();
+    const [primary, promo] = getFeaturedBundles({ FeaturedBundle: {
+      BundleRemainingDurationInSeconds: 648_000,
+      Bundle: { DataAssetID: 'primary', DurationRemainingInSeconds: 1_857_600, Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+      Bundles: [
+        { DataAssetID: 'primary', DurationRemainingInSeconds: 1_857_600, Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+        { DataAssetID: 'promo', DurationRemainingInSeconds: 648_000, Items: [{ Item: { ItemID: 'level-2' }, BasePrice: 200 }] }
+      ]
+    } }, 0);
+    expect(primary.endsInSeconds).toBe(1_857_600);
+    expect(primary.endsAt).toBe(1_857_600_000);
+    expect(promo.endsInSeconds).toBe(648_000);
+  });
+
+  it('falls back to the top-level duration for a bundle that omits its own', async () => {
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: {
+      Bundle: { DataAssetID: 'b', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+      BundleRemainingDurationInSeconds: 60
+    } }, 0);
+    expect(bundle.endsInSeconds).toBe(60);
+  });
+
+  it('reads Bundles when Bundle is absent', async () => {
+    // Some payloads carry `Bundles` instead of `Bundle`: without this those accounts would never see the page.
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: {
       Bundles: [{ ...FEATURED.Bundle }],
       BundleRemainingDurationInSeconds: 60
     } });
@@ -287,35 +343,56 @@ describe('getFeaturedBundle', () => {
   });
 
   it('turns the remaining duration into an absolute instant', async () => {
-    const { getFeaturedBundle } = await loadStore();
-    expect(getFeaturedBundle({ FeaturedBundle: FEATURED }, 1_000_000).endsAt).toBe(1_000_000 + 345_600_000);
+    const { getFeaturedBundles } = await loadStore();
+    expect(getFeaturedBundles({ FeaturedBundle: FEATURED }, 1_000_000)[0].endsAt).toBe(1_000_000 + 345_600_000);
   });
 
-  it('returns null when Riot sends no bundle at all', async () => {
-    // The normal state outside a bundle sale: null means "no bundle", not a failure, and the renderer does not draw the door.
-    const { getFeaturedBundle } = await loadStore();
-    expect(getFeaturedBundle({ SkinsPanelLayout: {} })).toBeNull();
-    expect(getFeaturedBundle({ FeaturedBundle: null })).toBeNull();
-    expect(getFeaturedBundle(undefined)).toBeNull();
+  it('returns an empty list when Riot sends no bundle at all', async () => {
+    // The normal state outside a bundle sale: [] means "nothing on sale", not a failure, and the renderer
+    // draws no door.
+    const { getFeaturedBundles } = await loadStore();
+    expect(getFeaturedBundles({ SkinsPanelLayout: {} })).toEqual([]);
+    expect(getFeaturedBundles({ FeaturedBundle: null })).toEqual([]);
+    expect(getFeaturedBundles(undefined)).toEqual([]);
   });
 
-  it('returns null for an empty bundle rather than rendering an empty page', async () => {
-    const { getFeaturedBundle } = await loadStore();
-    expect(getFeaturedBundle({ FeaturedBundle: { Bundle: { DataAssetID: 'b', Items: [] }, Bundles: [] } })).toBeNull();
-    expect(getFeaturedBundle({ FeaturedBundle: { Bundles: [{ DataAssetID: 'b', Items: [] }] } })).toBeNull();
+  it('drops an empty bundle rather than rendering an empty page', async () => {
+    const { getFeaturedBundles } = await loadStore();
+    expect(getFeaturedBundles({ FeaturedBundle: { Bundle: { DataAssetID: 'b', Items: [] }, Bundles: [] } })).toEqual([]);
+    expect(getFeaturedBundles({ FeaturedBundle: { Bundles: [{ DataAssetID: 'b', Items: [] }] } })).toEqual([]);
+  });
+
+  it('keeps a bundle that has items when a sibling is empty', async () => {
+    // The empty one must not take the good one down with it.
+    const { getFeaturedBundles } = await loadStore();
+    const bundles = getFeaturedBundles({ FeaturedBundle: { Bundles: [
+      { DataAssetID: 'empty', Items: [] },
+      { DataAssetID: 'real', Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] }
+    ] } });
+    expect(bundles.map((bundle) => bundle.id)).toEqual(['real']);
+  });
+
+  it('drops a bundle with no DataAssetID', async () => {
+    // The id is what the renderer keys the door and the page on; without it two bundles are indistinguishable.
+    const { getFeaturedBundles } = await loadStore();
+    const bundles = getFeaturedBundles({ FeaturedBundle: { Bundles: [
+      { Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 100 }] },
+      { DataAssetID: 'real', Items: [{ Item: { ItemID: 'level-2' }, BasePrice: 100 }] }
+    ] } });
+    expect(bundles.map((bundle) => bundle.id)).toEqual(['real']);
   });
 
   it('reports a missing duration as null instead of NaN', async () => {
     // NaN would reach the countdown and print '--:--:--' forever; null means "open, end unknown", and the contents are still readable.
-    const { getFeaturedBundle } = await loadStore();
-    const bundle = getFeaturedBundle({ FeaturedBundle: { ...FEATURED, BundleRemainingDurationInSeconds: undefined } });
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: { ...FEATURED, BundleRemainingDurationInSeconds: undefined } });
     expect(bundle.endsInSeconds).toBeNull();
     expect(bundle.endsAt).toBeNull();
   });
 
   it('drops an entry with no identifiable item and keeps the rest', async () => {
-    const { getFeaturedBundle } = await loadStore();
-    const bundle = getFeaturedBundle({ FeaturedBundle: { Bundle: {
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: { Bundle: {
       DataAssetID: 'b',
       Items: [
         { Item: { ItemTypeID: 'type' }, BasePrice: 100 },
@@ -327,8 +404,8 @@ describe('getFeaturedBundle', () => {
   });
 
   it('reports a non-numeric price or percent as null instead of NaN', async () => {
-    const { getFeaturedBundle } = await loadStore();
-    const bundle = getFeaturedBundle({ FeaturedBundle: { Bundle: {
+    const { getFeaturedBundles } = await loadStore();
+    const [bundle] = getFeaturedBundles({ FeaturedBundle: { Bundle: {
       DataAssetID: 'b',
       Items: [{ Item: { ItemID: 'level-1' }, BasePrice: 'free', DiscountedPrice: null, DiscountPercent: 'lots' }]
     } } });
@@ -341,11 +418,11 @@ describe('getFeaturedBundle', () => {
   it('normalises the FRACTION this endpoint sends into a whole percent', async () => {
     // Measured on a live Champions 2026 bundle: FeaturedBundle.DiscountPercent arrives as 0.34 / 0.3 / 0.29
     // while the Night Market sends 34 / 30 — stored raw, the field would mean two things depending on the path.
-    const { getFeaturedBundle } = await loadStore();
-    const percents = (values) => getFeaturedBundle({ FeaturedBundle: { Bundle: {
+    const { getFeaturedBundles } = await loadStore();
+    const percents = (values) => getFeaturedBundles({ FeaturedBundle: { Bundle: {
       DataAssetID: 'b',
       Items: values.map((v, i) => ({ Item: { ItemID: `level-${i}` }, BasePrice: 100, DiscountedPrice: 66, DiscountPercent: v }))
-    } } }).items.map((item) => item.discountPercent);
+    } } })[0].items.map((item) => item.discountPercent);
 
     // Fractions, exactly as the live payload sends them.
     expect(percents([0.34, 0.3, 0.29, 0.32])).toEqual([34, 30, 29, 32]);

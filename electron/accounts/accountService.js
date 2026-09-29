@@ -1,7 +1,7 @@
 import { captureLiveCredentials, getActiveAccountId, listAccounts, loadAccount, saveAccount, updateAccountSession } from './accountStore.js';
 import { getSessionTokens, resolveShard } from '../riot/auth.js';
-import { fetchAccountProfile, fetchStorefront, getDailyOffers, getFeaturedBundle, nightMarketWindow } from '../riot/store.js';
-import { resolveDailyOffersOrFallback, resolveFeaturedBundleOrFallback, resolveNightMarketOrFallback } from '../riot/contentCache.js';
+import { fetchAccountProfile, fetchStorefront, getDailyOffers, getFeaturedBundles, nightMarketWindow } from '../riot/store.js';
+import { resolveDailyOffersOrFallback, resolveFeaturedBundlesOrFallback, resolveNightMarketOrFallback } from '../riot/contentCache.js';
 import { fail, classifyError } from '../lib/errorKind.js';
 
 function expiry(accessToken) {
@@ -18,7 +18,7 @@ async function resolvedStore(session) {
     offers,
     contentUnavailable,
     nightMarket: await resolvedNightMarket(storefront),
-    bundle: await resolvedFeaturedBundle(storefront),
+    bundles: await resolvedFeaturedBundles(storefront),
     expiresIn: storefront?.SkinsPanelLayout?.SingleItemOffersRemainingDurationInSeconds ?? null,
     profile
   };
@@ -34,14 +34,14 @@ async function resolvedNightMarket(storefront) {
   return { offers, contentUnavailable, endsAt: market.endsAt };
 }
 
-// Featured bundle: like Night Market it is absent more often than present, and null means
-// "no bundle", not a failure. Resolved after the daily offers and outside their fallback
-// path, because a bundle that cannot be labelled must not touch the store.
-async function resolvedFeaturedBundle(storefront) {
-  const parsed = getFeaturedBundle(storefront);
-  if (!parsed) return null;
-  const { bundle, contentUnavailable } = await resolveFeaturedBundleOrFallback(parsed);
-  return { ...bundle, contentUnavailable };
+// Featured bundles: like Night Market they are absent more often than present, and an empty array means
+// "nothing on sale", not a failure. Resolved after the daily offers and outside their fallback path,
+// because a bundle that cannot be labelled must not touch the store.
+async function resolvedFeaturedBundles(storefront) {
+  const parsed = getFeaturedBundles(storefront);
+  if (!parsed.length) return [];
+  const { bundles, contentUnavailable } = await resolveFeaturedBundlesOrFallback(parsed);
+  return bundles.map((bundle) => ({ ...bundle, contentUnavailable }));
 }
 
 // PUUID of the Riot Client session signed in right now, or null while it sits at sign-in.

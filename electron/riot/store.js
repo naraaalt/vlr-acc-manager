@@ -189,26 +189,10 @@ function percentOrNull(value) {
   return Math.round(number <= 1 ? number * 100 : number);
 }
 
-// Featured bundle: the cosmetic bundle Riot is selling right now, inside the same storefront as the daily
-// store, so it costs no extra request. Its shape differs from the other two paths here: every item carries
-// its own price, discount and promo flag, so no price is reconstructed from the bundle price.
-//
-// `Bundles` has the same shape as `Bundle` and appears in some payloads where `Bundle` does not, hence
-// Bundle first, then Bundles[0]. An entry without an ItemID is dropped — that id resolves its name, image
-// and tier, and a missing row beats a row that lies about what it is.
-//
-// `now` is a parameter because the duration is measured AT THIS REQUEST: converted to an absolute instant
-// once, here, rather than going stale the moment it is read.
-export function getFeaturedBundle(storefront, now = Date.now()) {
-  const featured = storefront?.FeaturedBundle;
-  const primary = featured?.Bundle?.Items;
-  const secondary = featured?.Bundles?.[0]?.Items;
-  const bundle = Array.isArray(primary) && primary.length
-    ? featured.Bundle
-    : (Array.isArray(secondary) && secondary.length ? featured.Bundles[0] : null);
-  if (!bundle) return null;
-
-  const items = bundle.Items.map((entry) => {
+// One bundle's rows, in the shape the content index is keyed on. An entry without an ItemID is dropped —
+// that id resolves its name, image and tier, and a missing row beats a row that lies about what it is.
+function bundleRows(items) {
+  return (Array.isArray(items) ? items : []).map((entry) => {
     const item = entry?.Item;
     const itemId = item?.ItemID;
     if (typeof itemId !== 'string' || !itemId) return null;
@@ -226,12 +210,48 @@ export function getFeaturedBundle(storefront, now = Date.now()) {
       isPromoItem: Boolean(entry?.IsPromoItem)
     };
   }).filter(Boolean);
+}
 
-  const endsInSeconds = finiteOr(featured?.BundleRemainingDurationInSeconds, null);
-  return {
-    id: typeof bundle.DataAssetID === 'string' ? bundle.DataAssetID : '',
-    endsAt: endsInSeconds === null ? null : now + endsInSeconds * 1000,
-    endsInSeconds,
-    items
-  };
+// Featured bundles: the cosmetic bundles Riot is selling right now, inside the same storefront as the daily
+// store, so they cost no extra request. Every item carries its own price, discount and promo flag, so no
+// price is reconstructed from the bundle price.
+//
+// USUALLY ONE, but Riot runs a second promo bundle alongside the main one — measured live: Champions 2026
+// (7 items, 33% off) with Warden Launch (4 items, 51% off). Returning only the first hid the larger
+// discount entirely, so this returns the whole set.
+//
+// `Bundles` REPEATS the primary bundle as its own first entry, so the list is deduped on DataAssetID:
+// drawing the same bundle twice is worse than drawing one, and the repeat is not a second offer.
+//
+// The window is PER BUNDLE (`DurationRemainingInSeconds`). The top-level
+// `FeaturedBundle.BundleRemainingDurationInSeconds` is NOT it: on the live payload that field held the
+// SECOND bundle's window (7.5 days) while the first bundle's own field said 21.5 days, so preferring it
+// under-reported the main bundle by a fortnight. It is kept only as the fallback for a bundle that omits
+// its own field.
+//
+// `now` is a parameter because the durations are measured AT THIS REQUEST: converted to absolute instants
+// once, here, rather than going stale the moment they are read.
+export function getFeaturedBundles(storefront, now = Date.now()) {
+  const featured = storefront?.FeaturedBundle;
+  if (!featured) return [];
+  const fallbackSeconds = finiteOr(featured.BundleRemainingDurationInSeconds, null);
+
+  const seen = new Set();
+  const bundles = [];
+  for (const bundle of [featured.Bundle, ...(Array.isArray(featured.Bundles) ? featured.Bundles : [])]) {
+    const id = typeof bundle?.DataAssetID === 'string' ? bundle.DataAssetID : '';
+    if (!id || seen.has(id)) continue;
+    const items = bundleRows(bundle.Items);
+    // An empty bundle is not a sale: without this the page renders its shell around nothing.
+    if (!items.length) continue;
+    seen.add(id);
+    const endsInSeconds = finiteOr(bundle.DurationRemainingInSeconds, fallbackSeconds);
+    bundles.push({
+      id,
+      endsAt: endsInSeconds === null ? null : now + endsInSeconds * 1000,
+      endsInSeconds,
+      items
+    });
+  }
+  return bundles;
 }

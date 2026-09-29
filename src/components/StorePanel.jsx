@@ -355,8 +355,10 @@ function bundleKindLabel(item) {
 // with its original price struck through, not 0 VP: a 0 next to an item reads as "this item is
 // free", and that is not what Riot says. Its order is Riot's order and is not sorted like Night
 // Market, because a bundle is one set Riot already arranged — weapons first, accessories after.
-export function FeaturedBundleView({ account, now, onBack, onPreview }) {
-  const bundle = account.status === 'ready' ? account.store?.bundle : null;
+//
+// It takes the bundle ITSELF, not the account: Riot can be selling more than one at a time, so which
+// one this page is about is decided by the door that was pressed, not by the account.
+export function FeaturedBundleView({ bundle, now, onBack, onPreview }) {
   // The same helper as Night Market: it only needs a window with an absolute end, not offers.
   const remaining = nightMarketCountdown(bundle?.endsAt, now);
   const items = bundle?.items ?? [];
@@ -373,7 +375,7 @@ export function FeaturedBundleView({ account, now, onBack, onPreview }) {
       </div>
       <div className="market-head">
         <BrandMark size={18} />
-        <h2>{account.label.toUpperCase()} — FEATURED BUNDLE</h2>
+        <h2>FEATURED BUNDLE</h2>
         <span className="nm-head-live">
           {bundle?.name ?? '—'}
           {bundle?.discountPercent != null ? ` · -${bundle.discountPercent}%` : ''}

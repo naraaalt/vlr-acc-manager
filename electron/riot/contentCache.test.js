@@ -366,7 +366,7 @@ describe('resolveNightMarketOffers', () => {
 //
 // `included` (IsPromoItem) is the flag most easily misread: a promo item does NOT add to the bundle price,
 // yet it still carries a BasePrice — and that difference is exactly the bundle discount.
-describe('resolveFeaturedBundle', () => {
+describe('resolveFeaturedBundles', () => {
   // The shape getFeaturedBundle emits: this resolver takes parsed input, so anything else would test something that never happens.
   const item = (itemId, { base, discounted = null, percent = null, promo = false, quantity = 1, itemTypeId = 'type' } = {}) => ({
     itemTypeId, itemId, quantity, basePrice: base, discountedPrice: discounted, discountPercent: percent, isPromoItem: promo
@@ -389,8 +389,8 @@ describe('resolveFeaturedBundle', () => {
   it('resolves a skin item from the skin index, with everything the showcase modal reads', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     // Exactly what SkinPreviewModal reads, which is why the existing showcase modal needs no change to open from here.
     expect(bundle.items[0]).toMatchObject({
@@ -404,8 +404,8 @@ describe('resolveFeaturedBundle', () => {
   it('resolves buddy, spray and card from the accessory index with the right kind and image', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const [buddy, spray, card] = (await resolveFeaturedBundle(BUNDLE)).items.slice(2);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const [buddy, spray, card] = ((await resolveFeaturedBundles([BUNDLE]))[0]).items.slice(2);
 
     expect(buddy).toMatchObject({ kind: 'buddy', name: 'Elderflame Buddy', image: 'buddy.png', tier: null });
     // Sprays and cards ship a separate high-resolution version; that is the one used, not the icon.
@@ -420,11 +420,11 @@ describe('resolveFeaturedBundle', () => {
     // counts in the totals below, so the price Riot charges stays exact.
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle({
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([{
       ...BUNDLE,
       items: [item(LEVEL_UUID, { base: 2475, discounted: 2475 }), item('not-in-any-index', { base: 100, discounted: 100 })]
-    });
+    }]))[0];
 
     expect(bundle.items).toHaveLength(1);
     expect(bundle.items[0].id).toBe(LEVEL_UUID);
@@ -438,21 +438,21 @@ describe('resolveFeaturedBundle', () => {
     // Riot's ItemTypeID, so a card can say "BUDDY" even when it cannot say which buddy.
     vi.resetModules();
     globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const result = await resolveFeaturedBundleOrFallback({
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const result = await resolveFeaturedBundlesOrFallback([{
       ...BUNDLE,
       items: [
         item(BUDDY_UUID, { base: 475, discounted: 323, itemTypeId: 'dd3bf334-87f3-40bd-b043-682a57a8dc3a' }),
         item(SPRAY_UUID, { base: 325, discounted: 231, itemTypeId: 'd5f120f8-ff8c-4aac-92ea-f2b5acbe9475' }),
         item(CARD_UUID, { base: 375, discounted: 263, itemTypeId: '3f296c07-64c3-494c-923b-fe692a4fa1bd' })
       ]
-    });
+    }]);
 
     expect(result.contentUnavailable).toBe(true);
-    expect(result.bundle.items.map((entry) => entry.kind)).toEqual(['buddy', 'spray', 'card']);
-    expect(result.bundle.items.every((entry) => entry.name === 'Unknown item')).toBe(true);
-    expect(result.bundle.price).toBe(323 + 231 + 263);
-    expect(result.bundle.baseTotal).toBe(475 + 325 + 375);
+    expect(result.bundles[0].items.map((entry) => entry.kind)).toEqual(['buddy', 'spray', 'card']);
+    expect(result.bundles[0].items.every((entry) => entry.name === 'Unknown item')).toBe(true);
+    expect(result.bundles[0].price).toBe(323 + 231 + 263);
+    expect(result.bundles[0].baseTotal).toBe(475 + 325 + 375);
   });
 
   it('resolves an accessory sent under its LEVEL uuid, the way a real bundle sends it', async () => {
@@ -461,11 +461,11 @@ describe('resolveFeaturedBundle', () => {
     // entry uuid left that one item unnameable while the six others in the same bundle resolved.
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle({
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([{
       ...BUNDLE,
       items: [item(BUDDY_LEVEL_UUID, { base: 475, discounted: 323 })]
-    });
+    }]))[0];
 
     expect(bundle.items[0]).toMatchObject({
       id: BUDDY_LEVEL_UUID, kind: 'buddy', name: 'Elderflame Buddy', image: 'buddy.png'
@@ -477,16 +477,16 @@ describe('resolveFeaturedBundle', () => {
     // Both keys are indexed so whichever id a payload uses resolves; indexing only the level uuid would trade one unnameable item for another.
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle({ ...BUNDLE, items: [item(BUDDY_UUID, { base: 475, discounted: 323 })] });
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([{ ...BUNDLE, items: [item(BUDDY_UUID, { base: 475, discounted: 323 })] }]))[0];
     expect(bundle.items[0]).toMatchObject({ kind: 'buddy', name: 'Elderflame Buddy' });
   });
 
   it('computes both totals and the discount percent from the prices as sent', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     expect(bundle.baseTotal).toBe(2475 + 4950 + 475 + 325 + 375);
     expect(bundle.price).toBe(2475 + 4950);
@@ -499,9 +499,9 @@ describe('resolveFeaturedBundle', () => {
     // baseTotal > price and a positive discount — a smaller fixture can pass with the price computed wrongly.
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
     const skins = [LEVEL_UUID, OTHER_LEVEL_UUID, 'skin-3', 'skin-4'];
-    const bundle = await resolveFeaturedBundle({
+    const bundle = (await resolveFeaturedBundles([{
       id: BUNDLE_UUID,
       endsAt: 1_700_000_000_000,
       endsInSeconds: 345_600,
@@ -512,7 +512,7 @@ describe('resolveFeaturedBundle', () => {
         item(SPRAY_UUID, { base: 325, discounted: 0, promo: true }),
         item(CARD_UUID, { base: 375, discounted: 0, promo: true })
       ]
-    });
+    }]))[0];
 
     expect(bundle.baseTotal).toBe(16_025);
     expect(bundle.price).toBe(9_900);
@@ -527,8 +527,8 @@ describe('resolveFeaturedBundle', () => {
   it('falls back to the full price for an item Riot sent no discounted price for', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle({ ...BUNDLE, items: [item(LEVEL_UUID, { base: 2475 })] });
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([{ ...BUNDLE, items: [item(LEVEL_UUID, { base: 2475 })] }]))[0];
     expect(bundle.price).toBe(2475);
     expect(bundle.baseTotal).toBe(2475);
     // Two equal totals are not a 0% discount — the chip is dropped rather than printed as -0%.
@@ -538,8 +538,8 @@ describe('resolveFeaturedBundle', () => {
   it('takes the name and the key art from the bundle list', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     expect(bundle.name).toBe('Elderflame');
     // displayIcon2 (wide key art) and verticalPromoImage; logoIcon is null for Elderflame, hence the text name.
@@ -552,8 +552,8 @@ describe('resolveFeaturedBundle', () => {
     // let the renderer fall through to tall, and then to NO ART.
     vi.resetModules();
     stubContentApi({ bundles: [{ uuid: BUNDLE_UUID, displayName: 'Elderflame', displayIcon: 'bundle-square.png' }] });
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     expect(bundle.art).toEqual({ wide: null, tall: null, logo: null });
     // The name still resolves from the same entry: art and name are independent fields.
@@ -563,8 +563,8 @@ describe('resolveFeaturedBundle', () => {
   it('uses the tall poster when there is no wide key art', async () => {
     vi.resetModules();
     stubContentApi({ bundles: [{ uuid: BUNDLE_UUID, displayName: 'Elderflame', verticalPromoImage: 'bundle-tall.png' }] });
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     expect(bundle.art).toEqual({ wide: null, tall: 'bundle-tall.png', logo: null });
   });
@@ -572,8 +572,8 @@ describe('resolveFeaturedBundle', () => {
   it('carries the window through untouched', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([BUNDLE]))[0];
     expect(bundle.endsAt).toBe(BUNDLE.endsAt);
     expect(bundle.endsInSeconds).toBe(BUNDLE.endsInSeconds);
   });
@@ -582,8 +582,8 @@ describe('resolveFeaturedBundle', () => {
     // An older bundle no longer in /v1/bundles: the list only ever supplied its name and its art.
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const bundle = await resolveFeaturedBundle({ ...BUNDLE, id: 'bundle-not-listed' });
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const bundle = (await resolveFeaturedBundles([{ ...BUNDLE, id: 'bundle-not-listed' }]))[0];
     expect(bundle.name).toBe('UNKNOWN BUNDLE');
     expect(bundle.art).toEqual({ wide: null, tall: null, logo: null });
     expect(bundle.items).toHaveLength(5);
@@ -594,16 +594,16 @@ describe('resolveFeaturedBundle', () => {
     // Accessories are decoration on a bundle Riot served: losing those lists must not fail the page or be reported as an outage.
     vi.resetModules();
     stubContentApi({ accessoriesOk: false });
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const result = await resolveFeaturedBundleOrFallback(BUNDLE);
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const result = await resolveFeaturedBundlesOrFallback([BUNDLE]);
 
     expect(result.contentUnavailable).toBe(false);
-    expect(result.bundle.items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal' });
+    expect(result.bundles[0].items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal' });
     // The three accessory cards are GONE rather than drawn as "Unknown item": a nameless card reads as a broken app.
-    expect(result.bundle.items.map((entry) => entry.kind)).toEqual(['skin', 'skin']);
+    expect(result.bundles[0].items.map((entry) => entry.kind)).toEqual(['skin', 'skin']);
     // Money is untouched by that: the accessory prices are still inside Riot's totals.
-    expect(result.bundle.price).toBe(7425);
-    expect(result.bundle.baseTotal).toBe(8600);
+    expect(result.bundles[0].price).toBe(7425);
+    expect(result.bundles[0].baseTotal).toBe(8600);
   });
 
   it('keeps the item labels when only the bundle list is down', async () => {
@@ -611,16 +611,16 @@ describe('resolveFeaturedBundle', () => {
     // it must cost exactly those two things — the items keep their names, their kinds, their prices and the window.
     vi.resetModules();
     stubContentApi({ bundlesOk: false });
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const result = await resolveFeaturedBundleOrFallback(BUNDLE);
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const result = await resolveFeaturedBundlesOrFallback([BUNDLE]);
 
     expect(result.contentUnavailable).toBe(false);
-    expect(result.bundle.name).toBe('UNKNOWN BUNDLE');
-    expect(result.bundle.art).toEqual({ wide: null, tall: null, logo: null });
-    expect(result.bundle.items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal', price: 2475 });
-    expect(result.bundle.items[2]).toMatchObject({ kind: 'buddy', name: 'Elderflame Buddy' });
-    expect(result.bundle.price).toBe(7425);
-    expect(result.bundle.endsAt).toBe(BUNDLE.endsAt);
+    expect(result.bundles[0].name).toBe('UNKNOWN BUNDLE');
+    expect(result.bundles[0].art).toEqual({ wide: null, tall: null, logo: null });
+    expect(result.bundles[0].items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal', price: 2475 });
+    expect(result.bundles[0].items[2]).toMatchObject({ kind: 'buddy', name: 'Elderflame Buddy' });
+    expect(result.bundles[0].price).toBe(7425);
+    expect(result.bundles[0].endsAt).toBe(BUNDLE.endsAt);
   });
 
   it('treats an unparseable bundle list the same as a missing one', async () => {
@@ -628,15 +628,15 @@ describe('resolveFeaturedBundle', () => {
     // a 503: the name and the art go, the items and their labels do not, and it is not a content outage.
     vi.resetModules();
     stubContentApi({ bundlesMalformed: true });
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const result = await resolveFeaturedBundleOrFallback(BUNDLE);
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const result = await resolveFeaturedBundlesOrFallback([BUNDLE]);
 
     expect(result.contentUnavailable).toBe(false);
-    expect(result.bundle.name).toBe('UNKNOWN BUNDLE');
-    expect(result.bundle.art).toEqual({ wide: null, tall: null, logo: null });
-    expect(result.bundle.items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal' });
-    expect(result.bundle.price).toBe(7425);
-    expect(result.bundle.endsAt).toBe(BUNDLE.endsAt);
+    expect(result.bundles[0].name).toBe('UNKNOWN BUNDLE');
+    expect(result.bundles[0].art).toEqual({ wide: null, tall: null, logo: null });
+    expect(result.bundles[0].items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal' });
+    expect(result.bundles[0].price).toBe(7425);
+    expect(result.bundles[0].endsAt).toBe(BUNDLE.endsAt);
   });
 
   it('retries the bundle list after a failure instead of remembering the empty result', async () => {
@@ -653,14 +653,14 @@ describe('resolveFeaturedBundle', () => {
       }
       return working(url);
     });
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
 
-    const first = await resolveFeaturedBundle(BUNDLE);
+    const first = (await resolveFeaturedBundles([BUNDLE]))[0];
     // Degraded, not broken: the metadata is gone and everything Riot sent is still there.
     expect(first.name).toBe('UNKNOWN BUNDLE');
     expect(first.items[0]).toMatchObject({ kind: 'skin', name: 'Reaver Vandal', price: 2475 });
 
-    const second = await resolveFeaturedBundle(BUNDLE);
+    const second = (await resolveFeaturedBundles([BUNDLE]))[0];
     expect(bundleCalls).toBe(2);
     expect(second.name).toBe('Elderflame');
     expect(second.art).toEqual({ wide: 'bundle-wide.png', tall: 'bundle-tall.png', logo: null });
@@ -681,11 +681,11 @@ describe('resolveFeaturedBundle', () => {
         }
         return working(url);
       });
-      const { resolveFeaturedBundle } = await import('./contentCache.js');
+      const { resolveFeaturedBundles } = await import('./contentCache.js');
       const label = JSON.stringify(body);
 
       // Wrong shape: the list is decoration, so the metadata goes and Riot's data stays — and this is NOT an outage.
-      const first = await resolveFeaturedBundle(BUNDLE);
+      const first = (await resolveFeaturedBundles([BUNDLE]))[0];
       expect(first.name, `name for ${label}`).toBe('UNKNOWN BUNDLE');
       expect(first.art, `art for ${label}`).toEqual({ wide: null, tall: null, logo: null });
       expect(first.items[0], `items for ${label}`).toMatchObject({ kind: 'skin', name: 'Reaver Vandal', price: 2475 });
@@ -693,7 +693,7 @@ describe('resolveFeaturedBundle', () => {
       expect(first.endsAt, `endsAt for ${label}`).toBe(BUNDLE.endsAt);
 
       // A real list now, and it has to be REQUESTED again: a memoised empty map makes no second request.
-      const second = await resolveFeaturedBundle(BUNDLE);
+      const second = (await resolveFeaturedBundles([BUNDLE]))[0];
       expect(bundleCalls, `retry after ${label}`).toBe(2);
       expect(second.name, `recovered name for ${label}`).toBe('Elderflame');
       expect(second.art, `recovered art for ${label}`).toEqual({ wide: 'bundle-wide.png', tall: 'bundle-tall.png', logo: null });
@@ -715,10 +715,10 @@ describe('resolveFeaturedBundle', () => {
       }
       return working(url);
     });
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
 
-    const first = await resolveFeaturedBundle(BUNDLE);
-    const second = await resolveFeaturedBundle(BUNDLE);
+    const first = (await resolveFeaturedBundles([BUNDLE]))[0];
+    const second = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     // Exactly one fetch across both resolves: the empty array was accepted and remembered.
     expect(bundleCalls).toBe(1);
@@ -735,46 +735,46 @@ describe('resolveFeaturedBundle', () => {
     // survive — the same rule withDiscount records.
     vi.resetModules();
     globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const result = await resolveFeaturedBundleOrFallback(BUNDLE);
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const result = await resolveFeaturedBundlesOrFallback([BUNDLE]);
 
     expect(result.contentUnavailable).toBe(true);
-    expect(result.bundle.name).toBe('Unknown bundle');
-    expect(result.bundle.art).toEqual({ wide: null, tall: null, logo: null });
-    expect(result.bundle.items.map((entry) => entry.id)).toEqual(BUNDLE.items.map((entry) => entry.itemId));
-    expect(result.bundle.items.map((entry) => entry.price)).toEqual([2475, 4950, 0, 0, 0]);
-    expect(result.bundle.baseTotal).toBe(8600);
-    expect(result.bundle.price).toBe(7425);
-    expect(result.bundle.endsAt).toBe(BUNDLE.endsAt);
-    expect(result.bundle.items.every((entry) => entry.kind === 'other')).toBe(true);
+    expect(result.bundles[0].name).toBe('Unknown bundle');
+    expect(result.bundles[0].art).toEqual({ wide: null, tall: null, logo: null });
+    expect(result.bundles[0].items.map((entry) => entry.id)).toEqual(BUNDLE.items.map((entry) => entry.itemId));
+    expect(result.bundles[0].items.map((entry) => entry.price)).toEqual([2475, 4950, 0, 0, 0]);
+    expect(result.bundles[0].baseTotal).toBe(8600);
+    expect(result.bundles[0].price).toBe(7425);
+    expect(result.bundles[0].endsAt).toBe(BUNDLE.endsAt);
+    expect(result.bundles[0].items.every((entry) => entry.kind === 'other')).toBe(true);
   });
 
   it('gives the fallback record the same shape as a resolved one', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    const resolved = await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    const resolved = (await resolveFeaturedBundles([BUNDLE]))[0];
 
     // A FRESH module graph for the fallback, which is the point: the call above memoised the successful index,
     // so swapping fetch afterwards would compare two successful records — passing while the fallback is broken.
     vi.resetModules();
     globalThis.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
-    const { resolveFeaturedBundleOrFallback } = await import('./contentCache.js');
-    const fallback = await resolveFeaturedBundleOrFallback(BUNDLE);
+    const { resolveFeaturedBundlesOrFallback } = await import('./contentCache.js');
+    const fallback = await resolveFeaturedBundlesOrFallback([BUNDLE]);
 
     expect(fallback.contentUnavailable).toBe(true);
-    expect(Object.keys(fallback.bundle).sort()).toEqual(Object.keys(resolved).sort());
-    expect(Object.keys(fallback.bundle.art).sort()).toEqual(Object.keys(resolved.art).sort());
-    expect(Object.keys(fallback.bundle.items[0]).sort()).toEqual(Object.keys(resolved.items[0]).sort());
+    expect(Object.keys(fallback.bundles[0]).sort()).toEqual(Object.keys(resolved).sort());
+    expect(Object.keys(fallback.bundles[0].art).sort()).toEqual(Object.keys(resolved.art).sort());
+    expect(Object.keys(fallback.bundles[0].items[0]).sort()).toEqual(Object.keys(resolved.items[0]).sort());
   });
 
   it('shares the one index: no extra fetch for a second bundle load', async () => {
     vi.resetModules();
     stubContentApi();
-    const { resolveFeaturedBundle } = await import('./contentCache.js');
-    await resolveFeaturedBundle(BUNDLE);
+    const { resolveFeaturedBundles } = await import('./contentCache.js');
+    (await resolveFeaturedBundles([BUNDLE]))[0];
     const callsAfterFirst = globalThis.fetch.mock.calls.length;
-    await resolveFeaturedBundle(BUNDLE);
+    (await resolveFeaturedBundles([BUNDLE]))[0];
     expect(globalThis.fetch.mock.calls.length).toBe(callsAfterFirst);
   });
 });

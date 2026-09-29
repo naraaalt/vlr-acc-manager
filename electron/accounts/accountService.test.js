@@ -35,6 +35,10 @@ const CARD_LEVEL = 'card-elderflame';
 const MARKET_SECONDS = 12 * 24 * 3600 + 22 * 3600;
 // Four days, the way Riot sends it for a bundle that is currently on sale.
 const BUNDLE_SECONDS = 4 * 24 * 3600;
+// The second bundle Riot runs alongside the first, on a SHORTER window — measured live, and the
+// reason each bundle carries its own countdown instead of one shared figure.
+const PROMO_UUID = 'bundle-warden';
+const PROMO_SECONDS = 2 * 24 * 3600;
 
 function bonusOffer(levelId, { cost, discounted, percent, seen }) {
   return {
@@ -264,7 +268,7 @@ describe('getDashboard dengan Night Market', () => {
   });
 });
 
-// `bundle` is the FIFTH field in the store payload, same reason as the Night Market block above:
+// `bundles` is the FIFTH field in the store payload, same reason as the Night Market block above:
 // if its name is misspelled or left un-awaited, every other test stays green and the only loss is a
 // feature that never appears on screen.
 describe('getDashboard dengan Featured Bundle', () => {
@@ -274,7 +278,7 @@ describe('getDashboard dengan Featured Bundle', () => {
 
     const { accounts } = await service.getDashboard();
     expect(accounts[0].status).toBe('ready');
-    const bundle = accounts[0].store.bundle;
+    const bundle = accounts[0].store.bundles[0];
 
     expect(bundle).not.toBeNull();
     expect(bundle).toMatchObject({ id: BUNDLE_UUID, name: 'Elderflame' });
@@ -295,7 +299,7 @@ describe('getDashboard dengan Featured Bundle', () => {
     const service = await serviceWith({ storefront: storefrontWith({ FeaturedBundle: featuredBundle() }) });
 
     const { accounts } = await service.getDashboard();
-    const bundle = accounts[0].store.bundle;
+    const bundle = accounts[0].store.bundles[0];
     // Promo items still carry their full BasePrice; that difference is exactly the bundle's discount.
     expect(bundle.baseTotal).toBe(1775 + 2675 + 475 + 325 + 375);
     expect(bundle.price).toBe(1775 + 2675);
@@ -309,21 +313,46 @@ describe('getDashboard dengan Featured Bundle', () => {
     const before = Date.now();
     const { accounts } = await service.getDashboard();
     const after = Date.now();
-    const endsAt = accounts[0].store.bundle.endsAt;
+    const endsAt = accounts[0].store.bundles[0].endsAt;
 
     expect(endsAt).toBeGreaterThanOrEqual(before + BUNDLE_SECONDS * 1000);
     expect(endsAt).toBeLessThanOrEqual(after + BUNDLE_SECONDS * 1000);
   });
 
-  it('bundle null ketika Riot tidak sedang menjual bundle, dan akunnya tetap ready', async () => {
-    // The normal state outside a bundle sale: the field is simply absent, the store is unaffected.
+  it('bundles kosong ketika Riot tidak sedang menjual bundle, dan akunnya tetap ready', async () => {
+    // The normal state outside a bundle sale: the list is simply empty, the store is unaffected.
     useAccount(savedAccount());
     const service = await serviceWith({ storefront: storefrontWith() });
 
     const { accounts } = await service.getDashboard();
     expect(accounts[0].status).toBe('ready');
-    expect(accounts[0].store.bundle).toBeNull();
+    expect(accounts[0].store.bundles).toEqual([]);
     expect(accounts[0].store.offers).toHaveLength(1);
+  });
+
+  it('mengirim SEMUA bundle yang dijual, bukan cuma yang pertama', async () => {
+    // Measured live: Riot ran a second promo bundle beside the main one, and reading only the primary
+    // hid its discount entirely. The renderer draws one door per entry, so the list has to carry both.
+    useAccount(savedAccount());
+    const service = await serviceWith({ storefront: storefrontWith({ FeaturedBundle: featuredBundle({
+      Bundles: [{
+        ID: 'promo-row',
+        DataAssetID: PROMO_UUID,
+        CurrencyID: 'vp',
+        DurationRemainingInSeconds: PROMO_SECONDS,
+        Items: [{ Item: { ItemTypeID: 'skin-type', ItemID: ONI_LEVEL, Quantity: 1 }, BasePrice: 875, DiscountedPrice: 525, DiscountPercent: 0.4, IsPromoItem: false }]
+      }]
+    }) }) });
+
+    const { accounts } = await service.getDashboard();
+    const bundles = accounts[0].store.bundles;
+
+    expect(bundles.map((bundle) => bundle.id)).toEqual([BUNDLE_UUID, PROMO_UUID]);
+    expect(bundles[0].name).toBe('Elderflame');
+    expect(bundles[1]).toMatchObject({ id: PROMO_UUID, price: 525, baseTotal: 875, discountPercent: 40 });
+    // Each keeps its OWN window: the promo's own field wins over the payload's shared one.
+    expect(bundles[1].endsInSeconds).toBe(PROMO_SECONDS);
+    expect(bundles[0].endsInSeconds).toBe(BUNDLE_SECONDS);
   });
 
   it('layanan konten mati: label hilang, tapi harga, total dan jendela bundle tetap utuh', async () => {
@@ -337,11 +366,11 @@ describe('getDashboard dengan Featured Bundle', () => {
     const store = accounts[0].store;
     // A third-party failure must not turn an account Riot served fine into an error.
     expect(accounts[0].status).toBe('ready');
-    expect(store.bundle.contentUnavailable).toBe(true);
-    expect(store.bundle.name).toBe('Unknown bundle');
-    expect(store.bundle.items.map((entry) => entry.id)).toEqual([REAVER_LEVEL, ONI_LEVEL, BUDDY_LEVEL, SPRAY_LEVEL, CARD_LEVEL]);
-    expect(store.bundle.baseTotal).toBe(5625);
-    expect(store.bundle.price).toBe(4450);
-    expect(store.bundle.endsInSeconds).toBe(BUNDLE_SECONDS);
+    expect(store.bundles[0].contentUnavailable).toBe(true);
+    expect(store.bundles[0].name).toBe('Unknown bundle');
+    expect(store.bundles[0].items.map((entry) => entry.id)).toEqual([REAVER_LEVEL, ONI_LEVEL, BUDDY_LEVEL, SPRAY_LEVEL, CARD_LEVEL]);
+    expect(store.bundles[0].baseTotal).toBe(5625);
+    expect(store.bundles[0].price).toBe(4450);
+    expect(store.bundles[0].endsInSeconds).toBe(BUNDLE_SECONDS);
   });
 });

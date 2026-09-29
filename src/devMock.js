@@ -55,6 +55,9 @@ const BUNDLE_ITEMS = [
   { id: 'bundle-card', kind: 'card', name: 'Elderflame Card', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 375, discountPercent: 0, included: true, quantity: 1 }
 ];
 
+// Two bundles, because Riot runs a second promo bundle alongside the main one and one fixture would
+// never exercise the doors or the page's bundle selection. The second is deliberately smaller and
+// more heavily discounted, so a mix-up between them is visible rather than plausible.
 function bundleFixture() {
   const items = BUNDLE_ITEMS.map((item) => ({ ...item }));
   const baseTotal = items.reduce((sum, item) => sum + (item.basePrice ?? 0), 0);
@@ -70,6 +73,30 @@ function bundleFixture() {
     // A few days ahead, recomputed every time a store is created — the page never starts out "already ended".
     endsAt: Date.now() + (4 * 24 * 3600_000) + (6 * 3600_000),
     endsInSeconds: 4 * 24 * 3600 + 6 * 3600,
+    contentUnavailable: false
+  };
+}
+
+function promoBundleFixture() {
+  const items = [
+    { id: 'promo-skin', kind: 'skin', name: 'Galleria Warden', image: null, video: null, levels: [], chromas: [], tier: TIERS.select, price: 525, basePrice: 875, discountPercent: 0, included: false, quantity: 1 },
+    { id: 'promo-buddy', kind: 'buddy', name: 'Warden Buddy', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 475, discountPercent: 0, included: true, quantity: 1 },
+    { id: 'promo-spray', kind: 'spray', name: 'Warden Spray', image: null, video: null, levels: [], chromas: [], tier: null, price: 0, basePrice: 325, discountPercent: 0, included: true, quantity: 1 }
+  ];
+  const baseTotal = items.reduce((sum, item) => sum + (item.basePrice ?? 0), 0);
+  const price = items.reduce((sum, item) => sum + (item.price ?? item.basePrice ?? 0), 0);
+  return {
+    id: 'mock-bundle-warden',
+    name: 'Warden Launch',
+    art: { wide: null, tall: null, logo: null },
+    items,
+    baseTotal,
+    price,
+    discountPercent: Math.round((1 - price / baseTotal) * 100),
+    // A SHORTER window than the main bundle, which is what the live payload does — and it is the
+    // reason the page prints each bundle's own countdown rather than one shared figure.
+    endsAt: Date.now() + (2 * 24 * 3600_000),
+    endsInSeconds: 2 * 24 * 3600,
     contentUnavailable: false
   };
 }
@@ -95,7 +122,7 @@ function freshStore(accountName) {
         seen: index > 1
       }))
     },
-    bundle: bundleFixture(),
+    bundles: [bundleFixture(), promoBundleFixture()],
     profile: null
   };
 }
@@ -114,7 +141,7 @@ function makeReadyAccount(spec) {
       accountName: spec.accountName,
       offers: OFFERS.map((offer) => ({ ...offer })),
       expiresIn: 52_337,
-      bundle: bundleFixture(),
+      bundles: [bundleFixture(), promoBundleFixture()],
       profile: {
         level: spec.level,
         rank: spec.rank,
