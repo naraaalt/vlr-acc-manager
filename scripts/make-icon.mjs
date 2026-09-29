@@ -136,39 +136,71 @@ function toPNG(rgba, size) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// ICO writer: embeds PNG-compressed entries (Vista+ supports PNG entries)
-function toICO(pngs) {
-  const count = pngs.length;
+// BMP (DIB) entry: BITMAPINFOHEADER + 32-bit BGRA rows (bottom-up) + the 1bpp AND mask.
+function toBMP(rgba, size) {
+  const header = Buffer.alloc(40);
+  header.writeUInt32LE(40, 0);               // biSize
+  header.writeInt32LE(size, 4);              // biWidth
+  header.writeInt32LE(size * 2, 8);          // biHeight: XOR bitmap + AND mask
+  header.writeUInt16LE(1, 12);               // biPlanes
+  header.writeUInt16LE(32, 14);              // biBitCount
+  header.writeUInt32LE(0, 16);               // biCompression: BI_RGB
+  header.writeUInt32LE(size * size * 4, 20); // biSizeImage
+
+  const xor = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const src = ((size - 1 - y) * size + x) * 4; // rows are stored bottom-up
+      const dst = (y * size + x) * 4;
+      xor[dst] = rgba[src + 2];      // B
+      xor[dst + 1] = rgba[src + 1];  // G
+      xor[dst + 2] = rgba[src];      // R
+      xor[dst + 3] = rgba[src + 3];  // A
+    }
+  }
+
+  // AND mask: 1bpp, each row padded to 4 bytes. All zero — the alpha channel carries transparency.
+  const and = Buffer.alloc(Math.ceil(size / 32) * 4 * size, 0);
+  return Buffer.concat([header, xor, and]);
+}
+
+// ICO writer. PNG compression is ONLY valid for the 256px entry: Windows renders the smaller PNG
+// entries as the default icon, so the taskbar and Start menu showed Electron's mark while Task
+// Manager showed the gem — Task Manager reads a size that decodes, the shell reads one that does not.
+// Every size below 256 is therefore written as a BMP entry.
+function toICO(images) {
+  const count = images.length;
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); header.writeUInt16LE(1, 2); header.writeUInt16LE(count, 4);
-  const dirEntry = Buffer.alloc(16);
   const dirSize = 16 * count;
   let offset = 6 + dirSize;
   const entries = [];
-  const images = [];
-  for (const { size, png } of pngs) {
+  const blobs = [];
+  for (const { size, data } of images) {
+    const dirEntry = Buffer.alloc(16);
     dirEntry.writeUInt8(size >= 256 ? 0 : size, 0);
     dirEntry.writeUInt8(size >= 256 ? 0 : size, 1);
     dirEntry.writeUInt8(0, 2); dirEntry.writeUInt8(0, 3);
     dirEntry.writeUInt16LE(1, 4); dirEntry.writeUInt16LE(32, 6);
-    dirEntry.writeUInt32LE(png.length, 8);
+    dirEntry.writeUInt32LE(data.length, 8);
     dirEntry.writeUInt32LE(offset, 12);
-    offset += png.length;
-    entries.push(Buffer.from(dirEntry));
-    images.push(png);
+    offset += data.length;
+    entries.push(dirEntry);
+    blobs.push(data);
   }
-  return Buffer.concat([header, ...entries, ...images]);
+  return Buffer.concat([header, ...entries, ...blobs]);
 }
 
 const sizes = [16, 24, 32, 48, 64, 128, 256];
-const pngs = sizes.map((size) => ({ size, png: toPNG(renderGem(size), size) }));
+const images = sizes.map((size) => {
+  const rgba = renderGem(size);
+  return { size, data: size >= 256 ? toPNG(rgba, size) : toBMP(rgba, size) };
+});
 
-writeFileSync(path.join(outDir, 'icon.ico'), toICO(pngs));
+writeFileSync(path.join(outDir, 'icon.ico'), toICO(images));
 // icon.png (256px, for electron-builder + BrowserWindow icon fallback)
-const p256 = pngs.find((p) => p.size === 256);
-writeFileSync(path.join(outDir, 'icon.png'), p256.png);
+writeFileSync(path.join(outDir, 'icon.png'), toPNG(renderGem(256), 256));
 // 512px marketing png
-const big = toPNG(renderGem(512), 512);
-writeFileSync(path.join(outDir, 'icon@512.png'), big);
+writeFileSync(path.join(outDir, 'icon@512.png'), toPNG(renderGem(512), 512));
 
 console.log('icons written:', sizes.join(', '), '+ icon.png + icon@512.png →', outDir);

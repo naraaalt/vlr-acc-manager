@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, powerMonitor } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerIpcHandlers } from './ipcHandlers.js';
@@ -16,6 +17,15 @@ let mainWindow = null;
 const LEGACY_USER_DATA_NAME = 'valorant-account-manager';
 app.setPath('userData', path.join(app.getPath('appData'), LEGACY_USER_DATA_NAME));
 
+// NO setAppUserModelId here, deliberately. Calling it was what made Windows label the taskbar button
+// "Electron" and draw Electron's default mark on it, while Search and Task Manager showed the gem —
+// those two read the .exe, the taskbar reads the window's identity, and an app-set id made the shell
+// fall back to Electron's own. Measured by removing the call and watching the button change from
+// "Electron - 1 running window" with Electron's icon to "Sapphire - 1 running window" with the gem.
+//
+// Nothing needs it: notifications are attributed by the process, which is Sapphire.exe. Do not add it
+// back to "fix" the toast label.
+
 // Single-instance lock. A second copy would load and re-save the same accounts index
 // concurrently — the EPERM-on-rename failure the error panel explains — and could drive the
 // Riot switcher at the same time as the first. MUST come AFTER the userData pin: the lock is
@@ -29,6 +39,18 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
+// The window icon has to be a REAL file on disk, not a path inside app.asar. Electron itself reads
+// asar paths fine, so the window gets the right icon either way — but the shell does not: Explorer
+// draws the taskbar button from that file, cannot see inside the archive, and falls back to Electron's
+// default mark. That is exactly what happened: Search and Task Manager showed the gem (they read the
+// .exe) while the taskbar showed the Electron logo. extraResources puts a copy at
+// resources/icon.ico, outside the archive, for the shell to read.
+function windowIconPath() {
+  const packaged = path.join(process.resourcesPath ?? '', 'icon.ico');
+  if (app.isPackaged && fs.existsSync(packaged)) return packaged;
+  return path.join(__dirname, '..', 'build', 'icon.ico');
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1280,
@@ -37,7 +59,7 @@ function createWindow() {
     minHeight: 700,
     backgroundColor: '#060B10',
     titleBarStyle: 'hidden',
-    icon: path.join(__dirname, '..', 'build', 'icon.ico'),
+    icon: windowIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -68,10 +90,6 @@ if (!isPrimaryInstance) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
-    // Windows attributes notifications to the AppUserModelId. Without this the toast is
-    // labelled "Electron" in dev and misses the app identity when packaged. Keep it equal
-    // to electron-builder's appId.
-    app.setAppUserModelId('com.naraaalt.valorantaccountmanager');
     registerIpcHandlers();
     mainWindow = createWindow();
 
