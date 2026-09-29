@@ -147,6 +147,10 @@ async function appRunningFrom(appRoot) {
 // Deliberately NOT applied to the scratch DIRECTORY shapes: those mtimes are set locally by NSIS
 // writing into them, with nothing copied in from elsewhere, so there is no foreign timestamp to
 // inherit. `fallback` covers filesystems that do not report a creation time.
+//
+// This is a no-op for a file written in place — our own downloader's `%TEMP%\sapphire-update\*.exe`
+// has birthtime and mtime a few milliseconds apart — so it changes nothing there and the choice only
+// matters for the copied shape above.
 function appearedAtMs(info) {
   if (!info) return 0;
   return Number(info.birthtimeMs) > 0 ? info.birthtimeMs : info.mtimeMs;

@@ -21,7 +21,7 @@ const OFFERS = [
 ];
 
 const RANKS = [
-  { label: 'Rifat', accountName: 'Rifat#1337', level: 187, rank: 'Ascendant 2', rr: 42 },
+  { label: 'Rune', accountName: 'Rune#1337', level: 187, rank: 'Ascendant 2', rr: 42 },
   { label: 'Zyrox', accountName: 'Zyrox#6942', level: 143, rank: 'Diamond 1', rr: 78 },
   { label: 'Kaze', accountName: 'Kaze#2718', level: 221, rank: 'Immortal 3', rr: 156 },
   { label: 'Lynx', accountName: 'Lynx#8080', level: 96, rank: 'Gold 3', rr: 12 },

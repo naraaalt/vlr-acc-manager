@@ -96,9 +96,11 @@ The `×` hides the notice for the session only and never skips the version, so t
 
 ### Where the space goes
 
-An installer leaves its own scratch behind: the payload it unpacks, the executable it moves aside when replacing one, and a copy of itself. Measured on one machine after four updates, that came to **2.1 GB** — and every update adds roughly another 900 MB.
+An installer leaves its own scratch behind: the payload it unpacks, the executable it moves aside when replacing one, and a copy of itself. Measured on one machine after four updates, that had accumulated to **2.1 GB**.
 
-Sapphire sweeps it on every launch. Nothing to run and nothing to configure; the first launch after installing this version reclaims whatever earlier updates left, and every launch after that keeps it at zero.
+An in-app update is the common case and adds about **300 MB** — the moved-aside executable (216 MB) plus the installer's own cached copy (96 MB). The larger shapes come from a full install and from the portable build, both of which unpack the whole payload; a machine that only ever updates in place does not see them.
+
+Sapphire sweeps all of it on every launch. Nothing to run and nothing to configure; the first launch after installing this version reclaims whatever earlier updates left, and every launch after that keeps it at zero.
 
 Two delays are deliberate. A directory is left alone for its first ten minutes, because an installer sitting on its "choose a folder" prompt is holding its scratch open and looks exactly like a leftover. A downloaded installer is left for an hour, because a failed install is retried from that file. Both are then collected on a later launch.
 

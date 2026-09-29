@@ -8,7 +8,7 @@ describe('classifyError', () => {
   });
 
   it('classifies the real EPERM file-lock failure', () => {
-    const real = "EPERM: operation not permitted, rename 'C:\\Users\\rifat\\AppData\\Roaming\\valorant-account-manager\\accounts\\index.vam.a1b2.tmp' -> 'C:\\Users\\rifat\\AppData\\Roaming\\valorant-account-manager\\accounts\\index.vam'";
+    const real = "EPERM: operation not permitted, rename 'C:\\Users\\user\\AppData\\Roaming\\valorant-account-manager\\accounts\\index.vam.a1b2.tmp' -> 'C:\\Users\\user\\AppData\\Roaming\\valorant-account-manager\\accounts\\index.vam'";
     expect(classifyError(real)).toBe('fs-error');
   });
 

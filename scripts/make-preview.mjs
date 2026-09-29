@@ -23,7 +23,10 @@ const NEXT_VERSION = APP_VERSION.replace(/(\d+)$/, (patch) => String(Number(patc
 const playVariants = readFileSync(path.join(root, 'scripts', 'play-variants.js'), 'utf8');
 
 const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
-const HOME = 'C:/Users/rifat/AppData/Roaming/valorant-account-manager/accounts';
+// A neutral placeholder, not a real user name: this string is interpolated into the EPERM fixture
+// below, which renders on screen, so a plausible Windows account name here would be published in the
+// README's screenshot and in the repo. `user` reads the same for what the fixture is demonstrating.
+const HOME = 'C:/Users/user/AppData/Roaming/valorant-account-manager/accounts';
 const VID = (uuid) => `https://valorant.dyn.riotcdn.net/x/videos/release-13.05/${uuid}_default_universal.mp4`;
 
 // Real showcase material pulled from valorant-api (levels + chroma swatches).
